@@ -12,3 +12,4 @@ matplotlib
 praat-parselmouth
 resemblyzer
 silero-vad
+soundfile
