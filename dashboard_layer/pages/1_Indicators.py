@@ -1,14 +1,17 @@
 import streamlit as st
 from pymongo import MongoClient
 import pandas as pd
+import plotly.graph_objects as go
 
 from utils.refresh_procedure import refresh_procedure
+from utils.SunburstAdapter import SunburstAdapter
 
 st.title("DSM-5 Indicators")
 
 client = MongoClient("mongodb://mongodb:27017")
 db = client["iotsensing"]
 collection = db["indicator_scores"]
+collection_metrics = db["analyzed_metrics"]
 
 if collection.count_documents({}) == 0:
     st.warning("No data available.")
@@ -111,6 +114,51 @@ if selected_user:
                         delta_color="inverse",  # Assuming higher is worse (depression indicators)
                         help=f"Original key: {indicator}"
                     )
+
+        st.divider()
+
+        # --- SUNBURST VISUALIZATION ---
+        st.subheader("Clinical Status Hierarchy")
+
+        # Get the latest Indicator Record
+        latest_ind_doc = collection.find_one(
+            {"user_id": selected_user},
+            sort=[("timestamp", -1)]
+        )
+
+        if latest_ind_doc:
+            # Get the corresponding Metric Records (matching timestamp)
+            timestamp = latest_ind_doc["timestamp"]
+
+            metric_cursor = collection_metrics.find({
+                "user_id": selected_user,
+                "timestamp": timestamp
+            })
+            metric_records = list(metric_cursor)
+
+            # Process with Adapter
+            try:
+                adapter = SunburstAdapter("/app/core/mapping/config.json")
+                plot_data = adapter.process(latest_ind_doc, metric_records)
+
+                # Render Chart
+                fig = go.Figure(go.Sunburst(
+                    ids=plot_data['ids'],
+                    labels=plot_data['labels'],
+                    parents=plot_data['parents'],
+                    values=plot_data['values'],
+                    marker=dict(colors=plot_data['colors']),
+                    branchvalues="total",
+                    hovertemplate='<b>%{label}</b><br>Impact: %{value:.2f}<extra></extra>'
+                ))
+
+                fig.update_layout(margin=dict(t=0, l=0, r=0, b=0), height=500)
+                st.plotly_chart(fig, use_container_width=True)
+
+            except FileNotFoundError:
+                st.error("Config file not found. Please check 'core/mapping/config.json' path.")
+            except Exception as e:
+                st.error(f"Error generating hierarchy: {e}")
 
         st.divider()
 
