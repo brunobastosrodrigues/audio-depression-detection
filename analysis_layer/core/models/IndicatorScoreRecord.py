@@ -9,6 +9,8 @@ class IndicatorScoreRecord:
     user_id: int
     timestamp: datetime
     indicator_scores: Dict[str, float]
+    mdd_signal: bool = False
+    binary_scores: Dict[str, int] = None
 
     def to_dict(self):
         ts = self.timestamp
@@ -18,10 +20,13 @@ class IndicatorScoreRecord:
         elif isinstance(ts, pd.Timestamp):
             ts = ts.to_pydatetime()
 
-        ts = ts.replace(tzinfo=None)
+        if ts is not None:
+            ts = ts.replace(tzinfo=None)
 
         return {
             "user_id": self.user_id,
-            "timestamp": self.timestamp,
+            "timestamp": ts,
             "indicator_scores": self.indicator_scores,
+            "mdd_signal": self.mdd_signal,
+            "binary_scores": self.binary_scores or {}
         }
