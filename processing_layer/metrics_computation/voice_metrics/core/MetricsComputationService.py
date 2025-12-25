@@ -28,6 +28,28 @@ from core.extractors.myprosody_extractors import MyprosodyMetrics
 class MetricsComputationService:
     def __init__(self):
         self.day_counter = 0
+        
+        # Initialize OpenSMILE extractors once at startup
+        print("Initializing OpenSMILE models... this may take a moment.")
+        
+        # 1. Low-level descriptors (LLD) using ComParE_2016
+        self.smile_LLD_ComParE_2016 = opensmile.Smile(
+            feature_set=opensmile.FeatureSet.ComParE_2016,
+            feature_level=opensmile.FeatureLevel.LowLevelDescriptors,
+        )
+        
+        # 2. Low-level descriptors (LLD) using GeMAPSv01b
+        self.smile_LLD_GeMAPSv01b = opensmile.Smile(
+            feature_set=opensmile.FeatureSet.eGeMAPSv02,
+            feature_level=opensmile.FeatureLevel.LowLevelDescriptors,
+        )
+        
+        # 3. High-level descriptors (HLD) using ComParE_2016
+        self.smile_HLD_ComParE_2016 = opensmile.Smile(
+            feature_set=opensmile.FeatureSet.ComParE_2016,
+            feature_level=opensmile.FeatureLevel.Functionals,
+        )
+        print("OpenSMILE models initialized.")
 
     def compute(self, audio_bytes, user_id, metadata: dict = None) -> list[dict]:
         metadata = metadata or {}
@@ -37,29 +59,17 @@ class MetricsComputationService:
         audio_np = np.clip(audio_np, -1.0, 1.0)
 
         # first, compute the low-level descriptors (LLD) using ComParE_2016
-        smile_LLD_ComParE_2016 = opensmile.Smile(
-            feature_set=opensmile.FeatureSet.ComParE_2016,
-            feature_level=opensmile.FeatureLevel.LowLevelDescriptors,
-        )
-        features_LLD_ComParE_2016 = smile_LLD_ComParE_2016.process_signal(
+        features_LLD_ComParE_2016 = self.smile_LLD_ComParE_2016.process_signal(
             audio_np, sample_rate
         )
 
         # second, compute the low-level descriptors (LLD) using GeMAPSv01b
-        smile_LLD_GeMAPSv01b = opensmile.Smile(
-            feature_set=opensmile.FeatureSet.eGeMAPSv02,
-            feature_level=opensmile.FeatureLevel.LowLevelDescriptors,
-        )
-        features_LLD_GeMAPSv01b = smile_LLD_GeMAPSv01b.process_signal(
+        features_LLD_GeMAPSv01b = self.smile_LLD_GeMAPSv01b.process_signal(
             audio_np, sample_rate
         )
 
         # third, compute the high-level descriptors (HLD) using ComParE_2016
-        smile_HLD_ComParE_2016 = opensmile.Smile(
-            feature_set=opensmile.FeatureSet.ComParE_2016,
-            feature_level=opensmile.FeatureLevel.Functionals,
-        )
-        features_HLD = smile_HLD_ComParE_2016.process_signal(audio_np, sample_rate)
+        features_HLD = self.smile_HLD_ComParE_2016.process_signal(audio_np, sample_rate)
 
         # ----------------------------
         # Extract features
@@ -123,9 +133,12 @@ class MetricsComputationService:
 
         flat_metrics.update(myprosody_metrics)
 
-        # utiliy funcation for simulating data ingestion timestamps
-        timestamp = datetime.now(timezone.utc) + timedelta(days=self.day_counter)
-        self.day_counter += 1
+        # Use real-time UTC timestamps for production
+        timestamp = datetime.now(timezone.utc)
+        
+        # Simulation logic (commented out):
+        # timestamp = datetime.now(timezone.utc) + timedelta(days=self.day_counter)
+        # self.day_counter += 1
 
         # Convert all metrics to a list of records with board/environment metadata
         metric_records = [

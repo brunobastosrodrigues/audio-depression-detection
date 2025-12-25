@@ -41,6 +41,10 @@ services:
       build:
          context: ./processing_layer/metrics_computation/voice_metrics
          dockerfile: Dockerfile
+      deploy:
+         resources:
+            limits:
+               memory: 2G
       volumes:
          - ./processing_layer/metrics_computation/voice_metrics:/app
       depends_on:
@@ -78,6 +82,10 @@ services:
       build:
          context: ./analysis_layer
          dockerfile: Dockerfile
+      deploy:
+         resources:
+            limits:
+               memory: 1G
       ports:
          - "8083:8083"
       depends_on:

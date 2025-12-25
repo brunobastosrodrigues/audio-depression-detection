@@ -1,10 +1,18 @@
 from ports.ConsumerPort import ConsumerPort
-
+import queue
+import threading
+import time
 
 class MqttConsumerAdapter(ConsumerPort):
     def __init__(self, mqtt_client):
         self.client = mqtt_client
         self.topic_handlers = {}
+        
+        # Threaded processing
+        self.message_queue = queue.Queue()
+        self.is_running = True
+        self.worker_thread = threading.Thread(target=self._worker, daemon=True)
+        self.worker_thread.start()
 
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
@@ -45,21 +53,44 @@ class MqttConsumerAdapter(ConsumerPort):
         return False
 
     def on_message(self, client, userdata, msg):
+        # Offload processing to the worker thread immediately
+        # This keeps the MQTT loop unblocked
+        self.message_queue.put((msg.topic, msg.payload))
+
+    def _worker(self):
+        """Background thread to process messages from the queue."""
+        print("Worker thread started.")
+        while self.is_running:
+            try:
+                # Get message with timeout to allow checking is_running
+                try:
+                    topic, payload = self.message_queue.get(timeout=1.0)
+                except queue.Empty:
+                    continue
+
+                self._process_message(topic, payload)
+                self.message_queue.task_done()
+                
+            except Exception as e:
+                print(f"Error in worker thread: {e}")
+
+    def _process_message(self, topic, payload):
+        """Actual message processing logic."""
         try:
             # Collect all matching handlers
             handlers = []
 
             # Try exact match first
-            if msg.topic in self.topic_handlers:
-                handlers.extend(self.topic_handlers[msg.topic])
+            if topic in self.topic_handlers:
+                handlers.extend(self.topic_handlers[topic])
 
             # Try wildcard matches
             for pattern, pattern_handlers in self.topic_handlers.items():
-                if pattern != msg.topic and self._topic_matches(pattern, msg.topic):
+                if pattern != topic and self._topic_matches(pattern, topic):
                     handlers.extend(pattern_handlers)
 
             if not handlers:
-                print(f"No handlers for topic: {msg.topic}")
+                print(f"No handlers for topic: {topic}")
                 return
 
             # Remove duplicates while preserving order
@@ -71,7 +102,7 @@ class MqttConsumerAdapter(ConsumerPort):
                     unique_handlers.append(h)
 
             for handler in unique_handlers:
-                handler(msg.topic, msg.payload)
+                handler(topic, payload)
         except Exception as e:
             print("Error processing message:", e)
 

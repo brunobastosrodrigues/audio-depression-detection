@@ -2,6 +2,13 @@ import streamlit as st
 from pymongo import MongoClient
 import pandas as pd
 from utils.refresh_procedure import refresh_procedure
+from utils.setup_db import setup_indexes
+
+# Initialize database indexes
+try:
+    setup_indexes()
+except Exception as e:
+    print(f"Index setup failed (expected if DB is not ready): {e}")
 
 st.title("IoT Sensing – Dashboard")
 

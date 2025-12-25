@@ -86,10 +86,106 @@ else:
             default=available_metrics,
         )
 
-        filtered_chart_data = chart_data[selected_metrics]
+        if selected_metrics:
+            # Prepare display dataframe (pivoted)
+            display_df = chart_data[selected_metrics].sort_index(ascending=False).reset_index()
+            
+            # Sanitize data: Replace Infinite values with NaN
+            display_df = display_df.replace([float('inf'), float('-inf')], None)
 
-        st.line_chart(filtered_chart_data)
+            # Clean column names for display (optional, but metric names usually technical)
+            clean_names = {col: col.replace("_", " ").title() for col in selected_metrics}
 
-        filtered_df = df[df["metric_name"].isin(selected_metrics)]
+            # --- LATEST STATUS ---
+            st.subheader("Latest Status")
+            if not display_df.empty:
+                latest_row = display_df.iloc[0]
+                prev_row = display_df.iloc[1] if len(display_df) > 1 else None
+                
+                cols_per_row = 4
+                metric_cols = st.columns(cols_per_row)
+                
+                for i, metric in enumerate(selected_metrics):
+                    col_index = i % cols_per_row
+                    if i > 0 and col_index == 0:
+                        metric_cols = st.columns(cols_per_row)
+                    
+                    current_val = latest_row[metric]
+                    
+                    if pd.isna(current_val):
+                        display_val = "N/A"
+                        delta_str = None
+                    else:
+                        display_val = f"{current_val:.2f}"
+                        if prev_row is not None and not pd.isna(prev_row[metric]):
+                            delta_val = current_val - prev_row[metric]
+                            delta_str = f"{delta_val:.2f}"
+                        else:
+                            delta_str = None
+                    
+                    with metric_cols[col_index]:
+                        st.metric(
+                            label=clean_names[metric],
+                            value=display_val,
+                            delta=delta_str,
+                            help=f"Metric: {metric}"
+                        )
 
-        st.dataframe(filtered_df.drop(columns=["_id"]))
+            st.divider()
+
+            # --- VISUALIZATION ---
+            st.subheader("Trends")
+            st.line_chart(display_df.set_index("timestamp")[selected_metrics])
+
+            # --- DETAILED DATA ---
+            st.subheader("Detailed Data")
+            
+            column_config = {
+                "timestamp": st.column_config.DatetimeColumn(
+                    "Timestamp",
+                    format="D MMM YYYY, HH:mm",
+                )
+            }
+
+            for metric in selected_metrics:
+                # Determine dynamic min/max for the progress bar
+                series_max = display_df[metric].max()
+                series_min = display_df[metric].min()
+                
+                if pd.isna(series_max):
+                    max_val = 1.0
+                    min_val = 0.0
+                else:
+                    max_val = float(series_max)
+                    min_val = float(series_min)
+                
+                # Add buffer
+                safe_max = max_val + (abs(max_val) * 0.1) if max_val != 0 else 1.0
+                safe_min = min_val - (abs(min_val) * 0.1)
+                
+                # Ensure min < max
+                if safe_min >= safe_max:
+                    safe_max = safe_min + 1.0
+
+                column_config[metric] = st.column_config.ProgressColumn(
+                    label=clean_names[metric],
+                    format="%.2f",
+                    min_value=safe_min,
+                    max_value=safe_max,
+                )
+
+            st.dataframe(
+                display_df,
+                column_config=column_config,
+                use_container_width=True,
+                hide_index=True
+            )
+
+            # --- STATISTICS ---
+            with st.expander("View Summary Statistics"):
+                stats_df = display_df[selected_metrics].describe().T
+                stats_df = stats_df[["mean", "std", "min", "max"]]
+                stats_df.index = [clean_names.get(idx, idx) for idx in stats_df.index]
+                st.dataframe(stats_df.style.format("{:.2f}"))
+        else:
+             st.info("Please select at least one metric to display.")

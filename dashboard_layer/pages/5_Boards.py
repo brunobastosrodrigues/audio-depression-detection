@@ -146,27 +146,80 @@ env_options = {e["name"]: e["environment_id"] for e in environments}
 
 if boards:
     board_data = []
+    
+    # Pre-fetch recent metrics to determine data flow status
+    # Check for metrics in the last 5 minutes
+    five_mins_ago = datetime.utcnow() # Note: logic needs timedelta, added below
+    from datetime import timedelta
+    five_mins_ago = datetime.utcnow() - timedelta(minutes=5)
+    
+    # We can't easily query per board in a loop efficiently if there are many, 
+    # but for typical IoT home setup (few boards) it's fine.
+    
     for b in boards:
-        status = "Active" if b.get("is_active") else "Inactive"
+        # Determine Connection Status
+        is_active = b.get("is_active", False)
+        status_val = "Active" if is_active else "Inactive"
+        
+        # Determine Data Flow Status
+        board_id = b.get("board_id")
+        has_recent_data = raw_metrics_collection.find_one({
+            "board_id": board_id,
+            "timestamp": {"$gte": five_mins_ago}
+        }) is not None
+        
+        data_status = "Streaming" if has_recent_data else "Idle"
+
         last_seen = b.get("last_seen")
         if last_seen:
             if isinstance(last_seen, datetime):
-                last_seen_str = last_seen.strftime("%Y-%m-%d %H:%M")
+                last_seen_str = last_seen
             else:
-                last_seen_str = str(last_seen)
+                try:
+                    last_seen_str = datetime.fromisoformat(str(last_seen))
+                except:
+                    last_seen_str = None
         else:
-            last_seen_str = "Never"
+            last_seen_str = None
 
         board_data.append({
-            "Status": status,
+            "board_id": board_id, # Hidden ID for reference
+            "Status": status_val,
+            "Data Stream": data_status,
             "Name": b.get("name", ""),
             "MAC Address": b.get("mac_address", ""),
             "Environment": env_lookup.get(b.get("environment_id", ""), "Unknown"),
-            "Port": b.get("port", 0) or "-",
             "Last Seen": last_seen_str,
         })
 
-    st.dataframe(pd.DataFrame(board_data), use_container_width=True)
+    df_boards = pd.DataFrame(board_data)
+
+    st.dataframe(
+        df_boards,
+        column_config={
+            "board_id": None, # Hide
+            "Status": st.column_config.TextColumn(
+                "Connection",
+                help="TCP Connection Status",
+                validate="^(Active|Inactive)$"
+            ),
+            "Data Stream": st.column_config.TextColumn(
+                "Data Stream",
+                help="Receiving data in last 5 mins",
+                validate="^(Streaming|Idle)$"
+            ),
+             "Last Seen": st.column_config.DatetimeColumn(
+                "Last Seen",
+                format="D MMM YYYY, HH:mm:ss",
+            ),
+        },
+        use_container_width=True,
+        hide_index=True
+    )
+    
+    # Legend / Help
+    st.caption("ℹ️ **Connection:** TCP connection to the server. **Data Stream:** Audio data successfully processed in the last 5 minutes.")
+
 else:
     st.info("No boards configured. Boards will auto-register when they connect, or add one manually below.")
 
