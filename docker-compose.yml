@@ -99,6 +99,8 @@ services:
          - "8084:8084"
       volumes:
          - ./analysis_layer/core:/app/core:ro
+         - ./datasets:/app/datasets:ro
+         - ./data_ingestion_layer:/app/data_ingestion_layer:ro
       depends_on:
          - mongodb
       environment:
