@@ -1,0 +1,14 @@
+numpy
+paho-mqtt
+soundfile
+pyaudio
+librosa
+torch
+torchaudio
+pandas
+resampy
+scipy
+matplotlib
+praat-parselmouth
+resemblyzer
+silero-vad
