@@ -3,23 +3,32 @@ from datetime import datetime, timedelta
 from pymongo import MongoClient
 from typing import List
 from core.models.IndicatorScoreRecord import IndicatorScoreRecord
-
+from core.mapping.ConfigManager import ConfigManager
+import os
 
 class BaselineManager:
     def __init__(self):
-        self.client = MongoClient("mongodb://mongodb:27017")
+        mongo_uri = os.getenv("MONGO_URI", "mongodb://mongodb:27017")
+        self.client = MongoClient(mongo_uri)
         self.db = self.client["iotsensing"]
         self.collection_baseline = self.db["baseline"]
         self.collection_indicator_scores = self.db["indicator_scores"]
+
+        self.config_manager = ConfigManager()
 
         self.population_baseline = self._load_json_file(
             "core/baseline/population_baseline.json"
         )
 
-        self.config = self._load_json_file("core/mapping/config.json")
+        # Load default config initially, but we should use config_manager.get_config(user_id) when needed
+        self.config = self.config_manager._default_config
         self.day_adder = 1
 
     def _load_json_file(self, path):
+        if not os.path.exists(path):
+             # Try relative to analysis_layer root
+             path = os.path.join("analysis_layer", path)
+
         with open(path, "r") as f:
             return json.load(f)
 
@@ -161,6 +170,8 @@ class BaselineManager:
             )
             return
 
+        # Use user-specific config
+        user_config = self.config_manager.get_config(user_id)
         baseline_adjustments = {}
 
         for indicator, actual_score in phq9_scores.items():
@@ -170,7 +181,11 @@ class BaselineManager:
 
             error = actual_score - predicted_score
 
-            for metric, props in self.config[indicator]["metrics"].items():
+            # Check if indicator exists in config
+            if indicator not in user_config:
+                continue
+
+            for metric, props in user_config[indicator]["metrics"].items():
                 direction = props["direction"]
                 weight = props["weight"]
 
