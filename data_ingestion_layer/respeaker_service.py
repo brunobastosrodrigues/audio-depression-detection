@@ -22,11 +22,18 @@ import time
 import uuid
 from typing import Dict, Optional
 from datetime import datetime
+import os
 
 from pymongo import MongoClient
 import paho.mqtt.client as mqtt
 from paho.mqtt.client import CallbackAPIVersion
 import numpy as np
+
+# Mocking for environments without MongoDB
+try:
+    from mongomock import MongoClient as MockMongoClient
+except ImportError:
+    MockMongoClient = None
 
 from framework.payloads.AudioPayload import AudioPayload
 from framework.audio_utils import encode_audio_to_base64
@@ -84,7 +91,14 @@ class ReSpeakerService:
         max_boards: int = MAX_BOARDS,
     ):
         # MongoDB connection
-        self.mongo = MongoClient(mongo_url)
+        if os.environ.get("MONGO_MOCK", "false").lower() == "true":
+            if MockMongoClient is None:
+                raise ImportError("mongomock is required for mock mode but not installed.")
+            print("Using Mock MongoDB (mongomock)")
+            self.mongo = MockMongoClient(mongo_url)
+        else:
+            self.mongo = MongoClient(mongo_url)
+
         self.db = self.mongo["iotsensing"]
         self.boards_collection = self.db["boards"]
         self.environments_collection = self.db["environments"]
