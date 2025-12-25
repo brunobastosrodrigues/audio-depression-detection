@@ -97,6 +97,8 @@ services:
          dockerfile: Dockerfile
       ports:
          - "8084:8084"
+      volumes:
+         - ./analysis_layer/core:/app/core:ro
       depends_on:
          - mongodb
       environment:
