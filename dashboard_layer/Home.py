@@ -46,15 +46,24 @@ client = MongoClient(MONGO_URI)
 db = client["iotsensing"]
 collection = db["raw_metrics"]
 
-if collection.count_documents({}) == 0:
-    st.warning("No data available.")
-    st.stop()
-
 
 @st.cache_data
 def load_users():
-    df = pd.DataFrame(collection.find())
-    return df["user_id"].unique()
+    users = set()
+    # Check multiple collections to ensure we find all users
+    for col_name in ["raw_metrics", "indicator_scores", "analyzed_metrics"]:
+        try:
+            users.update(db[col_name].distinct("user_id"))
+        except Exception:
+            pass
+    return sorted(list(users))
+
+
+users = load_users()
+
+if not users:
+    st.warning("No data available.")
+    st.stop()
 
 
 st.sidebar.title("Actions")
@@ -63,7 +72,7 @@ if st.sidebar.button("🔄 Refresh Analysis"):
     refresh_procedure()
 
 st.sidebar.subheader("Select User")
-selected_user = st.sidebar.selectbox("User", load_users(), key="user_id")
+selected_user = st.sidebar.selectbox("User", users, key="user_id")
 
 # THIS PART IS ABOUT DELETING USER DATA IN THE DATABASE
 # col1, col2 = st.columns(2)
