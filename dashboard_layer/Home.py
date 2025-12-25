@@ -40,7 +40,9 @@ st.image("assets/highlevel_data_pipeline.png", caption="High-level Data Pipeline
 
 st.divider()
 
-client = MongoClient("mongodb://mongodb:27017")
+import os
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://mongodb:27017")
+client = MongoClient(MONGO_URI)
 db = client["iotsensing"]
 collection = db["raw_metrics"]
 
