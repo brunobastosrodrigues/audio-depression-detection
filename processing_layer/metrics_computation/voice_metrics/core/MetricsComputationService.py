@@ -1,4 +1,5 @@
 import numpy as np
+import os
 from audio_utils import audio_bytes_to_nparray
 from datetime import datetime, timezone, timedelta
 import opensmile
@@ -27,7 +28,12 @@ from core.extractors.myprosody_extractors import MyprosodyMetrics
 
 class MetricsComputationService:
     def __init__(self):
+        # SAFETY GUARD: Only enable time simulation if explicitly configured
+        self.simulation_mode = os.getenv("SIMULATION_MODE", "false").lower() == "true"
         self.day_counter = 0
+
+        if self.simulation_mode:
+            print("⚠️ WARNING: SIMULATION MODE ENABLED. Timestamps will be artificial ⚠️")
         
         # Initialize OpenSMILE extractors once at startup
         print("Initializing OpenSMILE models... this may take a moment.")
@@ -133,12 +139,12 @@ class MetricsComputationService:
 
         flat_metrics.update(myprosody_metrics)
 
-        # Use real-time UTC timestamps for production
-        timestamp = datetime.now(timezone.utc)
-        
-        # Simulation logic (commented out):
-        # timestamp = datetime.now(timezone.utc) + timedelta(days=self.day_counter)
-        # self.day_counter += 1
+        # SAFETY GUARD: Use real-time unless simulation is forced
+        if self.simulation_mode:
+            timestamp = datetime.now(timezone.utc) + timedelta(days=self.day_counter)
+            self.day_counter += 1
+        else:
+            timestamp = datetime.now(timezone.utc)
 
         # Convert all metrics to a list of records with board/environment metadata
         metric_records = [

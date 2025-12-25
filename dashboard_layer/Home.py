@@ -10,7 +10,7 @@ try:
 except Exception as e:
     print(f"Index setup failed (expected if DB is not ready): {e}")
 
-st.title("IoT Sensing – Dashboard")
+st.title("IHearYou: Linking Acoustic Speech Features with Major Depressive Disorder Symptoms")
 
 st.markdown("### Abstract")
 st.write(
