@@ -36,6 +36,18 @@ class MongoPersistenceAdapter(PersistencePort):
             return doc["timestamp"]
         return None
 
+    def get_first_indicator_score_date(self, user_id: int) -> Optional[datetime]:
+        cursor = (
+            self.collection_indicator_scores.find({"user_id": user_id})
+            .sort("timestamp", 1)
+            .limit(1)
+        )
+        doc = next(cursor, None)
+
+        if doc:
+            return doc["timestamp"]
+        return None
+
     def get_latest_indicator_score_date(self, user_id: int) -> Optional[datetime]:
         cursor = (
             self.collection_indicator_scores.find({"user_id": user_id})

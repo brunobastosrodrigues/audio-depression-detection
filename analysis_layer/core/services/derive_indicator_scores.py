@@ -7,17 +7,29 @@ import math
 from collections import OrderedDict, defaultdict
 
 
+from core.mapping.ConfigManager import ConfigManager
+
 def derive_indicator_scores(
     user_id: int,
     records: List[AnalyzedMetricRecord],
     repository,
-    mapping_path: str = "core/mapping/config.json",
+    mapping_path: str = "core/mapping/config.json", # kept for backward compatibility if any
+    config_manager: ConfigManager = None
 ) -> List[IndicatorScoreRecord]:
     if not records:
         return []
 
-    with open(mapping_path, "r") as f:
-        mapping_config = json.load(f)
+    if config_manager:
+        mapping_config = config_manager.get_config(user_id)
+    else:
+        # Fallback to loading from file if no manager provided
+        # Or instantiate one? Instantiating one is safer.
+        try:
+             cm = ConfigManager()
+             mapping_config = cm.get_config(user_id)
+        except Exception:
+             with open(mapping_path, "r") as f:
+                mapping_config = json.load(f)
 
     records_by_date = defaultdict(list)
     for record in records:
@@ -46,8 +58,57 @@ def derive_indicator_scores(
         if indicator not in previous_smoothed_scores or previous_smoothed_scores[indicator] is None:
             previous_smoothed_scores[indicator] = 0.0
 
+    # Determine if user is in "Learning Mode" (7-14 days)
+    # We need to know when the user started.
+    # We can try to get the first record date from repository.
+    # If not available, we assume this is the first day or we can't determine.
+    # If the user has history, we check the duration.
+
+    first_record_date = None
+    if hasattr(repository, 'get_first_indicator_score_date'):
+        first_record_date = repository.get_first_indicator_score_date(user_id)
+
+    # If no history, this batch might contain the first day.
+    if not first_record_date and records:
+        # Assuming sorted by date, use the first one.
+        # Note: records_by_date is ordered.
+        first_record_date = list(records_by_date.keys())[0]
+
     # We iterate through the new records day by day
     for record_date, daily_records in records_by_date.items():
+        # Check if in learning period
+        learning_period_days = 14
+        in_learning_mode = False
+        if first_record_date:
+            # handle both datetime and string dates if necessary, usually strings in ISO
+            # assuming record_date is compatible type with first_record_date or converted
+            from datetime import datetime
+
+            # Simple helper to parse if string
+            def to_dt(d):
+                if isinstance(d, str):
+                    try:
+                        return datetime.fromisoformat(d)
+                    except ValueError:
+                         return None
+                return d
+
+            d_current = to_dt(record_date)
+            d_start = to_dt(first_record_date)
+
+            if d_current and d_start:
+                delta = d_current - d_start
+                if delta.days < learning_period_days:
+                    in_learning_mode = True
+        else:
+            # If we can't determine start date, and we are processing data,
+            # safe to assume we might be in learning mode if this is the very first batch?
+            # Or assume NOT in learning mode to avoid blocking indefinitely?
+            # Given the requirement "Do not attempt detection on Day 1", let's err on side of caution?
+            # But if first_record_date is None, it means no history. So this IS Day 1.
+            in_learning_mode = True
+
+
         analyzed_value = {r.metric_name: r.analyzed_value for r in daily_records}
 
         current_smoothed_scores = {}
@@ -134,6 +195,10 @@ def derive_indicator_scores(
                 b2 = val
 
         mdd_signal = (active_count >= 5) and (b1 == 1 or b2 == 1)
+
+        # In Learning Mode, we do not signal MDD.
+        if in_learning_mode:
+            mdd_signal = False
 
         all_scores.append(
             IndicatorScoreRecord(

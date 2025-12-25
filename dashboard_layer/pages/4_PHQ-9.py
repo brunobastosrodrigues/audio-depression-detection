@@ -91,14 +91,15 @@ if selected_user:
         }
 
         try:
+            # We are calling a new endpoint that handles both finetuning and calibration
             response = requests.post(
-                "http://analysis_layer:8083/finetune_baseline",
+                "http://analysis_layer:8083/submit_phq9",
                 json=entry,
             )
             if response.status_code == 200:
-                st.success("PHQ-9 submitted. Baseline recomputed.")
+                st.success("PHQ-9 submitted. Baseline recomputed and Personalized Calibration performed.")
             else:
-                st.warning(f"Baseline finetuning failed: {response.status_code}")
+                st.warning(f"Submission failed: {response.status_code} - {response.text}")
         except Exception as e:
             st.error(f"Request failed: {e}")
 

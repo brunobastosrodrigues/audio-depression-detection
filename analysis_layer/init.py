@@ -11,6 +11,7 @@ from adapters.inbound.RestFinetuneBaselineAdapter import (
 from adapters.inbound.RestListUsersAdapter import router as users_router
 from adapters.inbound.RestBoardsAdapter import create_service_boards
 from adapters.inbound.RestEnvironmentsAdapter import create_service_environments
+from adapters.inbound.RestCalibrationAdapter import create_service_calibration
 
 # Outbound adapters
 from adapters.outbound.MongoPersistenceAdapter import MongoPersistenceAdapter
@@ -19,6 +20,7 @@ from adapters.outbound.MongoPersistenceAdapter import MongoPersistenceAdapter
 from core.use_cases.AnalyzeMetricsUseCase import AnalyzeMetricsUseCase
 from core.use_cases.DeriveIndicatorScoresUseCase import DeriveIndicatorScoresUseCase
 from core.baseline.BaselineManager import BaselineManager
+from core.services.CalibrationService import CalibrationService
 
 
 # ---------------------------------------------------------
@@ -33,6 +35,7 @@ app = FastAPI()
 
 baseline_manager = BaselineManager()
 repository = MongoPersistenceAdapter()
+calibration_service = CalibrationService()
 
 analyze_metrics_use_case = AnalyzeMetricsUseCase(repository)
 derive_indicator_scores_use_case = DeriveIndicatorScoresUseCase(repository)
@@ -48,6 +51,7 @@ app_derive_indicator_scores = create_service_derive_indicator_scores(
     derive_indicator_scores_use_case
 )
 app_finetune_baseline = create_service_finetune_baseline(baseline_manager)
+app_calibration = create_service_calibration(calibration_service)
 app_boards = create_service_boards(repository)
 app_environments = create_service_environments(repository)
 
@@ -58,6 +62,7 @@ app_environments = create_service_environments(repository)
 app.include_router(app_analyze_metrics)
 app.include_router(app_derive_indicator_scores)
 app.include_router(app_finetune_baseline)
+app.include_router(app_calibration)
 app.include_router(users_router)
 app.include_router(app_boards)
 app.include_router(app_environments)
