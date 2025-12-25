@@ -1,0 +1,23 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies for audio processing and building native extensions
+RUN apt-get update && apt-get install -y \
+    libsndfile1 \
+    gcc \
+    portaudio19-dev \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install only the required dependencies for respeaker_service
+# (not the full requirements.txt which has pyaudio/webrtcvad)
+RUN pip install --no-cache-dir \
+    pymongo \
+    paho-mqtt \
+    numpy \
+    soundfile
+
+COPY . .
+
+CMD ["python", "respeaker_service.py"]

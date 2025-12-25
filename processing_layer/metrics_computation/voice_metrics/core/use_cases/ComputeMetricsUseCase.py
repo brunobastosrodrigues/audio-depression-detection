@@ -19,12 +19,19 @@ class ComputeMetricsUseCase:
                 )
                 writer.writeheader()
 
-    def execute(self, audio_bytes: bytes):
+    def execute(self, audio_bytes: bytes, metadata: dict = None):
+        metadata = metadata or {}
 
-        user_id = self.user_profiling.recognize_user(audio_bytes)
+        # Use user_id from metadata if provided, otherwise recognize from audio
+        if metadata.get("user_id"):
+            user_id = metadata["user_id"]
+        else:
+            user_id = self.user_profiling.recognize_user(audio_bytes)
 
         start = time.perf_counter()
-        metrics = self.metrics_computation_service.compute(audio_bytes, user_id)
+        metrics = self.metrics_computation_service.compute(
+            audio_bytes, user_id, metadata=metadata
+        )
         end = time.perf_counter()
         duration = end - start
 

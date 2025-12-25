@@ -24,6 +24,9 @@ mqtt_adapter = MqttConsumerAdapter(client)
 compute_metrics_handler = ComputeMetricsHandler(comput_metrics_use_case)
 
 # register the handlers at the MQTTAdapter
+# Subscribe to wildcard topic for all boards: voice/{user_id}/{board_id}/{environment}
+mqtt_adapter.register_handler("voice/#", compute_metrics_handler)
+# Backward compatibility: also listen to legacy topic
 mqtt_adapter.register_handler("voice/mic1", compute_metrics_handler)
 
 

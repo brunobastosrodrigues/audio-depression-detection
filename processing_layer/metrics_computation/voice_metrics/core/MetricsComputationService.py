@@ -29,7 +29,8 @@ class MetricsComputationService:
     def __init__(self):
         self.day_counter = 0
 
-    def compute(self, audio_bytes, user_id) -> list[dict]:
+    def compute(self, audio_bytes, user_id, metadata: dict = None) -> list[dict]:
+        metadata = metadata or {}
 
         # Convert audio data into correct format
         audio_np, sample_rate = audio_bytes_to_nparray(audio_bytes)
@@ -126,7 +127,7 @@ class MetricsComputationService:
         timestamp = datetime.now(timezone.utc) + timedelta(days=self.day_counter)
         self.day_counter += 1
 
-        # Convert all metrics to a list of records
+        # Convert all metrics to a list of records with board/environment metadata
         metric_records = [
             {
                 "user_id": user_id,
@@ -134,6 +135,9 @@ class MetricsComputationService:
                 "metric_name": key,
                 "metric_value": value,
                 "origin": "metrics_computation",
+                "board_id": metadata.get("board_id"),
+                "environment_id": metadata.get("environment_id"),
+                "environment_name": metadata.get("environment_name"),
             }
             for key, value in flat_metrics.items()
         ]
