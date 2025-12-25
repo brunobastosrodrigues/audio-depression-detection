@@ -23,33 +23,95 @@ class BaselineManager:
         with open(path, "r") as f:
             return json.load(f)
 
+    def _get_context_key(self, timestamp_dt):
+        """
+        Map a timestamp to a context partition key.
+
+        Context keys:
+        - 'morning': 06:00 to 11:59
+        - 'evening': 18:00 to 23:59
+        - 'general': all other times or when timestamp is unavailable
+
+        Args:
+            timestamp_dt: A datetime object or ISO format string
+
+        Returns:
+            str: One of 'morning', 'evening', or 'general'
+        """
+        if not timestamp_dt:
+            return "general"
+
+        # Ensure we have a datetime object
+        if isinstance(timestamp_dt, str):
+            try:
+                timestamp_dt = datetime.fromisoformat(str(timestamp_dt))
+            except ValueError:
+                return "general"
+
+        hour = timestamp_dt.hour
+        if 6 <= hour < 12:
+            return "morning"
+        elif 18 <= hour <= 23:
+            return "evening"
+        else:
+            return "general"
+
     def get_population_baseline(self, metric_name=None):
         if metric_name:
             return self.population_baseline.get(metric_name)
         return self.population_baseline
 
-    def get_user_baseline(self, user_id, metric_name=None):
+    def get_user_baseline(self, user_id, metric_name=None, timestamp=None):
+        """
+        Retrieves baseline for a user.
 
+        If 'timestamp' is provided, attempts to fetch the time-specific baseline
+        (morning/evening) based on circadian context. Falls back to 'general' if
+        the time-specific partition is unavailable or empty.
+
+        Args:
+            user_id: The user's ID
+            metric_name: Optional specific metric to retrieve
+            timestamp: Optional timestamp for context-aware retrieval
+
+        Returns:
+            dict or metric value: The baseline metrics or a specific metric value
+        """
         latest_doc = self.collection_baseline.find_one(
             {"user_id": user_id}, sort=[("timestamp", -1)]
         )
 
         if not latest_doc:
-
+            # Cold start: Return population baseline
             if metric_name:
                 return self.get_population_baseline(metric_name)
             return self.population_baseline
 
-        user_baseline = latest_doc["metrics"]
+        # --- Handle Schema V1 (Legacy) ---
+        if latest_doc.get("schema_version", 1) < 2:
+            user_metrics = latest_doc.get("metrics", {})
 
+        # --- Handle Schema V2 (Context-Aware) ---
+        else:
+            partitions = latest_doc.get("context_partitions", {})
+            target_context = self._get_context_key(timestamp)
+
+            # Try target context, then fallback to general
+            context_data = partitions.get(target_context, {}).get("metrics", {})
+            if not context_data:
+                context_data = partitions.get("general", {}).get("metrics", {})
+
+            user_metrics = context_data
+
+        # --- Return logic ---
         if metric_name:
-            return user_baseline.get(
+            return user_metrics.get(
                 metric_name, self.get_population_baseline(metric_name)
             )
 
         # Merge user baselines with any missing population baselines
         merged = self.get_population_baseline().copy()
-        merged.update(user_baseline)
+        merged.update(user_metrics)
         return merged
 
     def get_indicator_scores(self, user_id: int) -> IndicatorScoreRecord:
@@ -71,7 +133,21 @@ class BaselineManager:
     def finetune_baseline(
         self, user_id, phq9_scores, total_score, functional_impact, timestamp
     ):
-        old_baseline = self.get_user_baseline(user_id)
+        """
+        Fine-tune the baseline for a user based on PHQ-9 feedback.
+
+        Updates both the context-specific partition (morning/evening) and the
+        general partition in V2 schema format.
+
+        Args:
+            user_id: The user's ID
+            phq9_scores: Dictionary of PHQ-9 indicator scores
+            total_score: Total PHQ-9 score
+            functional_impact: Functional impact rating
+            timestamp: Timestamp of the assessment
+        """
+        # Get baseline for the specific context
+        old_baseline = self.get_user_baseline(user_id, timestamp=timestamp)
         user_indicator_score_record = self.get_indicator_scores(user_id)
         user_indicator_scores = (
             user_indicator_score_record.indicator_scores
@@ -141,10 +217,51 @@ class BaselineManager:
         complete_baseline = old_baseline.copy()
         complete_baseline.update(updated_baselines)
 
+        # Determine context key for this timestamp
+        context_key = self._get_context_key(timestamp)
+
+        # Get existing document to preserve other partitions
+        existing_doc = self.collection_baseline.find_one(
+            {"user_id": user_id}, sort=[("timestamp", -1)]
+        )
+
+        # Build context partitions
+        if existing_doc and existing_doc.get("schema_version", 1) >= 2:
+            # Preserve existing partitions
+            partitions = existing_doc.get("context_partitions", {}).copy()
+        else:
+            # Initialize new partitions structure
+            partitions = {
+                "general": {
+                    "description": "Fallback baseline derived from all data",
+                    "metrics": {}
+                },
+                "morning": {
+                    "description": "06:00 to 12:00",
+                    "metrics": {}
+                },
+                "evening": {
+                    "description": "18:00 to 24:00",
+                    "metrics": {}
+                }
+            }
+
+        # Update the target context partition
+        if context_key not in partitions:
+            partitions[context_key] = {"metrics": {}}
+        partitions[context_key]["metrics"] = complete_baseline
+
+        # Also update general partition with the merged data
+        general_metrics = partitions.get("general", {}).get("metrics", {}).copy()
+        general_metrics.update(updated_baselines)
+        partitions["general"]["metrics"] = general_metrics
+
+        # Build V2 document
         updated_doc = {
             "user_id": user_id,
             "timestamp": timestamp,
-            "metrics": complete_baseline,
+            "schema_version": 2,
+            "context_partitions": partitions,
         }
 
         self.collection_baseline.replace_one(
@@ -153,4 +270,4 @@ class BaselineManager:
             upsert=True,
         )
 
-        print(f"Finetuned baseline for user {user_id}")
+        print(f"Finetuned baseline for user {user_id} (context: {context_key})")

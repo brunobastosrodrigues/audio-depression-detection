@@ -24,12 +24,16 @@ def analyze_metrics(
         }
     )
 
-    user_baseline = baseline_manager.get_user_baseline(user_id)
-
     z_scores = []
     for _, row in df.iterrows():
         metric = row["metric_name"]
         value = row["contextual_value"]
+        record_timestamp = row["timestamp"]
+
+        # Fetch baseline specific to this record's timestamp for context-aware retrieval
+        user_baseline = baseline_manager.get_user_baseline(
+            user_id, timestamp=record_timestamp
+        )
 
         if metric in user_baseline:
             mean = user_baseline[metric]["mean"]
