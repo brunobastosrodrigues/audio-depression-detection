@@ -18,7 +18,7 @@ class SunburstAdapter:
             metric_records: List of dicts or objects containing 'metric_name' and 'analyzed_value' (Z-scores)
 
         Returns:
-            Dict containing 'ids', 'labels', 'parents', 'values', 'colors' for Plotly.
+            Dict containing 'ids', 'labels', 'parents', 'values', 'colors', 'customdata' for Plotly.
         """
 
         # --- 1. Pre-process Inputs ---
@@ -63,8 +63,11 @@ class SunburstAdapter:
         ids = ["root"]
         labels = [center_label]
         parents = [""]
-        values = [0] # Root value is usually ignored or sum of children
+        values = [0.0] # Placeholder for root value
         colors = [center_color]
+        customdata = [0.0] # Custom data for root
+
+        total_root_value = 0.0
 
         # Iterate through DSM-5 Indicators (Inner Ring)
         for ind_key, ind_details in self.mapping_config.items():
@@ -82,46 +85,74 @@ class SunburstAdapter:
             ind_score = indicators.get(ind_key, 0)
             if ind_score is None: ind_score = 0
 
+            # Determine Parent Value (Indicator Size)
+            # Ensure it has some size even if 0 so it appears in the chart
+            parent_value = max(ind_score, 0.5)
+            total_root_value += parent_value
+
             # ID Strategy: root -> indicator
             node_id = f"root - {ind_key}"
 
             ids.append(node_id)
             labels.append(f"{clean_name}<br>({ind_score:.1f})")
             parents.append("root")
-            values.append(max(ind_score, 0.5)) # Ensure it has some size even if 0
+            values.append(parent_value)
+            customdata.append(ind_score) # Real score for hover
 
             # Color logic: Orange if active, Light Grey if inactive
             colors.append("#FF851B" if ind_score >= THRESHOLD else "#DDDDDD")
 
-            # Iterate through Acoustic Features (Outer Ring)
-            # These are the children of the Indicator
+            # Collect Children (Metrics)
+            children_data = []
             metrics = ind_details.get('metrics', {})
-            for metric_name, props in metrics.items():
 
+            for metric_name, props in metrics.items():
                 weight = props['weight']
                 if weight == 0: continue
 
                 z_score = metric_lookup.get(metric_name, 0)
                 if z_score is None: z_score = 0
 
-                # Outer Ring Node
-                child_id = f"{node_id} - {metric_name}"
-
-                ids.append(child_id)
-                labels.append(f"{metric_name}<br>z: {z_score:.1f}")
-                parents.append(node_id)
-
-                # Visual sizing: Use absolute Z-score to show "impact"
-                size = abs(z_score) if abs(z_score) > 0.1 else 0.1
-                values.append(size)
+                # Calculate raw size (absolute z-score)
+                raw_size = abs(z_score) if abs(z_score) > 0.1 else 0.1
 
                 # Color logic: Red for high contribution, Grey for normal
-                colors.append("#FF4136" if abs(z_score) > 2.0 else "#AAAAAA")
+                child_color = "#FF4136" if abs(z_score) > 2.0 else "#AAAAAA"
+
+                children_data.append({
+                    'id': f"{node_id} - {metric_name}",
+                    'label': f"{metric_name}", # Simplified label, value in hover
+                    'raw_size': raw_size,
+                    'z_score': z_score,
+                    'color': child_color
+                })
+
+            # Normalize children values to sum exactly to parent_value
+            children_sum = sum(c['raw_size'] for c in children_data)
+
+            if children_sum > 0:
+                factor = parent_value / children_sum
+            else:
+                # If no children or all zero (shouldn't happen with 0.1 min),
+                # we just don't append children or factor is 0
+                factor = 0
+
+            for child in children_data:
+                ids.append(child['id'])
+                labels.append(child['label'])
+                parents.append(node_id)
+                values.append(child['raw_size'] * factor) # Normalized value
+                colors.append(child['color'])
+                customdata.append(child['z_score']) # Real z-score for hover
+
+        # Update Root Value
+        values[0] = total_root_value if total_root_value > 0 else 1.0
 
         return {
             "ids": ids,
             "labels": labels,
             "parents": parents,
             "values": values,
-            "colors": colors
+            "colors": colors,
+            "customdata": customdata
         }
