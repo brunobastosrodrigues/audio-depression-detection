@@ -35,7 +35,13 @@ if selected_user:
         for doc in baseline_docs:
             timestamp = pd.to_datetime(doc["timestamp"])
             user_id = doc["user_id"]
-            for metric_name, values in doc["metrics"].items():
+
+            if doc.get("schema_version", 1) >= 2:
+                metrics = doc.get("context_partitions", {}).get("general", {}).get("metrics", {})
+            else:
+                metrics = doc.get("metrics", {})
+
+            for metric_name, values in metrics.items():
                 records.append(
                     {
                         "user_id": user_id,
