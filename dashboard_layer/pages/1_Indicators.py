@@ -140,7 +140,22 @@ if selected_user:
 
             # Process with Adapter
             try:
-                adapter = SunburstAdapter("/app/core/mapping/config.json")
+                # Resolve Config Path
+                import os
+                config_path = "/app/core/mapping/config.json"
+                if not os.path.exists(config_path):
+                     # Fallback for local testing or different structure
+                     potential_paths = [
+                         "../analysis_layer/core/mapping/config.json",
+                         "analysis_layer/core/mapping/config.json",
+                         "core/mapping/config.json"
+                     ]
+                     for p in potential_paths:
+                         if os.path.exists(p):
+                             config_path = p
+                             break
+
+                adapter = SunburstAdapter(config_path)
                 plot_data = adapter.process(latest_ind_doc, metric_records)
 
                 # Render Chart
@@ -150,15 +165,16 @@ if selected_user:
                     parents=plot_data['parents'],
                     values=plot_data['values'],
                     marker=dict(colors=plot_data['colors']),
+                    customdata=plot_data['customdata'],
                     branchvalues="total",
-                    hovertemplate='<b>%{label}</b><br>Impact: %{value:.2f}<extra></extra>'
+                    hovertemplate='<b>%{label}</b><br>Impact: %{customdata:.2f}<extra></extra>'
                 ))
 
                 fig.update_layout(margin=dict(t=0, l=0, r=0, b=0), height=500)
                 st.plotly_chart(fig, use_container_width=True)
 
             except FileNotFoundError:
-                st.error("Config file not found. Please check 'core/mapping/config.json' path.")
+                st.error(f"Config file not found. Please check '{config_path}' path.")
             except Exception as e:
                 st.error(f"Error generating hierarchy: {e}")
 
