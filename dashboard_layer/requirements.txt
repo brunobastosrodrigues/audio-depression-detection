@@ -3,3 +3,9 @@ pymongo
 pandas
 matplotlib
 plotly
+soundfile
+librosa
+torch
+paho-mqtt
+numpy
+scipy
