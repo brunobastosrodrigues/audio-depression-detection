@@ -5,6 +5,34 @@ from utils.refresh_procedure import refresh_procedure
 
 st.title("IoT Sensing – Dashboard")
 
+st.markdown("### Abstract")
+st.write(
+    """
+    This master’s thesis introduces a novel approach for automated mental health monitoring. 
+    Particularly designed around an acoustic-based approach for depression detection, designed 
+    specifically as a software application for IoT-enabled private households. Using passive 
+    sensing techniques, the system focuses on the detection of potential depressive behavior 
+    to allow timely intervention. By constructing a direct mapping between behavioral patterns 
+    and observable clinical symptoms, users can gain insight into their mental health state, 
+    helping to overcome the limitations of traditional methods.
+    """
+)
+st.image("assets/conceptual_idea.png", caption="Conceptual project idea.")
+
+st.markdown("### Data Pipeline Overview")
+st.write(
+    """
+    The proposed System Architecture is a platform-based architectural design that supports 
+    modular development along a pre-defined data processing pipeline. The architecture 
+    promotes reusability, encapsulation of complexity, and independent integration of 
+    components. This strategy is particularly suited for multimodal, explainable health 
+    assessments in IoT sensing environments.
+    """
+)
+st.image("assets/highlevel_data_pipeline.png", caption="High-level Data Pipeline.")
+
+st.divider()
+
 client = MongoClient("mongodb://mongodb:27017")
 db = client["iotsensing"]
 collection = db["raw_metrics"]
