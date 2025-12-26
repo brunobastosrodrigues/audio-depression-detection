@@ -14,6 +14,8 @@ class AudioPayload:
     environment_id: Optional[str] = None
     environment_name: Optional[str] = None
     quality_metrics: Optional[Dict[str, Any]] = None
+    # System mode for database routing: "live", "dataset", or "demo"
+    system_mode: Optional[Literal["live", "dataset", "demo"]] = None
 
     def to_dict(self):
         result = {
@@ -33,4 +35,6 @@ class AudioPayload:
             result["environment_name"] = self.environment_name
         if self.quality_metrics is not None:
             result["quality_metrics"] = self.quality_metrics
+        if self.system_mode is not None:
+            result["system_mode"] = self.system_mode
         return result

@@ -31,12 +31,14 @@ def derive_indicator_scores(
              with open(mapping_path, "r") as f:
                 mapping_config = json.load(f)
 
-    records_by_date = defaultdict(list)
+    # Group records by (date, system_mode) to keep data isolated
+    records_by_date_mode = defaultdict(list)
     for record in records:
         record_date = record.timestamp
-        records_by_date[record_date].append(record)
-    records_by_date = OrderedDict(
-        sorted(records_by_date.items(), key=lambda item: item[0])
+        system_mode = getattr(record, 'system_mode', None) or 'live'
+        records_by_date_mode[(record_date, system_mode)].append(record)
+    records_by_date_mode = OrderedDict(
+        sorted(records_by_date_mode.items(), key=lambda item: item[0])
     )
 
     all_scores = []
@@ -80,8 +82,8 @@ def derive_indicator_scores(
     EMA_WINDOW_DAYS = 14
     DEFAULT_ALPHA = 1.0 - (2.0 / (EMA_WINDOW_DAYS + 1.0))
 
-    # We iterate through the new records day by day
-    for record_date, daily_records in records_by_date.items():
+    # We iterate through the new records day by day, grouped by system_mode
+    for (record_date, system_mode), daily_records in records_by_date_mode.items():
         # Check if in learning period
         learning_period_days = 14
         in_learning_mode = False
@@ -212,7 +214,8 @@ def derive_indicator_scores(
                 timestamp=record_date,
                 indicator_scores=current_smoothed_scores,
                 mdd_signal=mdd_signal,
-                binary_scores=binary_scores
+                binary_scores=binary_scores,
+                system_mode=system_mode,
             )
         )
 

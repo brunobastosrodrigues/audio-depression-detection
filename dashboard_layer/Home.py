@@ -4,12 +4,12 @@ Provides project overview and quick status card.
 """
 
 import streamlit as st
-from pymongo import MongoClient
 import pandas as pd
 import os
 
 from utils.refresh_procedure import refresh_procedure
 from utils.setup_db import setup_indexes
+from utils.database import get_database, render_mode_selector, render_mode_badge
 
 # Initialize database indexes
 try:
@@ -24,12 +24,9 @@ st.set_page_config(
 )
 
 # --- DATABASE CONNECTION ---
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://mongodb:27017")
-client = MongoClient(MONGO_URI)
-db = client["iotsensing"]
+db = get_database()
 
 
-@st.cache_data
 def load_users():
     users = set()
     for col_name in ["raw_metrics", "indicator_scores", "analyzed_metrics"]:
@@ -41,6 +38,9 @@ def load_users():
 
 
 # --- SIDEBAR ---
+# Mode selector at top of sidebar
+render_mode_selector()
+
 st.sidebar.title("Actions")
 
 if st.sidebar.button("🔄 Refresh Analysis"):

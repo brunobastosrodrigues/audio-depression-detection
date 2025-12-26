@@ -12,7 +12,8 @@ import numpy as np
 import wave
 import io
 from datetime import datetime
-from pymongo import MongoClient
+
+from utils.database import get_database, render_mode_selector
 
 st.set_page_config(page_title="Voice Calibration", page_icon="🎤", layout="wide")
 
@@ -43,9 +44,7 @@ except ImportError:
     WEBRTC_AVAILABLE = False
 
 # --- DATABASE CONNECTION ---
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://mongodb:27017")
-client = MongoClient(MONGO_URI)
-db = client["iotsensing"]
+db = get_database()
 collection = db["user_config"]
 
 # --- READING PROMPTS ---
@@ -117,6 +116,8 @@ if service is None:
     st.stop()
 
 # --- SIDEBAR ---
+render_mode_selector()
+
 st.sidebar.title("Actions")
 st.sidebar.subheader("User ID")
 

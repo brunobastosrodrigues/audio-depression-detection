@@ -1,27 +1,46 @@
 from pymongo import MongoClient
 from ports.PersistencePort import PersistencePort
+from collections import defaultdict
 import numbers
+
+
+# Database routing map based on system_mode
+DB_MAP = {
+    "live": "iotsensing_live",
+    "dataset": "iotsensing_dataset",
+    "demo": "iotsensing_demo",
+    None: "iotsensing_live",  # Default fallback
+}
 
 
 class MongoPersistenceAdapter(PersistencePort):
     def __init__(
         self,
         mongo_url="mongodb://mongodb:27017",
-        db_name="iotsensing",
+        db_name="iotsensing_live",  # Default to live database
         collection_name="raw_metrics",
     ):
         self.client = MongoClient(mongo_url)
         self.db = self.client[db_name]
         self.collection = self.db[collection_name]
+        self.collection_name = collection_name
+
+    def _get_db(self, system_mode: str = None):
+        """Get database based on system_mode for routing."""
+        db_name = DB_MAP.get(system_mode, "iotsensing_live")
+        return self.client[db_name]
 
     def save_metrics(self, metrics: list[dict]) -> None:
         if not metrics:
             print("No metrics to save.")
             return
 
-        cleaned_metrics = []
+        # Group metrics by system_mode for database routing
+        metrics_by_mode = defaultdict(list)
+
         for m in metrics:
             value = m.get("metric_value")
+            system_mode = m.pop("system_mode", None)  # Extract and remove system_mode
 
             try:
                 numeric_value = float(value)
@@ -31,16 +50,26 @@ class MongoPersistenceAdapter(PersistencePort):
                     or numeric_value in [float("inf"), float("-inf")]
                 ):
                     m["metric_value"] = numeric_value
-                    cleaned_metrics.append(m)
+                    metrics_by_mode[system_mode].append(m)
                 else:
                     print(f"Skipped invalid (NaN/inf) metric: {m}")
 
             except (TypeError, ValueError):
                 print(f"Skipped non-numeric or malformed metric: {m}")
 
-        if not cleaned_metrics:
+        if not any(metrics_by_mode.values()):
             print("No valid numeric metrics to save.")
             return
 
-        result = self.collection.insert_many(cleaned_metrics)
-        print(f"Saved {len(result.inserted_ids)} metric records to DB.")
+        # Save to appropriate database for each system_mode
+        total_saved = 0
+        for system_mode, mode_metrics in metrics_by_mode.items():
+            if mode_metrics:
+                db = self._get_db(system_mode)
+                collection = db[self.collection_name]
+                result = collection.insert_many(mode_metrics)
+                db_name = DB_MAP.get(system_mode, "iotsensing_live")
+                print(f"Saved {len(result.inserted_ids)} metrics to {db_name}.{self.collection_name}")
+                total_saved += len(result.inserted_ids)
+
+        print(f"Total: {total_saved} metric records saved.")

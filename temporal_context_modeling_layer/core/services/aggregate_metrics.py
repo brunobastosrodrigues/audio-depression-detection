@@ -14,14 +14,16 @@ def aggregate_metrics(records: List[RawMetricRecord]) -> List[AggregatedMetricRe
             "timestamp": [r.timestamp for r in records],
             "metric_name": [r.metric_name for r in records],
             "metric_value": [r.metric_value for r in records],
+            "system_mode": [r.system_mode for r in records],
         }
     )
 
     df["metric_value"] = pd.to_numeric(df["metric_value"], errors="coerce")
     df = df.dropna(subset=["metric_value"])
 
+    # Group by system_mode as well to keep data separate
     grouped = (
-        df.groupby(["user_id", "timestamp", "metric_name"])["metric_value"]
+        df.groupby(["user_id", "timestamp", "metric_name", "system_mode"])["metric_value"]
         .mean()
         .reset_index()
     )
@@ -32,6 +34,7 @@ def aggregate_metrics(records: List[RawMetricRecord]) -> List[AggregatedMetricRe
             timestamp=row["timestamp"],
             metric_name=row["metric_name"],
             aggregated_value=row["metric_value"],
+            system_mode=row["system_mode"],
         )
         for _, row in grouped.iterrows()
     ]

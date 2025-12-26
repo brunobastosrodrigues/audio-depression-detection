@@ -21,6 +21,7 @@ def analyze_metrics(
             "metric_name": [r.metric_name for r in records],
             "contextual_value": [r.contextual_value for r in records],
             "metric_dev": [r.metric_dev for r in records],
+            "system_mode": [getattr(r, 'system_mode', None) or 'live' for r in records],
         }
     )
 
@@ -99,6 +100,7 @@ def analyze_metrics(
             timestamp=row["timestamp"],
             metric_name=row["metric_name"],
             analyzed_value=row["analyzed_value"],
+            system_mode=row["system_mode"],
         )
         for _, row in df.iterrows()
     ]

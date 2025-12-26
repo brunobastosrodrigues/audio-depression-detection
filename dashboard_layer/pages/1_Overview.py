@@ -4,7 +4,6 @@ Provides a simple, non-technical summary of mental health status.
 """
 
 import streamlit as st
-from pymongo import MongoClient
 import pandas as pd
 from datetime import datetime, timedelta
 import os
@@ -18,6 +17,7 @@ from utils.theme import (
     apply_custom_css,
 )
 from utils.DSM5Descriptions import DSM5Descriptions
+from utils.database import get_database, render_mode_selector
 
 st.set_page_config(page_title="Overview", page_icon="🏠", layout="wide")
 
@@ -26,14 +26,11 @@ apply_custom_css()
 st.title("Your Wellness Overview")
 
 # --- DATABASE CONNECTION ---
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://mongodb:27017")
-client = MongoClient(MONGO_URI)
-db = client["iotsensing"]
+db = get_database()
 collection_indicators = db["indicator_scores"]
 collection_phq9 = db["phq9_submissions"]
 
 
-@st.cache_data
 def load_users():
     users = set()
     for col_name in ["raw_metrics", "indicator_scores", "analyzed_metrics"]:
@@ -45,6 +42,8 @@ def load_users():
 
 
 # --- SIDEBAR ---
+render_mode_selector()
+
 st.sidebar.title("Actions")
 
 if st.sidebar.button("🔄 Refresh Analysis"):

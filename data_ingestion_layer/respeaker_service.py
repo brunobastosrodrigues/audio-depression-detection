@@ -237,6 +237,7 @@ class ReSpeakerService:
                         environment_id=config.environment_id,
                         environment_name=config.environment_name,
                         quality_metrics=metrics,
+                        system_mode="live",  # Physical boards always use live mode
                     )
 
                     # Publish to MQTT

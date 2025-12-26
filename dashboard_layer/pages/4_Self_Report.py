@@ -4,7 +4,6 @@ Includes PHQ-9 assessment with submission history and correlation to acoustic in
 """
 
 import streamlit as st
-from pymongo import MongoClient
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -14,6 +13,7 @@ import os
 
 from utils.refresh_procedure import refresh_procedure
 from utils.theme import COLORS, INDICATOR_CLINICAL_NAMES, apply_custom_css
+from utils.database import get_database, render_mode_selector
 
 st.set_page_config(page_title="Self-Report", page_icon="📋", layout="wide")
 
@@ -22,15 +22,12 @@ apply_custom_css()
 st.title("Self-Report Assessment")
 
 # --- DATABASE CONNECTION ---
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://mongodb:27017")
-client = MongoClient(MONGO_URI)
-db = client["iotsensing"]
+db = get_database()
 collection_metrics = db["raw_metrics"]
 collection_phq9 = db["phq9_submissions"]
 collection_indicators = db["indicator_scores"]
 
 
-@st.cache_data
 def load_users():
     users = set()
     for col_name in ["raw_metrics", "indicator_scores"]:
@@ -42,6 +39,8 @@ def load_users():
 
 
 # --- SIDEBAR ---
+render_mode_selector()
+
 st.sidebar.title("Actions")
 
 if st.sidebar.button("🔄 Refresh Analysis"):

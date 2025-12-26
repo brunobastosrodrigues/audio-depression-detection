@@ -1,5 +1,6 @@
 from typing import List, Optional
 from datetime import datetime
+from collections import defaultdict
 from core.models.ContextualMetricRecord import ContextualMetricRecord
 from core.models.AnalyzedMetricRecord import AnalyzedMetricRecord
 from core.models.IndicatorScoreRecord import IndicatorScoreRecord
@@ -9,11 +10,23 @@ from ports.PersistencePort import PersistencePort
 from pymongo import MongoClient
 
 
+# Database routing map based on system_mode
+DB_MAP = {
+    "live": "iotsensing_live",
+    "dataset": "iotsensing_dataset",
+    "demo": "iotsensing_demo",
+    None: "iotsensing_live",  # Default fallback
+}
+
+# All databases to query for comprehensive reads
+ALL_DBS = ["iotsensing_live", "iotsensing_dataset", "iotsensing_demo"]
+
+
 class MongoPersistenceAdapter(PersistencePort):
     def __init__(
         self,
         mongo_url="mongodb://mongodb:27017",
-        db_name="iotsensing",
+        db_name="iotsensing_live",  # Default to live database
     ):
         self.client = MongoClient(mongo_url)
         self.db = self.client[db_name]
@@ -24,111 +37,173 @@ class MongoPersistenceAdapter(PersistencePort):
         self.collection_boards = self.db["boards"]
         self.collection_environments = self.db["environments"]
 
-    def get_latest_analyzed_metric_date(self, user_id: int) -> Optional[datetime]:
-        cursor = (
-            self.collection_analyzed_metrics.find({"user_id": user_id})
-            .sort("timestamp", -1)
-            .limit(1)
-        )
-        doc = next(cursor, None)
+    def _get_db(self, system_mode: str = None):
+        """Get database based on system_mode for routing."""
+        db_name = DB_MAP.get(system_mode, "iotsensing_live")
+        return self.client[db_name]
 
-        if doc:
-            return doc["timestamp"]
-        return None
+    def get_latest_analyzed_metric_date(self, user_id: int) -> Optional[datetime]:
+        """Query all databases and return the latest date."""
+        latest = None
+        for db_name in ALL_DBS:
+            db = self.client[db_name]
+            cursor = (
+                db["analyzed_metrics"].find({"user_id": user_id})
+                .sort("timestamp", -1)
+                .limit(1)
+            )
+            doc = next(cursor, None)
+            if doc and doc.get("timestamp"):
+                if latest is None or doc["timestamp"] > latest:
+                    latest = doc["timestamp"]
+        return latest
 
     def get_first_indicator_score_date(self, user_id: int) -> Optional[datetime]:
-        cursor = (
-            self.collection_indicator_scores.find({"user_id": user_id})
-            .sort("timestamp", 1)
-            .limit(1)
-        )
-        doc = next(cursor, None)
-
-        if doc:
-            return doc["timestamp"]
-        return None
+        """Query all databases and return the earliest date."""
+        earliest = None
+        for db_name in ALL_DBS:
+            db = self.client[db_name]
+            cursor = (
+                db["indicator_scores"].find({"user_id": user_id})
+                .sort("timestamp", 1)
+                .limit(1)
+            )
+            doc = next(cursor, None)
+            if doc and doc.get("timestamp"):
+                if earliest is None or doc["timestamp"] < earliest:
+                    earliest = doc["timestamp"]
+        return earliest
 
     def get_latest_indicator_score_date(self, user_id: int) -> Optional[datetime]:
-        cursor = (
-            self.collection_indicator_scores.find({"user_id": user_id})
-            .sort("timestamp", -1)
-            .limit(1)
-        )
-        doc = next(cursor, None)
-
-        if doc:
-            return doc["timestamp"]
-        return None
+        """Query all databases and return the latest date."""
+        latest = None
+        for db_name in ALL_DBS:
+            db = self.client[db_name]
+            cursor = (
+                db["indicator_scores"].find({"user_id": user_id})
+                .sort("timestamp", -1)
+                .limit(1)
+            )
+            doc = next(cursor, None)
+            if doc and doc.get("timestamp"):
+                if latest is None or doc["timestamp"] > latest:
+                    latest = doc["timestamp"]
+        return latest
 
     def get_latest_indicator_score(
         self, user_id: int
-    ) -> Optional[IndicatorScoreRecord]:
-        latest_score_doc = self.collection_indicator_scores.find_one(
-            {"user_id": user_id},
-            sort=[("timestamp", -1)],
-        )
-        return latest_score_doc
+    ) -> Optional[dict]:
+        """Query all databases and return the latest indicator score."""
+        latest_doc = None
+        latest_ts = None
+        for db_name in ALL_DBS:
+            db = self.client[db_name]
+            doc = db["indicator_scores"].find_one(
+                {"user_id": user_id},
+                sort=[("timestamp", -1)],
+            )
+            if doc and doc.get("timestamp"):
+                if latest_ts is None or doc["timestamp"] > latest_ts:
+                    latest_ts = doc["timestamp"]
+                    latest_doc = doc
+        return latest_doc
 
     def get_contextual_metrics(
         self,
         user_id: int,
         start_date: Optional[datetime] = None,
     ) -> List[ContextualMetricRecord]:
-
+        """Query all databases and combine results."""
         query = {"user_id": user_id}
-
         if start_date:
             query["timestamp"] = {"$gte": start_date}
 
-        docs = self.collection_contextual_metrics.find(query)
-
-        return [
-            ContextualMetricRecord(
-                user_id=doc["user_id"],
-                timestamp=doc["timestamp"],
-                metric_name=doc["metric_name"],
-                contextual_value=doc["contextual_value"],
-                metric_dev=doc["metric_dev"],
-            )
-            for doc in docs
-        ]
+        all_records = []
+        for db_name in ALL_DBS:
+            db = self.client[db_name]
+            system_mode = next((k for k, v in DB_MAP.items() if v == db_name and k is not None), "live")
+            docs = db["contextual_metrics"].find(query)
+            for doc in docs:
+                all_records.append(
+                    ContextualMetricRecord(
+                        user_id=doc["user_id"],
+                        timestamp=doc["timestamp"],
+                        metric_name=doc["metric_name"],
+                        contextual_value=doc["contextual_value"],
+                        metric_dev=doc.get("metric_dev", 0.0),
+                        system_mode=doc.get("system_mode", system_mode),
+                    )
+                )
+        return all_records
 
     def get_analyzed_metrics(
         self,
         user_id: int,
         start_date: Optional[datetime] = None,
     ) -> List[AnalyzedMetricRecord]:
-
+        """Query all databases and combine results."""
         query = {"user_id": user_id}
-
         if start_date:
             query["timestamp"] = {"$gte": start_date}
 
-        docs = self.collection_analyzed_metrics.find(query)
-
-        return [
-            AnalyzedMetricRecord(
-                user_id=doc["user_id"],
-                timestamp=doc["timestamp"],
-                metric_name=doc["metric_name"],
-                analyzed_value=doc["analyzed_value"],
-            )
-            for doc in docs
-        ]
+        all_records = []
+        for db_name in ALL_DBS:
+            db = self.client[db_name]
+            system_mode = next((k for k, v in DB_MAP.items() if v == db_name and k is not None), "live")
+            docs = db["analyzed_metrics"].find(query)
+            for doc in docs:
+                all_records.append(
+                    AnalyzedMetricRecord(
+                        user_id=doc["user_id"],
+                        timestamp=doc["timestamp"],
+                        metric_name=doc["metric_name"],
+                        analyzed_value=doc["analyzed_value"],
+                        system_mode=doc.get("system_mode", system_mode),
+                    )
+                )
+        return all_records
 
     def save_analyzed_metrics(self, records: List[AnalyzedMetricRecord]) -> None:
+        """Route records to appropriate database based on system_mode."""
         if not records:
             return
-        dict_records = [r.to_dict() for r in records]
-        self.collection_analyzed_metrics.insert_many(dict_records)
-        print(f"Inserted {len(dict_records)} analyzed metrics records.")
+
+        # Group by system_mode
+        records_by_mode = defaultdict(list)
+        for r in records:
+            system_mode = r.system_mode
+            records_by_mode[system_mode].append(r.to_dict())
+
+        # Save to each database
+        total = 0
+        for system_mode, dict_records in records_by_mode.items():
+            db = self._get_db(system_mode)
+            db["analyzed_metrics"].insert_many(dict_records)
+            db_name = DB_MAP.get(system_mode, "iotsensing_live")
+            print(f"Inserted {len(dict_records)} analyzed metrics to {db_name}")
+            total += len(dict_records)
+        print(f"Total: {total} analyzed metrics records inserted.")
 
     def save_indicator_scores(self, scores: List[IndicatorScoreRecord]) -> None:
+        """Route records to appropriate database based on system_mode."""
         if not scores:
             return
-        dict_records = [r.to_dict() for r in scores]
-        self.collection_indicator_scores.insert_many(dict_records)
-        print(f"Inserted {len(dict_records)} indicator score records.")
+
+        # Group by system_mode
+        records_by_mode = defaultdict(list)
+        for r in scores:
+            system_mode = r.system_mode
+            records_by_mode[system_mode].append(r.to_dict())
+
+        # Save to each database
+        total = 0
+        for system_mode, dict_records in records_by_mode.items():
+            db = self._get_db(system_mode)
+            db["indicator_scores"].insert_many(dict_records)
+            db_name = DB_MAP.get(system_mode, "iotsensing_live")
+            print(f"Inserted {len(dict_records)} indicator scores to {db_name}")
+            total += len(dict_records)
+        print(f"Total: {total} indicator score records inserted.")
 
     def save_phq9(
         self, user_id, phq9_scores, total_score, functional_impact, timestamp

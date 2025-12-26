@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict
+from typing import Dict, Optional
 import pandas as pd
 
 
@@ -11,6 +11,7 @@ class IndicatorScoreRecord:
     indicator_scores: Dict[str, float]
     mdd_signal: bool = False
     binary_scores: Dict[str, int] = None
+    system_mode: Optional[str] = None
 
     def to_dict(self):
         ts = self.timestamp
@@ -23,10 +24,13 @@ class IndicatorScoreRecord:
         if ts is not None:
             ts = ts.replace(tzinfo=None)
 
-        return {
+        result = {
             "user_id": self.user_id,
             "timestamp": ts,
             "indicator_scores": self.indicator_scores,
             "mdd_signal": self.mdd_signal,
             "binary_scores": self.binary_scores or {}
         }
+        if self.system_mode is not None:
+            result["system_mode"] = self.system_mode
+        return result

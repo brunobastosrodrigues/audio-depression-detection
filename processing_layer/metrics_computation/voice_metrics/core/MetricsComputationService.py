@@ -157,6 +157,7 @@ class MetricsComputationService:
                 "board_id": metadata.get("board_id"),
                 "environment_id": metadata.get("environment_id"),
                 "environment_name": metadata.get("environment_name"),
+                "system_mode": metadata.get("system_mode", "live"),
             }
             for key, value in flat_metrics.items()
         ]

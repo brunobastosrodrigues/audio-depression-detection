@@ -4,11 +4,12 @@ Manage IoT boards (ReSpeaker) and environments.
 """
 
 import streamlit as st
-from pymongo import MongoClient
 import pandas as pd
 import requests
 from datetime import datetime, timedelta
 import os
+
+from utils.database import get_database, render_mode_selector
 
 st.set_page_config(page_title="Boards", page_icon="📡", layout="wide")
 
@@ -16,9 +17,7 @@ st.title("📡 Board Configuration")
 st.markdown("Manage IoT boards (ReSpeaker) and environments for audio capture.")
 
 # --- DATABASE CONNECTION ---
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://mongodb:27017")
-client = MongoClient(MONGO_URI)
-db = client["iotsensing"]
+db = get_database()
 boards_collection = db["boards"]
 environments_collection = db["environments"]
 raw_metrics_collection = db["raw_metrics"]
@@ -26,7 +25,6 @@ raw_metrics_collection = db["raw_metrics"]
 ANALYSIS_LAYER_URL = "http://analysis_layer:8083"
 
 
-@st.cache_data
 def load_users():
     users = set()
     for col_name in ["raw_metrics", "boards"]:
@@ -40,10 +38,11 @@ def load_users():
 
 
 # --- SIDEBAR ---
+render_mode_selector()
+
 st.sidebar.title("Actions")
 
 if st.sidebar.button("🔄 Refresh Data"):
-    st.cache_data.clear()
     st.rerun()
 
 st.sidebar.subheader("Select User")

@@ -9,9 +9,10 @@ import sys
 import threading
 import time
 from datetime import datetime
-from pymongo import MongoClient
 import pandas as pd
 import plotly.express as px
+
+from utils.database import get_database, render_mode_selector
 
 st.set_page_config(page_title="Data Tools", page_icon="🔧", layout="wide")
 
@@ -19,9 +20,7 @@ st.title("🔧 Data Tools")
 st.markdown("Debug tools for audio loading, baseline viewing, and data export.")
 
 # --- DATABASE CONNECTION ---
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://mongodb:27017")
-client = MongoClient(MONGO_URI)
-db = client["iotsensing"]
+db = get_database()
 
 # Add data_ingestion_layer to path
 DATA_INGESTION_PATH = "/app/data_ingestion_layer"
@@ -107,6 +106,8 @@ def load_users():
 
 
 # --- SIDEBAR ---
+render_mode_selector()
+
 st.sidebar.title("Actions")
 
 st.sidebar.subheader("Select User")

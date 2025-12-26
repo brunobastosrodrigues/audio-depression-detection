@@ -4,7 +4,6 @@ Visualizes symptom progression over time with Sankey diagrams and trend analysis
 """
 
 import streamlit as st
-from pymongo import MongoClient
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
@@ -22,6 +21,7 @@ from utils.theme import (
     apply_custom_css,
 )
 from utils.DSM5Descriptions import DSM5Descriptions
+from utils.database import get_database, render_mode_selector
 
 st.set_page_config(page_title="Trends", page_icon="📈", layout="wide")
 
@@ -31,13 +31,10 @@ st.title("Longitudinal Trends")
 st.markdown("Track how your patterns change over time and identify emerging trends.")
 
 # --- DATABASE CONNECTION ---
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://mongodb:27017")
-client = MongoClient(MONGO_URI)
-db = client["iotsensing"]
+db = get_database()
 collection_indicators = db["indicator_scores"]
 
 
-@st.cache_data
 def load_users():
     users = set()
     for col_name in ["indicator_scores", "analyzed_metrics"]:
@@ -49,6 +46,8 @@ def load_users():
 
 
 # --- SIDEBAR ---
+render_mode_selector()
+
 st.sidebar.title("Actions")
 
 if st.sidebar.button("🔄 Refresh Analysis"):
