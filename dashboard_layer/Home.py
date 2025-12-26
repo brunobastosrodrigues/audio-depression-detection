@@ -196,6 +196,13 @@ if current_mode == "live":
         "color": "#EAECEE",
         "visible": True
     })
+    cards.append({
+        "icon": "👥", 
+        "title": "User Management", 
+        "desc": "Manage authorized users for voice recognition", 
+        "color": "#FEF5E7",
+        "visible": True
+    })
 
 if current_mode == "dataset":
     cards.append({

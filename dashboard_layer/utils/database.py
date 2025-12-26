@@ -157,6 +157,7 @@ def render_mode_selector():
                 div[data-testid="stSidebarNav"] a[href*="Boards"],
                 div[data-testid="stSidebarNav"] a[href*="User_Recognition"],
                 div[data-testid="stSidebarNav"] a[href*="Voice_Calibration"],
+                div[data-testid="stSidebarNav"] a[href*="User_Management"],
                 div[data-testid="stSidebarNav"] a[href*="Data_Tools"] {
                     display: none !important;
                 }
@@ -175,6 +176,7 @@ def render_mode_selector():
             <style>
                 div[data-testid="stSidebarNav"] a[href*="Boards"],
                 div[data-testid="stSidebarNav"] a[href*="User_Recognition"],
+                div[data-testid="stSidebarNav"] a[href*="User_Management"],
                 div[data-testid="stSidebarNav"] a[href*="Voice_Calibration"] {
                     display: none !important;
                 }

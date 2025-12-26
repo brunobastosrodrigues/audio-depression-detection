@@ -1,0 +1,416 @@
+"""
+User Management page for Live Mode.
+Manage the identity of users in the Live system mode.
+Allows enrollment of new users and management of voice profiles.
+"""
+
+import streamlit as st
+import requests
+import tempfile
+import os
+import uuid
+import time
+from datetime import datetime
+import numpy as np
+
+from utils.database import get_database, render_mode_selector, get_current_mode
+
+# Board recorder
+try:
+    from utils.board_recorder import BoardRecorder
+except ImportError:
+    import sys
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from utils.board_recorder import BoardRecorder
+
+st.set_page_config(page_title="User Management", page_icon="👥", layout="wide")
+
+# Mode Check - Only available in Live mode
+if get_current_mode() != "live":
+    st.warning("⚠️ User Management is only available in Live Mode.")
+    st.info("Switch to Live mode from the sidebar to access user management features.")
+    st.stop()
+
+render_mode_selector()
+
+st.title("👥 User Management")
+st.markdown("""
+**Digital Roll Call** - Manage authorized users for voice recognition.
+Only registered users will be analyzed by the system.
+""")
+
+# --- DATABASE CONNECTION ---
+db = get_database()
+users_collection = db["users"]
+boards_collection = db["boards"]
+environments_collection = db["environments"]
+
+# API endpoints
+VOICE_PROFILING_API = os.getenv("VOICE_PROFILING_API", "http://voice_profiling:8000")
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+def get_all_users():
+    """Get all active users from database."""
+    try:
+        users = list(users_collection.find({"status": "active"}))
+        return users
+    except Exception as e:
+        st.error(f"Error loading users: {e}")
+        return []
+
+
+def delete_user(user_id: str):
+    """Delete a user from the database."""
+    try:
+        # Delete from local collection
+        users_collection.update_one(
+            {"user_id": user_id},
+            {"$set": {"status": "archived"}}
+        )
+        
+        # Call API to delete from voice_profiling
+        try:
+            response = requests.delete(f"{VOICE_PROFILING_API}/management/users/{user_id}")
+            if response.status_code != 200:
+                st.warning(f"API deletion returned status {response.status_code}")
+        except Exception as api_error:
+            st.warning(f"Could not reach API for deletion: {api_error}")
+        
+        return True
+    except Exception as e:
+        st.error(f"Error deleting user: {e}")
+        return False
+
+
+def enroll_user_local(user_id: str, name: str, role: str, audio_path: str):
+    """Enroll a user using the enrollment API."""
+    try:
+        with open(audio_path, 'rb') as f:
+            files = {'audio_file': ('enrollment.wav', f, 'audio/wav')}
+            data = {
+                'user_id': user_id,
+                'name': name,
+                'role': role
+            }
+            
+            response = requests.post(
+                f"{VOICE_PROFILING_API}/enrollment/enroll",
+                files=files,
+                data=data,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                
+                # Also save to local database for dashboard reference
+                users_collection.update_one(
+                    {"user_id": user_id},
+                    {
+                        "$set": {
+                            "user_id": user_id,
+                            "name": name,
+                            "role": role,
+                            "created_at": datetime.utcnow(),
+                            "status": "active"
+                        }
+                    },
+                    upsert=True
+                )
+                
+                return True, result
+            else:
+                return False, {"error": f"API returned {response.status_code}"}
+                
+    except Exception as e:
+        st.error(f"Enrollment error: {e}")
+        return False, {"error": str(e)}
+
+
+# =============================================================================
+# MAIN CONTENT
+# =============================================================================
+
+# Show current user count
+users = get_all_users()
+user_count = len(users)
+
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.metric("Registered Users", user_count)
+with col2:
+    patients = len([u for u in users if u.get("role") == "patient"])
+    st.metric("Patients", patients)
+with col3:
+    controls = len([u for u in users if u.get("role") == "control"])
+    st.metric("Controls", controls)
+
+st.divider()
+
+# =============================================================================
+# TABS
+# =============================================================================
+
+tab1, tab2 = st.tabs(["📋 User Roster", "➕ Enroll New User"])
+
+# =============================================================================
+# TAB 1: USER ROSTER
+# =============================================================================
+
+with tab1:
+    st.header("User Roster")
+    
+    if not users:
+        st.info("No users registered yet. Use the 'Enroll New User' tab to add users.")
+    else:
+        st.markdown(f"**{len(users)} registered user(s)**")
+        
+        # Create a table-like display
+        for user in users:
+            with st.container():
+                col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 1])
+                
+                with col1:
+                    st.markdown(f"**{user.get('name', 'Unknown')}**")
+                    st.caption(f"ID: {user.get('user_id', 'N/A')}")
+                
+                with col2:
+                    role = user.get('role', 'N/A')
+                    role_color = "#3b82f6" if role == "patient" else "#10b981"
+                    st.markdown(
+                        f'<span style="background: {role_color}20; color: {role_color}; '
+                        f'padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.85rem;">'
+                        f'{role.upper()}</span>',
+                        unsafe_allow_html=True
+                    )
+                
+                with col3:
+                    created = user.get('created_at')
+                    if created:
+                        if isinstance(created, str):
+                            date_str = created[:10]
+                        else:
+                            date_str = created.strftime('%Y-%m-%d')
+                        st.caption(f"📅 {date_str}")
+                
+                with col4:
+                    status = user.get('status', 'active')
+                    status_color = "#10b981" if status == "active" else "#6b7280"
+                    st.markdown(
+                        f'<span style="color: {status_color}; font-size: 0.85rem;">●</span> {status}',
+                        unsafe_allow_html=True
+                    )
+                
+                with col5:
+                    if st.button("🗑️", key=f"del_{user['user_id']}", help="Delete user"):
+                        if delete_user(user['user_id']):
+                            st.success(f"User '{user.get('name')}' deleted.")
+                            time.sleep(0.5)
+                            st.rerun()
+                        else:
+                            st.error("Failed to delete user.")
+                
+                st.divider()
+
+# =============================================================================
+# TAB 2: ENROLL NEW USER
+# =============================================================================
+
+with tab2:
+    st.header("Enroll New User")
+    st.markdown("""
+    Register a new user by providing their information and recording a voice sample.
+    The voice sample will be used to create a unique voice profile for speaker identification.
+    """)
+    
+    # User Information Section
+    st.subheader("1️⃣ User Information")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        user_name = st.text_input(
+            "Full Name *",
+            placeholder="Enter user's full name",
+            help="The display name for this user"
+        )
+    
+    with col2:
+        user_role = st.selectbox(
+            "Role *",
+            options=["patient", "control"],
+            help="Patient: Person being monitored. Control: Household member (not monitored)"
+        )
+    
+    # Voice Sample Section
+    st.divider()
+    st.subheader("2️⃣ Voice Sample")
+    
+    st.markdown("""
+    **Instructions:** The user should read the passage below clearly for 15-30 seconds.
+    This creates a unique voice profile for identification.
+    """)
+    
+    # Reading passage
+    passage = """The rainbow is a division of white light into many beautiful colors.
+These take the shape of a long round arch, with its path high above,
+and its two ends apparently beyond the horizon. There is, according to legend,
+a boiling pot of gold at one end. People look, but no one ever finds it."""
+    
+    st.markdown(
+        f"""
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white; padding: 1.5rem; border-radius: 12px;
+                    font-size: 1.15rem; line-height: 1.8; margin: 1rem 0;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <strong>📖 Reading Passage:</strong><br><br>
+            "{passage}"
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    
+    # Recording method
+    st.markdown("#### Choose Recording Method")
+    
+    # Get active boards
+    active_boards = list(boards_collection.find({"is_active": True}))
+    env_lookup = {e["environment_id"]: e["name"] for e in environments_collection.find({})}
+    
+    recording_method = st.radio(
+        "Recording source:",
+        ["Record from Board", "Upload Audio File"],
+        horizontal=True,
+        help="Using a board ensures audio quality matches deployment setup"
+    )
+    
+    audio_ready = False
+    audio_path = None
+    
+    if recording_method == "Record from Board":
+        if not active_boards:
+            st.warning("⚠️ No active boards found. Please ensure a board is connected.")
+        else:
+            board_options = {}
+            for b in active_boards:
+                env_name = env_lookup.get(b.get("environment_id"), "Unknown")
+                board_options[b["board_id"]] = f"{b.get('name', 'Unknown')} - {env_name}"
+            
+            selected_board = st.selectbox(
+                "Select Board",
+                options=list(board_options.keys()),
+                format_func=lambda x: board_options[x]
+            )
+            
+            col_a, col_b = st.columns([1, 2])
+            
+            with col_a:
+                duration = st.select_slider(
+                    "Duration",
+                    options=[15, 20, 30],
+                    value=20,
+                    format_func=lambda x: f"{x} sec"
+                )
+                
+                if st.button("🎙️ Start Recording", type="primary", use_container_width=True):
+                    recorder = BoardRecorder()
+                    with st.spinner(f"Recording for {duration} seconds... Please read now!"):
+                        audio_data = recorder.start_recording(selected_board, duration=duration)
+                    
+                    if audio_data is not None and len(audio_data) > 0:
+                        st.session_state["enrollment_audio_data"] = audio_data
+                        st.session_state["enrollment_method"] = "board"
+                        st.success("✅ Recording captured!")
+                        st.rerun()
+                    else:
+                        st.error("❌ No audio received. Check board connection.")
+            
+            with col_b:
+                if "enrollment_audio_data" in st.session_state and st.session_state.get("enrollment_method") == "board":
+                    st.success("✅ Audio sample ready!")
+                    st.audio(st.session_state["enrollment_audio_data"], sample_rate=16000)
+                    audio_ready = True
+                    
+                    if st.button("🔄 Re-record"):
+                        del st.session_state["enrollment_audio_data"]
+                        del st.session_state["enrollment_method"]
+                        st.rerun()
+    
+    else:  # Upload File
+        uploaded_file = st.file_uploader(
+            "Upload WAV or MP3 file",
+            type=["wav", "mp3"],
+            help="Upload a recording of the user reading the passage"
+        )
+        
+        if uploaded_file:
+            st.audio(uploaded_file)
+            st.session_state["enrollment_audio_file"] = uploaded_file
+            st.session_state["enrollment_method"] = "upload"
+            audio_ready = True
+    
+    # Enrollment Button
+    st.divider()
+    st.subheader("3️⃣ Complete Enrollment")
+    
+    can_enroll = user_name and audio_ready or ("enrollment_audio_data" in st.session_state or "enrollment_audio_file" in st.session_state)
+    
+    if st.button(
+        "✅ Register User",
+        type="primary",
+        disabled=not can_enroll,
+        use_container_width=True
+    ):
+        with st.spinner("Processing voice profile..."):
+            try:
+                # Generate unique user ID
+                new_user_id = str(uuid.uuid4())
+                
+                # Save audio to temporary file
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                    if st.session_state.get("enrollment_method") == "board":
+                        # Board recording - save numpy array
+                        audio_data = st.session_state.get("enrollment_audio_data")
+                        import soundfile as sf
+                        sf.write(tmp.name, audio_data, 16000)
+                    else:
+                        # Uploaded file
+                        audio_file = st.session_state.get("enrollment_audio_file")
+                        tmp.write(audio_file.getvalue())
+                    
+                    tmp_path = tmp.name
+                
+                # Enroll user via API
+                success, result = enroll_user_local(new_user_id, user_name, user_role, tmp_path)
+                
+                # Cleanup
+                os.remove(tmp_path)
+                
+                if success:
+                    st.success(f"🎉 User '{user_name}' enrolled successfully!")
+                    st.balloons()
+                    
+                    # Clear session state
+                    for key in ["enrollment_audio_data", "enrollment_audio_file", "enrollment_method"]:
+                        if key in st.session_state:
+                            del st.session_state[key]
+                    
+                    time.sleep(1.5)
+                    st.rerun()
+                else:
+                    st.error(f"❌ Enrollment failed: {result.get('error', 'Unknown error')}")
+            
+            except Exception as e:
+                st.error(f"❌ Error during enrollment: {e}")
+    
+    if not can_enroll:
+        st.caption("💡 Enter user information and record/upload audio to enable registration.")
+
+# =============================================================================
+# FOOTER
+# =============================================================================
+
+st.divider()
+st.caption("👥 User Management - Live Mode Only")
