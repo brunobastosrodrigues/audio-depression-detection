@@ -1,3 +1,4 @@
+import os
 from implementations.AudioSensor import AudioSensor
 from implementations.VoiceSensor import VoiceSensor
 from implementations.AudioFromFile import AudioFromFile
@@ -11,6 +12,7 @@ if __name__ == "__main__":
     voice_from_file = VoiceFromFile(
         filepath="datasets/long_depressed_sample_nobreak.wav",
         topic="voice/mic1",
+        mqtthostname=os.getenv("MQTT_HOST", "localhost"),
     )
 
     voice_from_file.run()

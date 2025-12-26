@@ -60,6 +60,7 @@ services:
          - "8010:8010"
       volumes:
          - ./data_ingestion_layer:/app
+         - ./datasets:/app/datasets:ro
       depends_on:
          - mqtt
          - mongodb

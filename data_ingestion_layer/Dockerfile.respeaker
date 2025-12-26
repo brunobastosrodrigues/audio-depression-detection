@@ -16,7 +16,12 @@ RUN pip install --no-cache-dir \
     pymongo \
     paho-mqtt \
     numpy \
-    soundfile
+    soundfile \
+    pyaudio \
+    torch \
+    torchaudio \
+    scipy \
+    librosa
 
 COPY . .
 
