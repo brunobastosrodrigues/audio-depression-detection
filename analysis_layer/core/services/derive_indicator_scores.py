@@ -74,6 +74,12 @@ def derive_indicator_scores(
         # Note: records_by_date is ordered.
         first_record_date = list(records_by_date.keys())[0]
 
+    # Calculate default alpha for 14-day EMA
+    # Alpha (smoothing) = 2 / (N + 1)
+    # Alpha (persistence) = 1 - Alpha (smoothing)
+    EMA_WINDOW_DAYS = 14
+    DEFAULT_ALPHA = 1.0 - (2.0 / (EMA_WINDOW_DAYS + 1.0))
+
     # We iterate through the new records day by day
     for record_date, daily_records in records_by_date.items():
         # Check if in learning period
@@ -162,7 +168,7 @@ def derive_indicator_scores(
 
             # Equation 4: Temporal Persistence (EMA)
             # S_bar(t) = (1 - alpha) * S_i(t) + alpha * S_bar(t-1)
-            alpha = details.get("smoothing_factor", 0.99)
+            alpha = details.get("smoothing_factor", DEFAULT_ALPHA)
             s_bar_prev = previous_smoothed_scores.get(indicator, 0.0)
 
             s_bar_t = (1 - alpha) * s_i_t + alpha * s_bar_prev

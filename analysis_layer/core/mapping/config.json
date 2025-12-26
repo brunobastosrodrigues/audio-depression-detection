@@ -74,7 +74,7 @@
             "clipping_threshold": 3.0
          }
       },
-      "smoothing_factor": 0.99,
+      "smoothing_factor": 0.8667,
       "severity_threshold": 0.5
    },
    "2_loss_of_interest": {
@@ -116,7 +116,7 @@
             "clipping_threshold": 3.0
          }
       },
-      "smoothing_factor": 0.99,
+      "smoothing_factor": 0.8667,
       "severity_threshold": 0.5
    },
    "3_significant_weight_changes": {
@@ -146,7 +146,7 @@
             "clipping_threshold": 3.0
          }
       },
-      "smoothing_factor": 0.99,
+      "smoothing_factor": 0.8667,
       "severity_threshold": 0.5
    },
    "4_insomnia_hypersomnia": {
@@ -170,7 +170,7 @@
             "clipping_threshold": 3.0
          }
       },
-      "smoothing_factor": 0.99,
+      "smoothing_factor": 0.8667,
       "severity_threshold": 0.5
    },
    "5_psychomotor_retardation_agitation": {
@@ -242,7 +242,7 @@
             "clipping_threshold": 3.0
          }
       },
-      "smoothing_factor": 0.99,
+      "smoothing_factor": 0.8667,
       "severity_threshold": 0.5
    },
    "6_fatigue_loss_of_energy": {
@@ -260,12 +260,12 @@
             "clipping_threshold": 3.0
          }
       },
-      "smoothing_factor": 0.99,
+      "smoothing_factor": 0.8667,
       "severity_threshold": 0.5
    },
    "7_feelings_of_worthlessness_guilt": {
       "metrics": {},
-      "smoothing_factor": 0.99,
+      "smoothing_factor": 0.8667,
       "severity_threshold": 0.5
    },
    "8_diminished_ability_to_think_or_concentrate": {
@@ -325,7 +325,7 @@
             "clipping_threshold": 3.0
          }
       },
-      "smoothing_factor": 0.99,
+      "smoothing_factor": 0.8667,
       "severity_threshold": 0.5
    },
    "9_recurrent_thoughts_of_death_or_being_suicidal": {
@@ -361,7 +361,7 @@
             "clipping_threshold": 3.0
          }
       },
-      "smoothing_factor": 0.99,
+      "smoothing_factor": 0.8667,
       "severity_threshold": 0.5
    }
 }
