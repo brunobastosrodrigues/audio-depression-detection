@@ -361,7 +361,7 @@ def seed_user_data(
             aggregated_metrics.append({
                 "user_id": user_id,
                 "metric_name": m_name,
-                "metric_value": np.mean(vals),
+                "aggregated_value": np.mean(vals),
                 "timestamp": current_date,
                 "system_mode": "demo"
             })
@@ -380,10 +380,9 @@ def seed_user_data(
             contextual_metrics.append({
                 "user_id": user_id,
                 "metric_name": m_name,
-                "metric_value": ema_val,
+                "contextual_value": ema_val,
+                "metric_dev": 0.0,  # Placeholder for metric deviation
                 "timestamp": current_date,
-                "context_window": "7d",
-                "smoothing_alpha": alpha,
                 "system_mode": "demo"
             })
 
@@ -440,7 +439,7 @@ def seed_user_data(
     analyzed_metrics = []
     for cm in contextual_metrics:
         m_name = cm["metric_name"]
-        val = cm["metric_value"]
+        val = cm["contextual_value"]
         stats = baseline_stats.get(m_name, {"mean": 0, "std": 1})
         
         if stats["std"] > 0:
