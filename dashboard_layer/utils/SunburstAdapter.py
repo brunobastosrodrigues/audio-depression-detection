@@ -37,14 +37,14 @@ class SunburstAdapter:
         active_count = 0
         core_symptom_active = False
 
-        # We assume a threshold of 1.0 for "Active" (Calibration required in future)
-        THRESHOLD = 1.0
-
         for key, score in indicators.items():
             # Treat None as 0
             if score is None: score = 0
 
-            if score >= THRESHOLD:
+            # Use specific threshold from config or default to 0.5
+            threshold = self.mapping_config.get(key, {}).get('severity_threshold', 0.5)
+
+            if score >= threshold:
                 active_count += 1
                 if key.startswith("1_") or key.startswith("2_"):
                     core_symptom_active = True
@@ -99,8 +99,11 @@ class SunburstAdapter:
             values.append(parent_value)
             customdata.append(ind_score) # Real score for hover
 
-            # Color logic: Orange if active, Light Grey if inactive
-            colors.append("#FF851B" if ind_score >= THRESHOLD else "#DDDDDD")
+            # Determine threshold
+            threshold = ind_details.get('severity_threshold', 0.5)
+
+            # Color logic: Red if active, Light Grey if inactive
+            colors.append("#FF4136" if ind_score >= threshold else "#DDDDDD")
 
             # Collect Children (Metrics)
             children_data = []

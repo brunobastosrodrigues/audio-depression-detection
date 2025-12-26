@@ -5,15 +5,58 @@ import plotly.graph_objects as go
 
 from utils.refresh_procedure import refresh_procedure
 from utils.SunburstAdapter import SunburstAdapter
+from utils.SankeyAdapter import SankeyAdapter
 
 st.title("DSM-5 Indicators")
 
 import os
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://mongodb:27017")
-client = MongoClient(MONGO_URI)
-db = client["iotsensing"]
-collection = db["indicator_scores"]
-collection_metrics = db["analyzed_metrics"]
+MONGO_MOCK = os.getenv("MONGO_MOCK", "false").lower() == "true"
+
+if MONGO_MOCK:
+    import mongomock
+    import datetime
+    client = mongomock.MongoClient()
+    db = client["iotsensing"]
+    collection = db["indicator_scores"]
+    collection_metrics = db["analyzed_metrics"]
+
+    # Seed mock data if empty
+    if collection.count_documents({}) == 0:
+        base = datetime.datetime.now()
+        # Week 1
+        collection.insert_one({
+            "user_id": "verify_user",
+            "timestamp": base - datetime.timedelta(days=14),
+            "mdd_signal": False,
+            "indicator_scores": {"1_insomnia": 0.8, "2_fatigue": 0.1}
+        })
+        # Week 3
+        collection.insert_one({
+            "user_id": "verify_user",
+            "timestamp": base,
+            "mdd_signal": False,
+            "indicator_scores": {"1_insomnia": 0.1, "2_fatigue": 0.9}
+        })
+        # Metrics
+        # Insert individual metrics as documents to match SunburstAdapter expectations
+        collection_metrics.insert_one({
+            "user_id": "verify_user",
+            "timestamp": base,
+            "metric_name": "jitter",
+            "analyzed_value": 0.5
+        })
+        collection_metrics.insert_one({
+            "user_id": "verify_user",
+            "timestamp": base,
+            "metric_name": "shimmer",
+            "analyzed_value": 0.2
+        })
+else:
+    client = MongoClient(MONGO_URI)
+    db = client["iotsensing"]
+    collection = db["indicator_scores"]
+    collection_metrics = db["analyzed_metrics"]
 
 if collection.count_documents({}) == 0:
     st.warning("No data available.")
@@ -183,6 +226,54 @@ if selected_user:
         # --- VISUALIZATION ---
         st.subheader("Trends")
         st.line_chart(display_df.set_index("timestamp")[selected_indicators])
+
+        st.divider()
+
+        # --- LONGITUDINAL PROGRESSION ---
+        st.subheader("Longitudinal Symptom Progression")
+        st.markdown(
+            "Visualizes the progression of dominant symptoms over time (e.g., Week 1 'Insomnia' $\to$ Week 3 'Fatigue')."
+        )
+
+        try:
+            # Re-use config path logic
+            import os
+            config_path = "/app/core/mapping/config.json"
+            if not os.path.exists(config_path):
+                potential_paths = [
+                    "../analysis_layer/core/mapping/config.json",
+                    "analysis_layer/core/mapping/config.json",
+                    "core/mapping/config.json",
+                ]
+                for p in potential_paths:
+                    if os.path.exists(p):
+                        config_path = p
+                        break
+
+            sankey_adapter = SankeyAdapter(config_path)
+            sankey_data = sankey_adapter.process(user_df)
+
+            if sankey_data:
+                fig_sankey = go.Figure(
+                    data=[
+                        go.Sankey(
+                            node=sankey_data["node"],
+                            link=sankey_data["link"],
+                        )
+                    ]
+                )
+
+                fig_sankey.update_layout(
+                    font_size=12,
+                    height=500,
+                    margin=dict(t=20, l=10, r=10, b=20),
+                )
+                st.plotly_chart(fig_sankey, use_container_width=True)
+            else:
+                st.info("Not enough data for longitudinal analysis.")
+
+        except Exception as e:
+            st.error(f"Error generating Sankey Diagram: {e}")
 
         # --- DETAILED DATA ---
         st.subheader("Detailed Data")
