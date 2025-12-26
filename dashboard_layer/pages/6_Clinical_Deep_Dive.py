@@ -7,6 +7,7 @@ import json
 from utils.SunburstAdapter import SunburstAdapter
 from utils.SankeyAdapter import SankeyAdapter
 from utils.WaterfallAdapter import WaterfallAdapter
+from utils.path_utils import get_config_path
 
 st.set_page_config(page_title="Clinical Deep Dive", layout="wide")
 
@@ -59,7 +60,8 @@ Red indicates active thresholds.
 """)
 
 try:
-    sun_adapter = SunburstAdapter("/app/core/mapping/config.json")
+    config_path = get_config_path()
+    sun_adapter = SunburstAdapter(config_path)
     sun_data = sun_adapter.process(latest_ind, metric_records)
 
     fig_sun = go.Figure(go.Sunburst(
@@ -87,7 +89,7 @@ Select a specific indicator to see which acoustic features contributed to its sc
 """)
 
 # Dropdown to select indicator
-with open("core/mapping/config.json", "r") as f:
+with open(get_config_path(), "r") as f:
     config = json.load(f)
 
 # Sort indicators by score in descending order
@@ -102,7 +104,7 @@ selected_ind_name = st.selectbox("Select Indicator to Explain:", list(ind_option
 selected_ind_key = ind_options[selected_ind_name]
 
 try:
-    wf_adapter = WaterfallAdapter("/app/core/mapping/config.json")
+    wf_adapter = WaterfallAdapter(get_config_path())
     wf_data = wf_adapter.process(selected_ind_key, metric_records)
 
     if wf_data and len(wf_data['x']) > 1: # Only plot if there are metrics
@@ -143,7 +145,7 @@ Allows early detection of prodromal phases (e.g., Monopitch -> Loss of Interest)
 df_inds = pd.DataFrame(user_inds)
 
 try:
-    sankey_adapter = SankeyAdapter("/app/core/mapping/config.json")
+    sankey_adapter = SankeyAdapter(get_config_path())
     sankey_data = sankey_adapter.process(df_inds)
 
     if sankey_data:
