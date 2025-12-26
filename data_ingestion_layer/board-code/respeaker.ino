@@ -171,7 +171,27 @@ void loop() {
       Serial.println(mac);
       client.print(mac);
       
-      Serial.println("Streaming Audio...");
+      // Wait for Server Acknowledgment
+      unsigned long start_wait = millis();
+      bool server_ready = false;
+      while (millis() - start_wait < 5000) {
+        if (client.available()) {
+          String response = client.readStringUntil('\n');
+          if (response.indexOf("READY") >= 0) {
+            server_ready = true;
+            break;
+          }
+        }
+        delay(10);
+      }
+
+      if (server_ready) {
+        Serial.println("Server Ready! Streaming Audio...");
+      } else {
+        Serial.println("Server handshake failed or timed out.");
+        client.stop();
+        return;
+      }
     } else {
       delay(1000); 
       return;
