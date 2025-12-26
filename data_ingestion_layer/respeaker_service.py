@@ -272,6 +272,9 @@ class ReSpeakerService:
             mac_address = mac_data.decode().strip().upper()
             print(f"Handshake received from {addr}: MAC={mac_address}")
 
+            # Send acknowledgement
+            conn.sendall(b"READY\n")
+
             # Remove timeout for normal operation
             conn.settimeout(None)
 
