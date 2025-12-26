@@ -146,17 +146,30 @@ class MetricsComputationService:
         else:
             timestamp = datetime.now(timezone.utc)
 
-        # OPTIMIZED: Return a single grouped record containing all metrics
-        # This reduces database writes from ~25 documents to 1 document per audio chunk.
-        grouped_record = {
+        # Prepare acoustic feature records (for raw_metrics collection)
+        acoustic_feature_records = []
+        for metric_name, metric_value in flat_metrics.items():
+            acoustic_feature_records.append({
+                "user_id": user_id,
+                "timestamp": timestamp,
+                "metric_name": metric_name,
+                "metric_value": metric_value,
+                "origin": "metrics_computation",
+                "board_id": metadata.get("board_id"),
+                "environment_id": metadata.get("environment_id"),
+                "environment_name": metadata.get("environment_name"),
+                "system_mode": metadata.get("system_mode", "live"),
+            })
+
+        # Prepare audio quality metrics record (for audio_quality_metrics collection)
+        audio_quality_record = {
             "user_id": user_id,
             "timestamp": timestamp,
-            "metrics": flat_metrics,
-            "origin": "metrics_computation",
+            "metrics_data": metadata.get("quality_metrics", {}), # Use 'metrics_data' key for consistency with adapter
             "board_id": metadata.get("board_id"),
             "environment_id": metadata.get("environment_id"),
             "environment_name": metadata.get("environment_name"),
             "system_mode": metadata.get("system_mode", "live"),
         }
 
-        return [grouped_record]
+        return acoustic_feature_records, audio_quality_record

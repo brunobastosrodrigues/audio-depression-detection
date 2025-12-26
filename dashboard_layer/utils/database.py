@@ -146,16 +146,7 @@ def render_mode_selector():
     # Handle mode change
     if selected_mode != current_mode:
         st.session_state.system_mode = selected_mode
-        try:
-            st.switch_page("Home.py")
-        except ValueError:
-             # Fallback for some environments
-             try:
-                st.switch_page("dashboard_layer/Home.py")
-             except ValueError:
-                # If redirection fails, we accept that we are on the current page
-                # but the mode has been updated.
-                pass
+        st.rerun()
 
     # Dynamic CSS to hide sidebar pages based on mode
     css_to_inject = ""

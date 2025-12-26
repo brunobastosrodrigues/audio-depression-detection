@@ -107,11 +107,11 @@ if boards:
             {"Board": board_name_map.get(d["_id"], d["_id"]), "Packets": d["count"]}
             for d in activity_data
         ])
-        
+
         fig = px.bar(
-            df_activity, 
-            x="Board", 
-            y="Packets", 
+            df_activity,
+            x="Board",
+            y="Packets",
             color="Board",
             template="plotly_white",
             labels={"Packets": "Samples Captured"}
@@ -120,6 +120,50 @@ if boards:
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No data packets received from any board in the last 15 minutes.")
+
+    # --- Audio Quality Summary ---
+    st.markdown("##### Audio Quality Summary (Last 60s)")
+
+    one_min_ago = datetime.utcnow() - timedelta(seconds=60)
+    board_ids = [b["board_id"] for b in boards]
+
+    quality_data = list(audio_quality_metrics_collection.find(
+        {"board_id": {"$in": board_ids}, "timestamp": {"$gte": one_min_ago}},
+        {"rms": 1, "db_fs": 1, "snr": 1, "clipping_count": 1, "dynamic_range": 1, "_id": 0}
+    ))
+
+    if quality_data:
+        # Calculate aggregates
+        avg_dbfs = sum(d.get("db_fs", -96) for d in quality_data) / len(quality_data)
+        total_clipping = sum(d.get("clipping_count", 0) for d in quality_data)
+
+        dynamic_ranges = [d.get("dynamic_range", 0) for d in quality_data if d.get("dynamic_range", 0) > 0]
+        avg_dynamic_range = sum(dynamic_ranges) / len(dynamic_ranges) if dynamic_ranges else 0
+
+        snr_values = [d.get("snr") for d in quality_data if d.get("snr") is not None and d.get("snr") != 0]
+        avg_snr = sum(snr_values) / len(snr_values) if snr_values else None
+
+        # Determine overall quality status
+        if avg_dbfs > -20:
+            quality_status = "Good"
+            quality_icon = "🟢"
+        elif avg_dbfs > -30:
+            quality_status = "Fair"
+            quality_icon = "🟡"
+        else:
+            quality_status = "Low"
+            quality_icon = "🔴"
+
+        col1, col2, col3, col4, col5 = st.columns(5)
+        col1.metric("Signal Level", f"{quality_icon} {quality_status}", f"{avg_dbfs:.1f} dBFS")
+        col2.metric("Avg Dynamic Range", f"{avg_dynamic_range:.1f} dB" if avg_dynamic_range > 0 else "N/A")
+        col3.metric("Avg SNR", f"{avg_snr:.1f} dB" if avg_snr else "Calculating...")
+        col4.metric("Clipping Events", total_clipping, "last 60s")
+        col5.metric("Samples", len(quality_data))
+
+        st.caption("For detailed per-board analytics, expand a board under **Manage Boards** and select the **Analytics** tab.")
+    else:
+        st.info("No audio quality data available. Quality metrics appear when boards are streaming.")
 
 st.divider()
 

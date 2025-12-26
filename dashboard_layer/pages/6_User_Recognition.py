@@ -1,7 +1,7 @@
 """
-User Recognition & Enrollment page.
-Manage voice profiles for speaker verification using resemblyzer (VoiceEncoder).
-Features guided reading prompts, in-browser audio recording, and board recording.
+User Recognition page.
+Register users and manage voice profiles for speaker identification.
+Registration is REQUIRED for metrics to be computed.
 """
 
 import streamlit as st
@@ -9,27 +9,22 @@ import os
 import sys
 import tempfile
 import numpy as np
-import wave
-import io
 import uuid
 import time
 from datetime import datetime
 
-# Import utils
 from utils.database import get_database, render_mode_selector, get_current_mode
 
 # Board recorder
 try:
     from utils.board_recorder import BoardRecorder
 except ImportError:
-    # Handle relative import if needed
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from utils.board_recorder import BoardRecorder
 
-# --- REAMBLYSER & UTILS SETUP ---
+# Resemblyzer
 try:
     from resemblyzer import VoiceEncoder, preprocess_wav
-    from scipy.io.wavfile import write as write_wav
     RESEMBLYZER_AVAILABLE = True
 except ImportError:
     RESEMBLYZER_AVAILABLE = False
@@ -41,28 +36,17 @@ if get_current_mode() != "live":
     st.info("This page is only available in Live mode.")
     st.stop()
 
-st.title("User Recognition")
-st.markdown("Register users and manage voice profiles. **Registration is required** for metric computation.")
+render_mode_selector()
 
-# Try importing webrtc for browser recording
-try:
-    from streamlit_webrtc import webrtc_streamer, WebRtcMode, AudioProcessorBase
-    import av
-    WEBRTC_AVAILABLE = True
-except ImportError:
-    WEBRTC_AVAILABLE = False
+st.title("User Recognition")
 
 # --- DATABASE CONNECTION ---
 db = get_database()
 user_config_collection = db["user_config"]
+voice_profiling_collection = db["voice_profiling"]
 boards_collection = db["boards"]
-# We also need to interface with processing_layer's storage if we want to be compatible
-# But for now we stick to user_config and I will update VoiceAuthenticationService logic if possible
-# Or just implement enrollment here directly using Resemblyzer to be compatible with live system.
+environments_collection = db["environments"]
 
-# --- ENROLLMENT LOGIC (RESEMBLYZER) ---
-# We will implement the enrollment logic directly here to ensure compatibility with processing_layer
-# which uses resemblyzer.
 
 @st.cache_resource
 def get_encoder():
@@ -70,295 +54,475 @@ def get_encoder():
         return VoiceEncoder()
     return None
 
+
 encoder = get_encoder()
 
 if not RESEMBLYZER_AVAILABLE:
-    st.error("Resemblyzer library not found. Please install it to use this feature.")
+    st.error("Resemblyzer library not available. Voice recognition features disabled.")
     st.stop()
 
-def enroll_user_resemblyzer(audio_path, user_id, user_data):
-    """
-    Generates embedding using Resemblyzer and stores it.
-    """
-    wav = preprocess_wav(audio_path)
-    embedding = encoder.embed_utterance(wav)
 
-    # Store in user_config (dashboard storage)
-    user_config_collection.update_one(
-        {"user_id": user_id},
-        {"$set": {
-            "voice_profile": embedding.tolist(), # Store as list
-            "d_vector": embedding.tolist(), # Legacy compatibility
-            "name": user_data.get("name"),
-            "gender": user_data.get("gender"),
-            "age": user_data.get("age"),
-            "updated_at": datetime.utcnow()
-        }},
-        upsert=True
-    )
-
-    # Also store in 'voice_profiling' collection if it exists (Live System)
-    # This ensures the processing_layer (live system) picks it up.
+def enroll_user(audio_path: str, user_id: str, user_data: dict) -> bool:
+    """Generate voice embedding and store user profile."""
     try:
-        voice_profiling_collection = db["voice_profiling"] # This might need to be iotsensing.voice_profiling
-        # Check if we are in live mode, usually db is iotsensing_live.
-        # But processing_layer usually connects to 'iotsensing'.
-        # We try to write to 'voice_profiling' in the current DB.
+        wav = preprocess_wav(audio_path)
+        embedding = encoder.embed_utterance(wav)
 
+        # Store in user_config (dashboard storage)
+        user_config_collection.update_one(
+            {"user_id": user_id},
+            {
+                "$set": {
+                    "voice_profile": embedding.tolist(),
+                    "d_vector": embedding.tolist(),
+                    "name": user_data.get("name"),
+                    "gender": user_data.get("gender"),
+                    "age": user_data.get("age"),
+                    "registered_at": user_data.get("registered_at", datetime.utcnow()),
+                    "updated_at": datetime.utcnow(),
+                }
+            },
+            upsert=True,
+        )
+
+        # Also store in voice_profiling collection for processing layer
         voice_profiling_collection.update_one(
-             {"user_id": user_id},
-             {"$set": {
-                 "embedding": embedding.tolist(),
-                 "updated_at": datetime.utcnow()
-             }},
-             upsert=True
+            {"user_id": user_id},
+            {"$set": {"embedding": embedding.tolist(), "updated_at": datetime.utcnow()}},
+            upsert=True,
         )
+
+        return True
     except Exception as e:
-        print(f"Could not update voice_profiling collection: {e}")
+        st.error(f"Enrollment error: {e}")
+        return False
 
-    return True
 
-# --- SIDEBAR: USER SELECTION ---
-render_mode_selector()
+def get_registered_users():
+    """Get all registered users."""
+    users = list(user_config_collection.find({"voice_profile": {"$exists": True}}))
+    return users
 
-st.sidebar.title("User Management")
 
-# Fetch users
-users_cursor = user_config_collection.find({}, {"user_id": 1, "name": 1})
-users_dict = {u.get("user_id"): u.get("name", "Unknown") for u in users_cursor if u.get("user_id")}
+def delete_user(user_id: str):
+    """Delete a user profile."""
+    user_config_collection.delete_one({"user_id": user_id})
+    voice_profiling_collection.delete_one({"user_id": user_id})
 
-action = st.sidebar.radio("Action", ["Select Existing User", "Register New User"])
 
-selected_user_id = None
-user_metadata = {}
+# =============================================================================
+# MAIN CONTENT
+# =============================================================================
 
-if action == "Select Existing User":
-    if users_dict:
-        selected_user_id_str = st.sidebar.selectbox(
-            "Select User",
-            options=list(users_dict.keys()),
-            format_func=lambda x: f"{users_dict[x]} ({x})"
-        )
-        selected_user_id = selected_user_id_str
-        # Load metadata
-        user_doc = user_config_collection.find_one({"user_id": selected_user_id})
-        if user_doc:
-            st.sidebar.info(f"**Name:** {user_doc.get('name')}\n\n**Gender:** {user_doc.get('gender')}\n\n**Age:** {user_doc.get('age')}")
-    else:
-        st.sidebar.warning("No users found.")
+st.markdown("""
+**Voice registration is required** for the system to compute metrics.
+Only audio from recognized speakers will be processed and analyzed.
+""")
+
+# Show registration status
+users = get_registered_users()
+
+if not users:
+    st.warning("No users registered. Please register at least one user to start collecting metrics.")
 else:
-    st.sidebar.subheader("New User Details")
-    new_name = st.sidebar.text_input("Name")
-    new_gender = st.sidebar.selectbox("Gender", ["Male", "Female", "Non-binary", "Prefer not to say"])
-    new_age = st.sidebar.number_input("Age", min_value=0, max_value=120, value=25)
+    st.success(f"{len(users)} user(s) registered. The system is ready to process audio.")
 
-    if new_name:
-        # Generate ID only when we actually enroll, or preview it
-        # We will generate it during enrollment process
-        pass
+st.divider()
 
-# --- MAIN CONTENT ---
-
+# =============================================================================
 # TABS
-tab1, tab2 = st.tabs(["📝 Enrollment", "✅ Verification Check"])
+# =============================================================================
+tab_register, tab_users, tab_verify = st.tabs(["Register New User", "Registered Users", "Test Recognition"])
 
-with tab1:
-    st.header("Voice Enrollment")
+# =============================================================================
+# TAB 1: REGISTER NEW USER
+# =============================================================================
+with tab_register:
+    st.header("Register New User")
+    st.markdown("Complete the form below to register a new user for voice recognition.")
 
-    if action == "Register New User" and not new_name:
-        st.info("👈 Please enter user details in the sidebar to start registration.")
-    elif action == "Select Existing User" and not selected_user_id:
-        st.info("👈 Please select a user in the sidebar.")
+    # User Details Section
+    st.subheader("1. User Details")
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        user_name = st.text_input("Name *", placeholder="Enter full name")
+    with col2:
+        user_gender = st.selectbox("Gender", ["Male", "Female", "Non-binary", "Prefer not to say"])
+    with col3:
+        user_age = st.number_input("Age", min_value=1, max_value=120, value=30)
+
+    if not user_name:
+        st.info("Please enter a name to continue.")
     else:
-        # Enrollment Flow
-        if action == "Register New User":
-             st.markdown(f"### Registering: {new_name}")
-             st.info("Registration requires a voice sample. Metrics will ONLY be computed for registered voices.")
-        else:
-             st.markdown(f"### Update Voice Profile: {users_dict[selected_user_id]}")
+        st.divider()
 
-        st.markdown("#### Step 1: Record Voice Sample")
-        st.caption("Please read the text below clearly.")
+        # Voice Sample Section
+        st.subheader("2. Record Voice Sample")
 
-        # Simplified Prompt
-        prompt_text = """When the sunlight strikes raindrops in the air, they act as a prism and form a rainbow.
-The rainbow is a division of white light into many beautiful colors."""
+        st.markdown("""
+        Read the passage below **once, clearly** (~10-15 seconds). This creates your unique voice profile.
+        """)
+
+        # Simple, short passage
+        passage = """The rainbow is a division of white light into many beautiful colors.
+These take the shape of a long round arch, with its path high above,
+and its two ends apparently beyond the horizon."""
 
         st.markdown(
             f"""
-            <div style="background: #F8F9FA; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #3498DB;
-                 font-size: 1.2rem; line-height: 1.6; margin: 1rem 0;">
-                {prompt_text}
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white; padding: 1.5rem; border-radius: 12px;
+                        font-size: 1.15rem; line-height: 1.8; margin: 1rem 0;
+                        box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <strong>Read this passage:</strong><br><br>
+                "{passage}"
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-        # Recording Methods
-        method = st.radio("Recording Method", ["Microphone (Browser)", "Record from Board", "Upload File"], horizontal=True)
+        st.markdown("#### Choose Recording Method")
 
-        audio_data = None
+        # Get active boards
+        active_boards = list(boards_collection.find({"is_active": True}))
+        env_lookup = {e["environment_id"]: e["name"] for e in environments_collection.find({})}
 
-        if method == "Microphone (Browser)":
-            if WEBRTC_AVAILABLE:
-                # Audio processor for capturing audio
-                class AudioProcessor(AudioProcessorBase):
-                    def __init__(self):
-                        self.audio_frames = []
-                        self.sample_rate = 16000
+        method = st.radio(
+            "Recording source:",
+            ["Record from Board (Recommended)", "Upload Audio File"],
+            horizontal=True,
+            help="Using a registered board ensures audio quality matches your deployment setup.",
+        )
 
-                    def recv(self, frame: av.AudioFrame) -> av.AudioFrame:
-                        # Store audio data
-                        audio_array = frame.to_ndarray()
-                        self.audio_frames.append(audio_array)
-                        return frame
+        audio_ready = False
+        audio_source = None
 
-                webrtc_ctx = webrtc_streamer(
-                    key="enrollment-recorder",
-                    mode=WebRtcMode.SENDONLY,
-                    audio_receiver_size=256,
-                    media_stream_constraints={"video": False, "audio": True},
+        if method == "Record from Board (Recommended)":
+            if not active_boards:
+                st.warning("No active boards found. Please ensure a board is connected and streaming.")
+                st.caption("Go to the Boards page to check board status.")
+            else:
+                board_options = {}
+                for b in active_boards:
+                    env_name = env_lookup.get(b.get("environment_id"), "Unknown")
+                    board_options[b["board_id"]] = f"{b.get('name', 'Unknown')} - {env_name}"
+
+                selected_board = st.selectbox(
+                    "Select Board",
+                    options=list(board_options.keys()),
+                    format_func=lambda x: board_options[x],
                 )
 
-                if webrtc_ctx.audio_receiver:
-                    st.info("🎤 Recording in progress... Read the passage above.")
+                col_rec, col_status = st.columns([1, 2])
 
-                    # Collect audio frames
-                    audio_frames = []
-                    try:
-                        while True:
-                            frame = webrtc_ctx.audio_receiver.get_frame(timeout=1)
-                            audio_frames.append(frame.to_ndarray())
-                    except Exception:
-                        pass
+                with col_rec:
+                    record_duration = st.select_slider(
+                        "Recording duration",
+                        options=[10, 15, 20],
+                        value=15,
+                        format_func=lambda x: f"{x} seconds",
+                    )
 
-                    if audio_frames:
-                        # Combine frames
-                        audio_array = np.concatenate(audio_frames, axis=1)
-                        st.session_state["recorded_audio"] = audio_array
-                        st.success(f"✅ Recorded {len(audio_frames)} frames")
+                    if st.button("Start Recording", type="primary", use_container_width=True):
+                        recorder = BoardRecorder()
+                        with st.spinner(f"Recording for {record_duration} seconds... Please read the passage now!"):
+                            recorded_audio = recorder.start_recording(selected_board, duration=record_duration)
 
-                # Check for recorded audio in session state
-                if "recorded_audio" in st.session_state:
-                    st.success("Audio recorded! Click 'Complete Registration' below to process.")
-                    audio_data = st.session_state.get("recorded_audio")
-            else:
-                st.error("WebRTC not installed.")
+                        if recorded_audio is not None and len(recorded_audio) > 0:
+                            st.session_state["enrollment_audio"] = recorded_audio
+                            st.session_state["enrollment_source"] = "board"
+                            st.success("Recording captured!")
+                            st.rerun()
+                        else:
+                            st.error("No audio received. Ensure the board is streaming.")
 
-        elif method == "Record from Board":
-            st.markdown("#### Record from a connected ReSpeaker Board")
-            # List boards
-            active_boards = list(boards_collection.find({"is_active": True}))
-            if not active_boards:
-                st.warning("No active boards found.")
-            else:
-                board_options = {b['board_id']: f"{b.get('name', 'Unknown')} ({b.get('environment_name', 'Unknown')})" for b in active_boards}
-                selected_board_id = st.selectbox("Select Board", options=list(board_options.keys()), format_func=lambda x: board_options[x])
+                with col_status:
+                    if "enrollment_audio" in st.session_state and st.session_state.get("enrollment_source") == "board":
+                        st.success("Audio sample ready!")
+                        st.audio(st.session_state["enrollment_audio"], sample_rate=16000)
+                        audio_ready = True
+                        audio_source = "session"
 
-                if st.button("🔴 Start Recording (15s)"):
-                    recorder = BoardRecorder()
-                    with st.spinner(f"Recording from {board_options[selected_board_id]} for 15 seconds... Please speak now."):
-                        recorded_audio = recorder.start_recording(selected_board_id, duration=15)
+                        if st.button("Clear Recording", type="secondary"):
+                            del st.session_state["enrollment_audio"]
+                            del st.session_state["enrollment_source"]
+                            st.rerun()
 
-                    if recorded_audio is not None and len(recorded_audio) > 0:
-                        st.success("Audio captured from board!")
-                        st.session_state["board_audio"] = recorded_audio
-                    else:
-                        st.error("Failed to capture audio. Ensure the board is streaming.")
+        else:  # Upload File
+            uploaded_file = st.file_uploader(
+                "Upload a WAV or MP3 file",
+                type=["wav", "mp3"],
+                help="Record yourself reading the passage above.",
+            )
 
-            if "board_audio" in st.session_state:
-                st.audio(st.session_state["board_audio"], sample_rate=16000)
-                audio_data = st.session_state["board_audio"]
+            if uploaded_file:
+                st.audio(uploaded_file)
+                st.session_state["enrollment_audio"] = uploaded_file
+                st.session_state["enrollment_source"] = "upload"
+                audio_ready = True
+                audio_source = "upload"
 
-        elif method == "Upload File":
-            uploaded = st.file_uploader("Upload WAV/MP3", type=["wav", "mp3"])
-            if uploaded:
-                st.audio(uploaded)
-                audio_data = uploaded
+        # Registration Button
+        st.divider()
+        st.subheader("3. Complete Registration")
 
-        # Enroll Button
-        if st.button("Complete Registration / Update Profile", type="primary", disabled=(audio_data is None and "board_audio" not in st.session_state and "recorded_audio" not in st.session_state)):
-            # Prepare audio file
+        can_register = user_name and (
+            audio_ready
+            or ("enrollment_audio" in st.session_state)
+        )
+
+        if st.button(
+            "Register User",
+            type="primary",
+            disabled=not can_register,
+            use_container_width=True,
+        ):
             with st.spinner("Processing voice profile..."):
                 try:
+                    # Generate unique ID
+                    new_user_id = str(uuid.uuid4())
+
+                    # Save audio to temp file
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                        audio_data = st.session_state.get("enrollment_audio")
+
                         if isinstance(audio_data, np.ndarray):
-                            # From browser recording
-                            # Ensure we handle different shapes if needed, but simple write is ok if it's 1D/2D
-                            if audio_data.ndim == 2:
-                                # (Channels, Samples) -> (Samples, Channels) or Flatten if mono
-                                # Webrtc usually gives (Channels, Samples)
-                                audio_data = audio_data.T
                             import soundfile as sf
                             sf.write(tmp.name, audio_data, 16000)
                         elif hasattr(audio_data, "getvalue"):
                             tmp.write(audio_data.getvalue())
-                        elif "board_audio" in st.session_state:
-                             import soundfile as sf
-                             sf.write(tmp.name, st.session_state["board_audio"], 16000)
+                        elif hasattr(audio_data, "read"):
+                            tmp.write(audio_data.read())
 
                         tmp_path = tmp.name
 
-                    # Determine User ID
-                    if action == "Register New User":
-                        uid = str(uuid.uuid4())
-                        u_data = {"name": new_name, "gender": new_gender, "age": new_age}
-                    else:
-                        uid = selected_user_id
-                        # Get existing data to preserve or update
-                        u_data = user_config_collection.find_one({"user_id": uid})
+                    # Enroll user
+                    user_data = {
+                        "name": user_name,
+                        "gender": user_gender,
+                        "age": user_age,
+                        "registered_at": datetime.utcnow(),
+                    }
 
-                    # Enroll
-                    enroll_user_resemblyzer(tmp_path, uid, u_data)
-
-                    st.success(f"User {u_data['name']} successfully registered/updated!")
-                    if action == "Register New User":
-                        st.info(f"Assigned User ID: {uid}")
+                    success = enroll_user(tmp_path, new_user_id, user_data)
 
                     # Cleanup
                     os.remove(tmp_path)
-                    if "board_audio" in st.session_state:
-                        del st.session_state["board_audio"]
 
-                    time.sleep(1)
-                    st.rerun()
+                    if success:
+                        st.success(f"User '{user_name}' registered successfully!")
+                        st.balloons()
+
+                        # Clear session state
+                        if "enrollment_audio" in st.session_state:
+                            del st.session_state["enrollment_audio"]
+                        if "enrollment_source" in st.session_state:
+                            del st.session_state["enrollment_source"]
+
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error("Registration failed. Please try again.")
 
                 except Exception as e:
-                    st.error(f"Enrollment failed: {e}")
+                    st.error(f"Error during registration: {e}")
 
-with tab2:
-    st.header("Verification Check")
-    # Simple check against selected user
-    if selected_user_id:
-        st.markdown(f"Verify against **{users_dict.get(selected_user_id)}**")
+        if not can_register:
+            st.caption("Enter user details and record a voice sample to enable registration.")
 
-        check_file = st.file_uploader("Upload Audio to Verify", key="verify_up")
-        if check_file:
-             if st.button("Verify"):
-                 with st.spinner("Verifying..."):
-                     # Load profile
-                     user_doc = user_config_collection.find_one({"user_id": selected_user_id})
-                     if not user_doc or "voice_profile" not in user_doc:
-                         st.error("No profile found.")
-                     else:
-                         ref_embed = np.array(user_doc["voice_profile"])
+# =============================================================================
+# TAB 2: REGISTERED USERS
+# =============================================================================
+with tab_users:
+    st.header("Registered Users")
 
-                         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-                            tmp.write(check_file.getvalue())
+    users = get_registered_users()
+
+    if not users:
+        st.info("No users registered yet. Use the 'Register New User' tab to add users.")
+    else:
+        for user in users:
+            with st.container():
+                col1, col2, col3, col4, col5 = st.columns([3, 2, 1, 2, 1])
+
+                with col1:
+                    st.markdown(f"**{user.get('name', 'Unknown')}**")
+
+                with col2:
+                    st.caption(f"Gender: {user.get('gender', 'N/A')}")
+
+                with col3:
+                    st.caption(f"Age: {user.get('age', 'N/A')}")
+
+                with col4:
+                    reg_date = user.get("registered_at") or user.get("updated_at")
+                    if reg_date:
+                        st.caption(f"Registered: {reg_date.strftime('%Y-%m-%d')}")
+
+                with col5:
+                    if st.button("Delete", key=f"del_{user['user_id']}", type="secondary"):
+                        delete_user(user["user_id"])
+                        st.success(f"User '{user.get('name')}' deleted.")
+                        time.sleep(0.5)
+                        st.rerun()
+
+                st.divider()
+
+        # Update voice profile section
+        st.subheader("Update Voice Profile")
+        st.markdown("Re-record a user's voice sample to improve recognition accuracy.")
+
+        user_options = {u["user_id"]: u.get("name", "Unknown") for u in users}
+        selected_user_id = st.selectbox(
+            "Select user to update",
+            options=list(user_options.keys()),
+            format_func=lambda x: user_options[x],
+        )
+
+        if selected_user_id:
+            update_method = st.radio("Recording method:", ["Board", "Upload"], horizontal=True, key="update_method")
+
+            if update_method == "Board":
+                active_boards = list(boards_collection.find({"is_active": True}))
+                if active_boards:
+                    board_opts = {b["board_id"]: b.get("name", "Unknown") for b in active_boards}
+                    sel_board = st.selectbox("Board", list(board_opts.keys()), format_func=lambda x: board_opts[x], key="upd_board")
+
+                    if st.button("Record Update Sample (15s)", key="upd_rec"):
+                        recorder = BoardRecorder()
+                        with st.spinner("Recording..."):
+                            audio = recorder.start_recording(sel_board, duration=15)
+                        if audio is not None and len(audio) > 0:
+                            st.session_state["update_audio"] = audio
+                            st.success("Recorded!")
+                else:
+                    st.warning("No active boards.")
+
+            else:
+                upd_file = st.file_uploader("Upload file", type=["wav", "mp3"], key="upd_file")
+                if upd_file:
+                    st.session_state["update_audio"] = upd_file
+
+            if "update_audio" in st.session_state:
+                if st.button("Update Profile", type="primary", key="upd_btn"):
+                    with st.spinner("Updating..."):
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                            audio_data = st.session_state["update_audio"]
+                            if isinstance(audio_data, np.ndarray):
+                                import soundfile as sf
+                                sf.write(tmp.name, audio_data, 16000)
+                            else:
+                                tmp.write(audio_data.getvalue())
                             tmp_path = tmp.name
 
-                         wav = preprocess_wav(tmp_path)
-                         query_embed = encoder.embed_utterance(wav)
+                        user_doc = user_config_collection.find_one({"user_id": selected_user_id})
+                        success = enroll_user(tmp_path, selected_user_id, user_doc or {})
+                        os.remove(tmp_path)
 
-                         # Cosine similarity
-                         sim = np.dot(ref_embed, query_embed) / (np.linalg.norm(ref_embed) * np.linalg.norm(query_embed))
+                        if success:
+                            st.success("Profile updated!")
+                            del st.session_state["update_audio"]
+                            st.rerun()
 
-                         st.metric("Similarity Score", f"{sim:.2f}")
-                         if sim > 0.75:
-                             st.success("✅ Match Confirmed")
-                         else:
-                             st.error("❌ No Match")
+# =============================================================================
+# TAB 3: TEST RECOGNITION
+# =============================================================================
+with tab_verify:
+    st.header("Test Recognition")
+    st.markdown("Upload or record audio to test if the system can identify a registered user.")
 
-                         os.remove(tmp_path)
+    users = get_registered_users()
+
+    if not users:
+        st.warning("No users registered. Register users first to test recognition.")
     else:
-        st.info("Select a user from the sidebar to verify.")
+        test_method = st.radio("Test audio source:", ["Upload File", "Record from Board"], horizontal=True)
+
+        test_audio = None
+
+        if test_method == "Upload File":
+            test_file = st.file_uploader("Upload test audio", type=["wav", "mp3"], key="test_file")
+            if test_file:
+                st.audio(test_file)
+                test_audio = test_file
+
+        else:
+            active_boards = list(boards_collection.find({"is_active": True}))
+            if active_boards:
+                board_opts = {b["board_id"]: b.get("name", "Unknown") for b in active_boards}
+                test_board = st.selectbox("Board", list(board_opts.keys()), format_func=lambda x: board_opts[x], key="test_board")
+
+                if st.button("Record Test Sample (10s)"):
+                    recorder = BoardRecorder()
+                    with st.spinner("Recording..."):
+                        audio = recorder.start_recording(test_board, duration=10)
+                    if audio is not None:
+                        st.session_state["test_audio"] = audio
+                        st.rerun()
+
+                if "test_audio" in st.session_state:
+                    st.audio(st.session_state["test_audio"], sample_rate=16000)
+                    test_audio = st.session_state["test_audio"]
+            else:
+                st.warning("No active boards available.")
+
+        if test_audio is not None:
+            if st.button("Run Recognition Test", type="primary"):
+                with st.spinner("Analyzing voice..."):
+                    try:
+                        # Save to temp
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                            if isinstance(test_audio, np.ndarray):
+                                import soundfile as sf
+                                sf.write(tmp.name, test_audio, 16000)
+                            else:
+                                tmp.write(test_audio.getvalue())
+                            tmp_path = tmp.name
+
+                        # Generate embedding
+                        wav = preprocess_wav(tmp_path)
+                        query_embed = encoder.embed_utterance(wav)
+
+                        # Compare against all users
+                        results = []
+                        for user in users:
+                            if "voice_profile" in user:
+                                ref_embed = np.array(user["voice_profile"])
+                                sim = np.dot(ref_embed, query_embed) / (
+                                    np.linalg.norm(ref_embed) * np.linalg.norm(query_embed)
+                                )
+                                results.append({
+                                    "name": user.get("name", "Unknown"),
+                                    "similarity": sim,
+                                    "user_id": user["user_id"],
+                                })
+
+                        os.remove(tmp_path)
+
+                        if results:
+                            # Sort by similarity
+                            results.sort(key=lambda x: x["similarity"], reverse=True)
+                            best = results[0]
+
+                            st.subheader("Recognition Results")
+
+                            if best["similarity"] >= 0.75:
+                                st.success(f"Identified: **{best['name']}** (similarity: {best['similarity']:.2%})")
+                            elif best["similarity"] >= 0.6:
+                                st.warning(f"Possible match: **{best['name']}** (similarity: {best['similarity']:.2%})")
+                            else:
+                                st.error("No match found. Speaker not recognized.")
+
+                            # Show all scores
+                            st.markdown("##### All Similarity Scores")
+                            for r in results:
+                                icon = "🟢" if r["similarity"] >= 0.75 else "🟡" if r["similarity"] >= 0.6 else "🔴"
+                                st.markdown(f"{icon} **{r['name']}**: {r['similarity']:.2%}")
+
+                            # Clear test audio
+                            if "test_audio" in st.session_state:
+                                del st.session_state["test_audio"]
+
+                    except Exception as e:
+                        st.error(f"Recognition error: {e}")

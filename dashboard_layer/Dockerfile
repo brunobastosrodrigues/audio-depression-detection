@@ -1,8 +1,10 @@
 FROM python:3.10-slim
 
-# Install system dependencies for audio processing
+# Install system dependencies for audio processing and resemblyzer
 RUN apt-get update && apt-get install -y \
     libsndfile1 \
+    build-essential \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

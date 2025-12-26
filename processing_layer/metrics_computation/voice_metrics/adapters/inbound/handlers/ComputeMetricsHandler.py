@@ -21,6 +21,7 @@ class ComputeMetricsHandler(Handler):
                 "environment_name": data.get("environment_name"),
                 "source_topic": topic,
                 "system_mode": data.get("system_mode", "live"),  # Default to live
+                "quality_metrics": data.get("quality_metrics"),
             }
 
             self.use_case.execute(audio_bytes, metadata=metadata)

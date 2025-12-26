@@ -29,13 +29,16 @@ class ComputeMetricsUseCase:
             user_id = self.user_profiling.recognize_user(audio_bytes)
 
         start = time.perf_counter()
-        metrics = self.metrics_computation_service.compute(
+        raw_metrics_list, quality_metrics_record = self.metrics_computation_service.compute(
             audio_bytes, user_id, metadata=metadata
         )
         end = time.perf_counter()
         duration = end - start
 
-        self.persistence.save_metrics(metrics)
+        self.persistence.save_metrics(raw_metrics_list)
+        if quality_metrics_record.get("metrics_data"): # Only save if there are actual quality metrics
+            self.persistence.save_audio_quality_metrics([quality_metrics_record])
+
 
         with open(self.log_path, mode="a", newline="") as f:
             writer = csv.DictWriter(
