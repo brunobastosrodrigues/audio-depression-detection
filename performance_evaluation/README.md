@@ -261,7 +261,7 @@ class VoiceMetricsService:
             ctx.set_audio_duration(len(audio_bytes) / 16000)
             
         # Periodically export metrics
-        if self.profiler.metrics_count > 100:
+        if len(self.profiler.metrics) > 100:
             self.profiler.export_json()
 ```
 

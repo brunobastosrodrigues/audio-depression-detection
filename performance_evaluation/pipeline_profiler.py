@@ -20,8 +20,11 @@ import sys
 import os
 import argparse
 import time
-import numpy as np
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import numpy as np
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -51,17 +54,19 @@ class PipelineProfiler:
         if audio_file and not os.path.exists(audio_file):
             raise FileNotFoundError(f"Audio file not found: {audio_file}")
     
-    def profile_data_ingestion(self, audio_data: np.ndarray, sample_rate: int):
+    def profile_data_ingestion(self, audio_data, sample_rate: int):
         """
         Profile the data ingestion layer (collection + VAD filtering).
         
         Args:
-            audio_data: Audio samples
+            audio_data: Audio samples (numpy array)
             sample_rate: Sample rate in Hz
             
         Returns:
             Filtered audio segments
         """
+        import numpy as np
+        
         audio_duration_s = len(audio_data) / sample_rate
         
         # Profile audio collection (simulated - in real system this is hardware I/O)
@@ -136,17 +141,19 @@ class PipelineProfiler:
                 ctx.set_metadata({'error': str(e)})
                 return [audio_data]  # Return original if VAD fails
     
-    def profile_feature_extraction(self, audio_segment: np.ndarray, sample_rate: int):
+    def profile_feature_extraction(self, audio_segment, sample_rate: int):
         """
         Profile feature extraction (voice metrics computation).
         
         Args:
-            audio_segment: Audio segment to process
+            audio_segment: Audio segment to process (numpy array)
             sample_rate: Sample rate in Hz
             
         Returns:
             Extracted features dictionary
         """
+        import random
+        
         audio_duration_s = len(audio_segment) / sample_rate
         
         features = {}
@@ -166,7 +173,7 @@ class PipelineProfiler:
                     # Simulate feature extraction
                     # In real system, this would call actual extractors
                     for feature in feature_list:
-                        features[feature] = np.random.random()
+                        features[feature] = random.random()
                     
                     ctx.set_audio_duration(audio_duration_s)
                     ctx.set_metadata({
@@ -178,12 +185,12 @@ class PipelineProfiler:
         
         return features
     
-    def profile_user_recognition(self, audio_segment: np.ndarray, sample_rate: int):
+    def profile_user_recognition(self, audio_segment, sample_rate: int):
         """
         Profile user recognition (speaker identification).
         
         Args:
-            audio_segment: Audio segment
+            audio_segment: Audio segment (numpy array)
             sample_rate: Sample rate in Hz
             
         Returns:
@@ -262,15 +269,23 @@ class PipelineProfiler:
         if self.audio_file:
             try:
                 import librosa
+                import numpy as np
                 audio_data, sample_rate = librosa.load(self.audio_file, sr=16000, mono=True)
                 print(f"Loaded audio file: {len(audio_data)/sample_rate:.2f}s @ {sample_rate}Hz")
+            except ImportError:
+                print("librosa not installed, using synthetic audio data")
+                import numpy as np
+                sample_rate = 16000
+                audio_data = np.random.randn(sample_rate * duration_s).astype(np.float32) * 0.1
             except Exception as e:
                 print(f"Failed to load audio file: {e}")
                 print("Using synthetic audio data instead")
+                import numpy as np
                 sample_rate = 16000
                 audio_data = np.random.randn(sample_rate * duration_s).astype(np.float32) * 0.1
         else:
             # Generate synthetic audio
+            import numpy as np
             sample_rate = 16000
             audio_data = np.random.randn(sample_rate * duration_s).astype(np.float32) * 0.1
             print(f"Generated synthetic audio: {duration_s}s @ {sample_rate}Hz")
