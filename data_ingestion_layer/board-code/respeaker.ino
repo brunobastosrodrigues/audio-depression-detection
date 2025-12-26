@@ -7,17 +7,24 @@
 const char* ssid     = "bbr";
 const char* password = "Nopassword1";
 const char* host     = "192.168.1.34"; // <--- YOUR PC IP ADDRESS
-const int port       = 8010;           // ReSpeaker Service port
+const int port       = 8010;
 
-// ================= AUDIO SETTINGS =================
+// ================= HIGH-FIDELITY AUDIO SETTINGS =================
 #define SAMPLE_RATE     16000
 #define I2S_SCK         8
 #define I2S_WS          7
 #define I2S_SD          44  // Mic Input
 
-// VOLUME CONTROL (Digital Gain)
-// 12 is usually the "sweet spot" (16x boost)
-// If too loud/distorted, change to 13 or 14.
+// VAD SETTINGS (Edge Intelligence)
+// Threshold: Adjust this if it cuts off too much (Lower = More Sensitive)
+#define VAD_THRESHOLD   150 
+// Hangover: Keeps recording for 500ms AFTER you stop speaking
+// This preserves the "breathiness" or "trailing off" at the end of sentences.
+#define HANGOVER_MS     500 
+
+// DIGITAL GAIN
+// 12 is the standard boost for ReSpeaker. 
+// If audio is too quiet, try 11. If distorted, try 13.
 #define BIT_SHIFT       12 
 
 // Internal Globals
@@ -25,46 +32,70 @@ RingbufHandle_t audio_ringbuf;
 WiFiClient client;
 TaskHandle_t i2s_task_handle;
 
-// ================= CORE 1: RECORDING TASK =================
-// This runs on a separate core to ensure smooth recording (No Helicopter noise)
+// ================= CORE 1: SMART AUDIO TASK =================
 void i2s_reader_task(void *param) {
   size_t bytes_read = 0;
   
-  // We process data in small, fast chunks
-  const int samples_per_chunk = 256; 
-  
   // Buffers
+  const int samples_per_chunk = 256; 
   int32_t raw_buffer[samples_per_chunk]; 
   int16_t clean_buffer[samples_per_chunk]; 
 
+  // VAD State Variables
+  unsigned long last_speech_time = 0;
+  bool is_streaming = false;
+
   while (true) {
-    // 1. Read Raw 32-bit Data (Blocks until data arrives)
+    // 1. READ RAW DATA
+    // We request 32-bit data. Because we configured "ONLY_LEFT" in setup,
+    // this data comes directly from the XMOS Noise Suppression engine.
     i2s_read(I2S_NUM_0, raw_buffer, sizeof(raw_buffer), &bytes_read, portMAX_DELAY);
     
-    int samples_acquired = bytes_read / 4; // Number of 32-bit samples received
+    int samples_acquired = bytes_read / 4;
     int idx = 0;
+    long energy_sum = 0;
 
-    // 2. PROCESS EVERY SAMPLE (Fixes "Fast" Audio)
-    // We iterate i++ (taking everything) instead of i+=2 (skipping half)
+    // 2. PROCESS & CONVERT
     for (int i = 0; i < samples_acquired; i++) {
-      
       int32_t sample = raw_buffer[i];
 
-      // Manual Volume Boost
+      // Digital Gain Boost
       sample = sample >> BIT_SHIFT;
 
-      // Hard Limiter (Prevents crackling if too loud)
+      // Soft Limiter (Prevents harsh digital clipping distortion)
       if (sample > 32767) sample = 32767;
       else if (sample < -32768) sample = -32768;
 
-      clean_buffer[idx++] = (int16_t)sample;
+      int16_t final_sample = (int16_t)sample;
+      clean_buffer[idx++] = final_sample;
+      
+      // Calculate Energy (Loudness) for VAD
+      energy_sum += abs(final_sample);
     }
 
-    // 3. Send to Ring Buffer (Safety Net)
-    if (idx > 0) {
-      // Send data to the buffer so the WiFi loop can pick it up later
+    // 3. EDGE LOGIC (VAD)
+    float average_energy = energy_sum / samples_acquired;
+
+    // Detect Voice
+    if (average_energy > VAD_THRESHOLD) {
+      last_speech_time = millis(); // Reset "silence" timer
+      is_streaming = true;
+    }
+
+    // Check Hangover (Are we still in the "tail" of the speech?)
+    if (millis() - last_speech_time < HANGOVER_MS) {
+        is_streaming = true;
+    } else {
+        is_streaming = false;
+    }
+
+    // 4. SMART SEND
+    // Only send data if we are actively streaming. 
+    // This utilizes the hardware to filter silence, saving bandwidth.
+    if (is_streaming && idx > 0) {
       xRingbufferSend(audio_ringbuf, clean_buffer, idx * sizeof(int16_t), pdMS_TO_TICKS(10));
     }
+    // Note: If silence, we drop the data here. The loop continues instantly.
   }
 }
 
@@ -72,10 +103,10 @@ void i2s_reader_task(void *param) {
 void setup() {
   Serial.begin(115200);
 
-  // 1. Create Ring Buffer (32KB is plenty for audio)
+  // 1. Create Ring Buffer
   audio_ringbuf = xRingbufferCreate(32 * 1024, RINGBUF_TYPE_BYTEBUF);
   if (audio_ringbuf == NULL) {
-    Serial.println("Error: Could not allocate Ring Buffer");
+    Serial.println("Error: Failed to create Ring Buffer");
     while(1);
   }
 
@@ -85,13 +116,14 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
   Serial.println("\nWiFi Connected!");
 
-  // 3. Configure I2S (SLAVE MODE - Critical for ReSpeaker)
+  // 3. I2S CONFIGURATION (CRITICAL FOR QUALITY)
   i2s_config_t i2s_config = {
-    .mode = (i2s_mode_t)(I2S_MODE_SLAVE | I2S_MODE_RX), 
+    .mode = (i2s_mode_t)(I2S_MODE_SLAVE | I2S_MODE_RX), // Slave Mode = Perfect Sync with XMOS Clock
     .sample_rate = SAMPLE_RATE,
-    .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
+    .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,       // Native ReSpeaker depth
     
-    // We read everything as a single stream to ensure we don't lose data
+    // THIS LINE IS THE KEY TO QUALITY:
+    // "ONLY_LEFT" selects Channel 0, which carries the XMOS Processed Audio (Noise Cancelled).
     .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT, 
     
     .communication_format = I2S_COMM_FORMAT_STAND_I2S,
@@ -104,45 +136,41 @@ void setup() {
   i2s_pin_config_t pin_config = {
     .bck_io_num = I2S_SCK, 
     .ws_io_num = I2S_WS, 
-    .data_out_num = -1, // Not used
+    .data_out_num = -1, 
     .data_in_num = I2S_SD
   };
 
-  // Install and Start I2S Driver
   i2s_driver_install(I2S_NUM_0, &i2s_config, 0, NULL);
   i2s_set_pin(I2S_NUM_0, &pin_config);
 
-  // 4. Start the Recording Task on Core 1
-  // This separates recording from WiFi sending
+  // 4. Start the Smart Task
   xTaskCreatePinnedToCore(
-    i2s_reader_task,   // Function
-    "I2S Reader",      // Name
-    4096,              // Stack size
-    NULL,              // Parameters
-    1,                 // Priority
-    &i2s_task_handle,  // Handle
-    1                  // Core ID (1)
+    i2s_reader_task,   
+    "HighFi_Reader",      
+    4096,              
+    NULL,              
+    1,                 
+    &i2s_task_handle,  
+    1                  
   );
   
-  Serial.println("System Ready. Waiting for connection...");
+  Serial.println("High-Fidelity Audio System Ready.");
 }
 
 // ================= CORE 0: WIFI SENDER =================
 void loop() {
-  // 1. Ensure Connection to PC
+  // 1. Connection Logic
   if (!client.connected()) {
     Serial.println("Connecting to PC Server...");
     if (client.connect(host, port)) {
       Serial.println("Connected!");
 
-      // --- NEW: MAC ADDRESS HANDSHAKE ---
-      // Send the MAC address (e.g. "AA:BB:CC:DD:EE:FF") as the first message
+      // REQUIRED: Handshake with MAC Address
       String mac = WiFi.macAddress();
       Serial.print("Sending Handshake: ");
       Serial.println(mac);
       client.print(mac);
-      // ----------------------------------
-
+      
       Serial.println("Streaming Audio...");
     } else {
       delay(1000); 
@@ -150,18 +178,15 @@ void loop() {
     }
   }
 
-  // 2. Retrieve Data from Ring Buffer
+  // 2. Retrieve Data (Empty if VAD is active & room is silent)
   size_t size_received = 0;
-  // We allow a small wait (10ms) to gather data
   uint8_t *data = (uint8_t *)xRingbufferReceive(audio_ringbuf, &size_received, pdMS_TO_TICKS(10));
 
-  // 3. Send Data to PC
+  // 3. Send
   if (data != NULL) {
     if (client.connected()) {
         client.write(data, size_received);
     }
-    
-    // Return the memory to the buffer so it can be reused
     vRingbufferReturnItem(audio_ringbuf, (void *)data);
   }
 }

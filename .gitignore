@@ -27,5 +27,6 @@ ex_files
 
 **/performance_log.csv
 
-# Claude Code local guidance
+# AI assistant local guidance
 CLAUDE.md
+GEMINI.md

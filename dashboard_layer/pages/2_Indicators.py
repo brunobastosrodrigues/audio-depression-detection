@@ -531,9 +531,12 @@ elif view_mode == "Research Data":
             )
 
             if selected_metrics:
-                display_df = (
-                    chart_data[selected_metrics].sort_index(ascending=False).reset_index()
-                )
+                # Prepare display dataframe
+                # Rename index to 'Measurement Time' to avoid collision if a metric is named 'timestamp'
+                display_df = chart_data[selected_metrics].sort_index(ascending=False)
+                display_df.index.name = "Measurement Time"
+                display_df = display_df.reset_index()
+                
                 display_df = display_df.replace([float("inf"), float("-inf")], None)
 
                 # Trends
@@ -541,9 +544,9 @@ elif view_mode == "Research Data":
 
                 fig = px.line(
                     display_df.melt(
-                        id_vars=["timestamp"], var_name="Metric", value_name="Value"
+                        id_vars=["Measurement Time"], var_name="Metric", value_name="Value"
                     ),
-                    x="timestamp",
+                    x="Measurement Time",
                     y="Value",
                     color="Metric",
                     template="plotly_white",
@@ -559,7 +562,7 @@ elif view_mode == "Research Data":
                 st.markdown("#### Data Table")
 
                 column_config = {
-                    "timestamp": st.column_config.DatetimeColumn(
+                    "Measurement Time": st.column_config.DatetimeColumn(
                         "Timestamp",
                         format="D MMM YYYY, HH:mm",
                     )
