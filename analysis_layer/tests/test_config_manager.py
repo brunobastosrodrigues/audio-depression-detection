@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 import os
 import json
-from analysis_layer.core.mapping.ConfigManager import ConfigManager
+from core.mapping.ConfigManager import ConfigManager
 
 class TestConfigManager(unittest.TestCase):
     def setUp(self):

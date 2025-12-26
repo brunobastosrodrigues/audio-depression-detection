@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
-from analysis_layer.core.services.CalibrationService import CalibrationService
-from analysis_layer.core.models.IndicatorScoreRecord import IndicatorScoreRecord
+from core.services.CalibrationService import CalibrationService
+from core.models.IndicatorScoreRecord import IndicatorScoreRecord
 
 class TestCalibrationService(unittest.TestCase):
     def setUp(self):

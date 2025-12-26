@@ -24,7 +24,7 @@ RUN pip install --no-cache-dir -r temp_requirements.txt
 
 RUN apt-get update && apt-get install -y praat
 
-ENV PYTHONPATH="/app/core/myprosody:${PYTHONPATH}"
+ENV PYTHONPATH="/app/core/myprosody"
 
 WORKDIR /app
 COPY . .
