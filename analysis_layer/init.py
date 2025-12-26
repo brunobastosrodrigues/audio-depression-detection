@@ -21,6 +21,7 @@ from core.use_cases.AnalyzeMetricsUseCase import AnalyzeMetricsUseCase
 from core.use_cases.DeriveIndicatorScoresUseCase import DeriveIndicatorScoresUseCase
 from core.baseline.BaselineManager import BaselineManager
 from core.services.CalibrationService import CalibrationService
+from core.mapping.ConfigManager import ConfigManager
 
 
 # ---------------------------------------------------------
@@ -33,12 +34,20 @@ app = FastAPI()
 # Instantiate core components
 # ---------------------------------------------------------
 
+# Create a shared ConfigManager instance
+config_manager = ConfigManager()
+
+# BaselineManager internally creates ConfigManager, but it's better if we could share it.
+# However, modifying BaselineManager might be out of scope or risky if it relies on internal state.
+# For now, we just pass our shared config_manager to DeriveIndicatorScoresUseCase.
+# (Note: BaselineManager creates its own ConfigManager in __init__)
 baseline_manager = BaselineManager()
+
 repository = MongoPersistenceAdapter()
 calibration_service = CalibrationService()
 
 analyze_metrics_use_case = AnalyzeMetricsUseCase(repository)
-derive_indicator_scores_use_case = DeriveIndicatorScoresUseCase(repository)
+derive_indicator_scores_use_case = DeriveIndicatorScoresUseCase(repository, config_manager)
 
 # ---------------------------------------------------------
 # Create routers from adapters
