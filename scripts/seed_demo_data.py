@@ -33,6 +33,13 @@ INDICATORS = [
 
 CORE_INDICATORS = ["1_depressed_mood", "2_loss_of_interest"]
 
+# Indicators that cannot be monitored through voice/speech features
+# These are always set to 0.0 in demo mode as they require other measurement methods
+NON_VOICE_MONITORABLE_INDICATORS = [
+    "3_significant_weight_changes",  # Requires direct measurement
+    "7_feelings_of_worthlessness_guilt",  # Primarily cognitive/emotional, no acoustic correlates
+]
+
 # Complete Acoustic Metrics List
 ACOUSTIC_METRICS = [
     "mean_f0", "std_f0", "f0_range", "f0_avg",
@@ -107,8 +114,8 @@ def generate_indicator_scores(
     scores = {}
 
     for indicator in INDICATORS:
-        # User requirement: Weight changes cannot be measured by sound
-        if indicator == "3_significant_weight_changes":
+        # Skip indicators that cannot be monitored through voice/speech
+        if indicator in NON_VOICE_MONITORABLE_INDICATORS:
             scores[indicator] = 0.0
             continue
 
