@@ -112,6 +112,12 @@ def generate_indicator_scores(
         if indicator == "3_significant_weight_changes":
             scores[indicator] = 0.0
             continue
+        
+        # Feelings of worthlessness/guilt is primarily cognitive/emotional
+        # and has limited direct acoustic correlates, so it's not populated from voice
+        if indicator == "7_feelings_of_worthlessness_guilt":
+            scores[indicator] = 0.0
+            continue
 
         if indicator in CORE_INDICATORS:
             # Core symptoms track severity closely
