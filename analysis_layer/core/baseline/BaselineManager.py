@@ -32,9 +32,10 @@ class BaselineManager:
         with open(path, "r") as f:
             return json.load(f)
 
-    def _get_context_key(self, timestamp_dt):
+    def _get_context_key(self, timestamp_dt) -> str:
         """
-        Map a timestamp to a context partition key.
+        Map a timestamp to a context partition key to avoid circadian false positives.
+        Stores separate baselines for morning and evening periods.
 
         Context keys:
         - 'morning': 06:00 to 11:59
