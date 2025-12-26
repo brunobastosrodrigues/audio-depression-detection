@@ -108,10 +108,11 @@ class QualityMetricsService:
             collection.insert_one(record)
             
             # Log only if there's something interesting
-            if quality_metrics.get("clipping_count", 0) > 0 or quality_metrics.get("snr"):
+            if quality_metrics.get("clipping_count", 0) > 0 or quality_metrics.get("snr") is not None:
+                snr_str = f"{quality_metrics.get('snr'):.2f}" if quality_metrics.get("snr") is not None else "N/A"
                 print(f"Saved quality metrics for {board_id}: dBFS={quality_metrics.get('db_fs', 0):.2f}, "
                       f"Clipping={quality_metrics.get('clipping_count', 0)}, "
-                      f"SNR={quality_metrics.get('snr', 'N/A')}")
+                      f"SNR={snr_str}")
                 
         except Exception as e:
             print(f"Error processing message from {msg.topic}: {e}")

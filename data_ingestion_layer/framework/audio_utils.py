@@ -112,6 +112,7 @@ def calculate_audio_metrics(audio_np: np.ndarray, sample_rate: int, noise_floor:
         metrics["dynamic_range"] = 0.0
 
     # SNR: Signal-to-Noise Ratio
+    # SNR can be negative if signal is weaker than noise floor, which is valid
     if noise_floor is not None and noise_floor > 0 and rms > 0:
         metrics["snr"] = float(20 * np.log10(rms / noise_floor))
     else:

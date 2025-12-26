@@ -8,6 +8,13 @@ import pandas as pd
 import requests
 from datetime import datetime, timedelta
 import os
+import traceback
+import queue
+import json
+import base64
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from utils.database import get_database, render_mode_selector, get_current_mode
 
@@ -101,7 +108,6 @@ if boards:
             for d in activity_data
         ])
         
-        import plotly.express as px
         fig = px.bar(
             df_activity, 
             x="Board", 
@@ -325,9 +331,6 @@ if boards:
                 with st.spinner("Listening for audio stream (10s timeout)..."):
                     try:
                         import paho.mqtt.client as mqtt
-                        import queue
-                        import json
-                        import base64
                         
                         # Helper to capture one message with timeout
                         def capture_single_message(topic, hostname="mqtt", port=1883, timeout=10):
@@ -619,9 +622,6 @@ if boards:
                         # Plot metrics over time
                         st.markdown("##### Metrics Over Time")
                         
-                        import plotly.graph_objects as go
-                        from plotly.subplots import make_subplots
-                        
                         # Create DataFrame for plotting
                         df_quality = pd.DataFrame(quality_data)
                         
@@ -724,8 +724,6 @@ if boards:
                     
                     with col_chart:
                         if count > 0:
-                            import plotly.express as px
-                            
                             # Create hourly bins
                             df_activity = pd.DataFrame(timestamps, columns=["timestamp"])
                             df_activity["hour"] = df_activity["timestamp"].dt.floor("H")
@@ -745,7 +743,6 @@ if boards:
                             
                 except Exception as e:
                     st.error(f"Error loading analytics: {e}")
-                    import traceback
                     st.code(traceback.format_exc())
 
             st.markdown("---")
