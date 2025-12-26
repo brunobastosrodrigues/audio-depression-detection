@@ -15,7 +15,14 @@ class UserRecognitionAudioUseCase:
         self.user_profiles = self.repository.load_all_user_embeddings()
         self.encoder = VoiceEncoder()
 
+    def reload_user_profiles(self):
+        """Reload user profiles from database (e.g., after new enrollment)."""
+        self.user_profiles = self.repository.load_all_user_embeddings()
+
     def recognize_user(self, audio_bytes: bytes) -> dict:
+        # Reload profiles to ensure we have the latest registered users
+        self.reload_user_profiles()
+        
         wav, _ = wav_bytes_to_np_float32(audio_bytes)
 
         # Generate query vector for the short incoming chunk
