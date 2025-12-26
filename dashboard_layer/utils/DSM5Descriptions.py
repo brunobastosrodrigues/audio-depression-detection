@@ -70,9 +70,9 @@ class DSM5Descriptions:
                 "This might be eating much more or much less than usual."
             ),
             "acoustic_rationale": (
-                "While weight changes are not directly measurable through voice, "
-                "associated fatigue and physiological changes can affect voice "
-                "quality, pitch patterns, and vocal cord function."
+                "Weight changes cannot be measured through voice or speech analysis. "
+                "This indicator requires direct measurement or self-reporting and is "
+                "not populated from acoustic features in this system."
             ),
             "is_core": False,
         },

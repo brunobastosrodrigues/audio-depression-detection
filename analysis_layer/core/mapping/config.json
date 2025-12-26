@@ -120,32 +120,7 @@
       "severity_threshold": 0.5
    },
    "3_significant_weight_changes": {
-      "metrics": {
-         "f0_avg": {
-            "weight": 1.0,
-            "correlation": "linear",
-            "direction": "negative",
-            "clipping_threshold": 3.0
-         },
-         "jitter": {
-            "weight": 1.0,
-            "correlation": "linear",
-            "direction": "positive",
-            "clipping_threshold": 3.0
-         },
-         "shimmer": {
-            "weight": 1.0,
-            "correlation": "linear",
-            "direction": "positive",
-            "clipping_threshold": 3.0
-         },
-         "hnr_mean": {
-            "weight": 1.0,
-            "correlation": "linear",
-            "direction": "negative",
-            "clipping_threshold": 3.0
-         }
-      },
+      "metrics": {},
       "smoothing_factor": 0.8667,
       "severity_threshold": 0.5
    },

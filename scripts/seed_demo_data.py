@@ -107,7 +107,8 @@ def generate_indicator_scores(
     scores = {}
 
     for indicator in INDICATORS:
-        # User requirement: Weight changes cannot be measured by sound
+        # Weight changes cannot be measured by voice/speech features
+        # This indicator is always set to 0.0 as it requires direct measurement
         if indicator == "3_significant_weight_changes":
             scores[indicator] = 0.0
             continue
