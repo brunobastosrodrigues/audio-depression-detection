@@ -215,6 +215,7 @@ class ReSpeakerService:
             self.noise_floors[board_id]["rms_history"].append(rms)
             
             # Calculate noise floor as minimum RMS in history (excluding zeros)
+            # We exclude zeros because they represent complete silence, not ambient noise
             history = self.noise_floors[board_id]["rms_history"]
             non_zero_rms = [r for r in history if r > 0]
             if non_zero_rms:
