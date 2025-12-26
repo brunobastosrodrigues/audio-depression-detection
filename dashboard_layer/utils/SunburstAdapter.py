@@ -1,6 +1,20 @@
 import json
 import pandas as pd
 
+# Import theme colors if available, fallback to defaults
+try:
+    from utils.theme import COLORS, INDICATOR_COLORS
+except ImportError:
+    COLORS = {
+        "danger": "#E74C3C",
+        "warning": "#F39C12",
+        "success": "#27AE60",
+        "inactive": "#BDC3C7",
+        "text_secondary": "#7F8C8D",
+    }
+    INDICATOR_COLORS = {}
+
+
 class SunburstAdapter:
     def __init__(self, config_path="core/mapping/config.json"):
         """
@@ -51,13 +65,13 @@ class SunburstAdapter:
 
         if active_count >= 5 and core_symptom_active:
             center_label = "<b>MDD<br>SUPPORT</b>"
-            center_color = "#FF4136" # Red
+            center_color = COLORS["danger"]
         elif active_count > 0:
             center_label = "<b>MONITORING</b>"
-            center_color = "#FFDC00" # Yellow
+            center_color = COLORS["warning"]
         else:
             center_label = "<b>NO<br>SUPPORT</b>"
-            center_color = "#2ECC40" # Green
+            center_color = COLORS["success"]
 
         # --- 3. Build Plotly Lists ---
         ids = ["root"]
@@ -102,8 +116,9 @@ class SunburstAdapter:
             # Determine threshold
             threshold = ind_details.get('severity_threshold', 0.5)
 
-            # Color logic: Red if active, Light Grey if inactive
-            colors.append("#FF4136" if ind_score >= threshold else "#DDDDDD")
+            # Color logic: Use indicator-specific color if active, inactive grey otherwise
+            ind_color = INDICATOR_COLORS.get(ind_key, COLORS["danger"])
+            colors.append(ind_color if ind_score >= threshold else COLORS["inactive"])
 
             # Collect Children (Metrics)
             children_data = []
@@ -119,8 +134,8 @@ class SunburstAdapter:
                 # Calculate raw size (absolute z-score)
                 raw_size = abs(z_score) if abs(z_score) > 0.1 else 0.1
 
-                # Color logic: Red for high contribution, Grey for normal
-                child_color = "#FF4136" if abs(z_score) > 2.0 else "#AAAAAA"
+                # Color logic: Danger for high contribution, secondary for normal
+                child_color = COLORS["danger"] if abs(z_score) > 2.0 else COLORS["text_secondary"]
 
                 children_data.append({
                     'id': f"{node_id} - {metric_name}",

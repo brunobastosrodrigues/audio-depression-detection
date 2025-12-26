@@ -26,3 +26,6 @@ processing_layer/metrics_computation/voice_metrics/core/myprosody/myprosody/data
 ex_files
 
 **/performance_log.csv
+
+# Claude Code local guidance
+CLAUDE.md

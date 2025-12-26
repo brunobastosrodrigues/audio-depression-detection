@@ -1,12 +1,23 @@
+"""
+Board Configuration page.
+Manage IoT boards (ReSpeaker) and environments.
+"""
+
 import streamlit as st
 from pymongo import MongoClient
 import pandas as pd
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
+import os
 
-st.title("Board Configuration")
+st.set_page_config(page_title="Boards", page_icon="📡", layout="wide")
 
-client = MongoClient("mongodb://mongodb:27017")
+st.title("📡 Board Configuration")
+st.markdown("Manage IoT boards (ReSpeaker) and environments for audio capture.")
+
+# --- DATABASE CONNECTION ---
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://mongodb:27017")
+client = MongoClient(MONGO_URI)
 db = client["iotsensing"]
 boards_collection = db["boards"]
 environments_collection = db["environments"]
@@ -14,54 +25,65 @@ raw_metrics_collection = db["raw_metrics"]
 
 ANALYSIS_LAYER_URL = "http://analysis_layer:8083"
 
-# Sidebar: User selection
-st.sidebar.title("Actions")
 
-# Try to get users from existing data
 @st.cache_data
 def load_users():
-    # Try raw_metrics first
-    if raw_metrics_collection.count_documents({}) > 0:
-        df = pd.DataFrame(raw_metrics_collection.find())
-        return sorted(df["user_id"].unique().tolist())
-    # Fall back to boards collection
-    if boards_collection.count_documents({}) > 0:
-        df = pd.DataFrame(boards_collection.find())
-        return sorted(df["user_id"].unique().tolist())
-    return [1]  # Default user
+    users = set()
+    for col_name in ["raw_metrics", "boards"]:
+        try:
+            users.update(db[col_name].distinct("user_id"))
+        except Exception:
+            pass
+    if not users:
+        users.add(1)  # Default user
+    return sorted(list(users))
 
 
-users = load_users()
-st.sidebar.subheader("Select User")
-selected_user = st.sidebar.selectbox("User", users, key="user_id")
+# --- SIDEBAR ---
+st.sidebar.title("Actions")
 
-if st.sidebar.button("Refresh Data"):
+if st.sidebar.button("🔄 Refresh Data"):
     st.cache_data.clear()
     st.rerun()
 
-# ----- Environments Section -----
+st.sidebar.subheader("Select User")
+users = load_users()
+selected_user = st.sidebar.selectbox("User", users, key="user_id")
+
+st.divider()
+
+# ============================================================================
+# ENVIRONMENTS SECTION
+# ============================================================================
 st.header("Environments")
+st.markdown("Environments represent physical locations where boards are placed (e.g., Living Room, Bedroom).")
 
 environments = list(environments_collection.find({"user_id": selected_user}))
 
 if environments:
     env_data = []
     for e in environments:
+        created = e.get("created_at")
+        if created and isinstance(created, datetime):
+            created_str = created.strftime("%Y-%m-%d %H:%M")
+        else:
+            created_str = "-"
+
         env_data.append({
-            "ID": e.get("environment_id", "")[:8] + "...",
+            "ID": str(e.get("environment_id", ""))[:8] + "...",
             "Name": e.get("name", ""),
             "Description": e.get("description", "") or "-",
-            "Created": e.get("created_at", "").strftime("%Y-%m-%d %H:%M") if e.get("created_at") else "-",
+            "Created": created_str,
         })
-    st.dataframe(pd.DataFrame(env_data), use_container_width=True)
+    st.dataframe(pd.DataFrame(env_data), use_container_width=True, hide_index=True)
 else:
     st.info("No environments configured. Add one below.")
 
-with st.expander("Add Environment", expanded=len(environments) == 0):
+with st.expander("➕ Add Environment", expanded=len(environments) == 0):
     with st.form("add_environment"):
         env_name = st.text_input("Name", placeholder="e.g., Living Room")
         env_description = st.text_area("Description (optional)")
-        submitted = st.form_submit_button("Add Environment")
+        submitted = st.form_submit_button("Add Environment", type="primary")
         if submitted and env_name:
             try:
                 response = requests.post(
@@ -84,59 +106,72 @@ with st.expander("Add Environment", expanded=len(environments) == 0):
 
 # Environment management
 if environments:
-    st.subheader("Manage Environments")
-    for env in environments:
-        with st.expander(f"{env['name']}"):
-            col1, col2 = st.columns([3, 1])
+    with st.expander("✏️ Manage Environments"):
+        for env in environments:
+            st.markdown(f"**{env['name']}**")
+            col1, col2, col3 = st.columns([2, 2, 1])
+
             with col1:
                 new_name = st.text_input(
                     "Name",
                     value=env["name"],
                     key=f"env_name_{env['environment_id']}",
+                    label_visibility="collapsed",
                 )
-                new_desc = st.text_area(
+
+            with col2:
+                new_desc = st.text_input(
                     "Description",
                     value=env.get("description") or "",
                     key=f"env_desc_{env['environment_id']}",
+                    label_visibility="collapsed",
+                    placeholder="Description",
                 )
-            with col2:
-                st.write("")  # Spacer
-                st.write("")
-                if st.button("Update", key=f"env_update_{env['environment_id']}"):
-                    try:
-                        response = requests.put(
-                            f"{ANALYSIS_LAYER_URL}/environments/{env['environment_id']}",
-                            json={"name": new_name, "description": new_desc or None},
-                            timeout=10,
-                        )
-                        if response.status_code == 200:
-                            st.success("Updated!")
-                            st.cache_data.clear()
-                            st.rerun()
-                        else:
-                            st.error(f"Failed: {response.text}")
-                    except requests.exceptions.RequestException as e:
-                        st.error(f"Error: {e}")
 
-                if st.button("Delete", key=f"env_delete_{env['environment_id']}", type="secondary"):
-                    try:
-                        response = requests.delete(
-                            f"{ANALYSIS_LAYER_URL}/environments/{env['environment_id']}",
-                            timeout=10,
-                        )
-                        if response.status_code == 200:
-                            st.success("Deleted!")
-                            st.cache_data.clear()
-                            st.rerun()
-                        else:
-                            st.error(f"Failed: {response.text}")
-                    except requests.exceptions.RequestException as e:
-                        st.error(f"Error: {e}")
+            with col3:
+                col_update, col_delete = st.columns(2)
+                with col_update:
+                    if st.button("💾", key=f"env_update_{env['environment_id']}", help="Save"):
+                        try:
+                            response = requests.put(
+                                f"{ANALYSIS_LAYER_URL}/environments/{env['environment_id']}",
+                                json={"name": new_name, "description": new_desc or None},
+                                timeout=10,
+                            )
+                            if response.status_code == 200:
+                                st.success("Updated!")
+                                st.cache_data.clear()
+                                st.rerun()
+                            else:
+                                st.error(f"Failed: {response.text}")
+                        except requests.exceptions.RequestException as e:
+                            st.error(f"Error: {e}")
+
+                with col_delete:
+                    if st.button("🗑️", key=f"env_delete_{env['environment_id']}", help="Delete"):
+                        try:
+                            response = requests.delete(
+                                f"{ANALYSIS_LAYER_URL}/environments/{env['environment_id']}",
+                                timeout=10,
+                            )
+                            if response.status_code == 200:
+                                st.success("Deleted!")
+                                st.cache_data.clear()
+                                st.rerun()
+                            else:
+                                st.error(f"Failed: {response.text}")
+                        except requests.exceptions.RequestException as e:
+                            st.error(f"Error: {e}")
+
+            st.markdown("---")
 
 st.divider()
 
-# ----- Boards Section -----
+# ============================================================================
+# BOARDS SECTION
+# ============================================================================
 st.header("Boards")
+st.markdown("Boards are IoT devices (e.g., ReSpeaker) that capture and stream audio data.")
 
 boards = list(boards_collection.find({"user_id": selected_user}))
 
@@ -146,48 +181,29 @@ env_options = {e["name"]: e["environment_id"] for e in environments}
 
 if boards:
     board_data = []
-    
-    # Pre-fetch recent metrics to determine data flow status
-    # Check for metrics in the last 5 minutes
-    five_mins_ago = datetime.utcnow() # Note: logic needs timedelta, added below
-    from datetime import timedelta
     five_mins_ago = datetime.utcnow() - timedelta(minutes=5)
-    
-    # We can't easily query per board in a loop efficiently if there are many, 
-    # but for typical IoT home setup (few boards) it's fine.
-    
+
     for b in boards:
-        # Determine Connection Status
         is_active = b.get("is_active", False)
-        status_val = "Active" if is_active else "Inactive"
-        
-        # Determine Data Flow Status
         board_id = b.get("board_id")
+
         has_recent_data = raw_metrics_collection.find_one({
             "board_id": board_id,
             "timestamp": {"$gte": five_mins_ago}
         }) is not None
-        
-        data_status = "Streaming" if has_recent_data else "Idle"
 
         last_seen = b.get("last_seen")
-        if last_seen:
-            if isinstance(last_seen, datetime):
-                last_seen_str = last_seen
-            else:
-                try:
-                    last_seen_str = datetime.fromisoformat(str(last_seen))
-                except:
-                    last_seen_str = None
+        if last_seen and isinstance(last_seen, datetime):
+            last_seen_str = last_seen
         else:
             last_seen_str = None
 
         board_data.append({
-            "board_id": board_id, # Hidden ID for reference
-            "Status": status_val,
-            "Data Stream": data_status,
+            "board_id": board_id,
+            "Status": "🟢 Active" if is_active else "⚪ Inactive",
+            "Data": "📡 Streaming" if has_recent_data else "💤 Idle",
             "Name": b.get("name", ""),
-            "MAC Address": b.get("mac_address", ""),
+            "MAC": b.get("mac_address", ""),
             "Environment": env_lookup.get(b.get("environment_id", ""), "Unknown"),
             "Last Seen": last_seen_str,
         })
@@ -197,33 +213,24 @@ if boards:
     st.dataframe(
         df_boards,
         column_config={
-            "board_id": None, # Hide
-            "Status": st.column_config.TextColumn(
-                "Connection",
-                help="TCP Connection Status",
-                validate="^(Active|Inactive)$"
-            ),
-            "Data Stream": st.column_config.TextColumn(
-                "Data Stream",
-                help="Receiving data in last 5 mins",
-                validate="^(Streaming|Idle)$"
-            ),
-             "Last Seen": st.column_config.DatetimeColumn(
+            "board_id": None,
+            "Last Seen": st.column_config.DatetimeColumn(
                 "Last Seen",
                 format="D MMM YYYY, HH:mm:ss",
             ),
         },
         use_container_width=True,
-        hide_index=True
+        hide_index=True,
     )
-    
-    # Legend / Help
-    st.caption("ℹ️ **Connection:** TCP connection to the server. **Data Stream:** Audio data successfully processed in the last 5 minutes.")
+
+    st.caption(
+        "**Status:** TCP connection to server | **Data:** Audio processed in last 5 minutes"
+    )
 
 else:
-    st.info("No boards configured. Boards will auto-register when they connect, or add one manually below.")
+    st.info("No boards configured. Boards auto-register when they connect, or add one manually below.")
 
-with st.expander("Add Board Manually"):
+with st.expander("➕ Add Board Manually"):
     if not environments:
         st.warning("Please add an environment first before adding a board.")
     else:
@@ -231,7 +238,7 @@ with st.expander("Add Board Manually"):
             board_name = st.text_input("Name", placeholder="e.g., Kitchen Mic")
             mac_address = st.text_input("MAC Address", placeholder="AA:BB:CC:DD:EE:FF")
             selected_env = st.selectbox("Environment", list(env_options.keys()))
-            submitted = st.form_submit_button("Add Board")
+            submitted = st.form_submit_button("Add Board", type="primary")
             if submitted and board_name and mac_address:
                 try:
                     response = requests.post(
@@ -255,17 +262,22 @@ with st.expander("Add Board Manually"):
 
 # Board management
 if boards:
-    st.subheader("Manage Boards")
-    for board in boards:
-        status_icon = "" if board.get("is_active") else ""
-        with st.expander(f"{status_icon} {board['name']} ({board['mac_address']})"):
-            col1, col2 = st.columns([3, 1])
+    with st.expander("✏️ Manage Boards"):
+        for board in boards:
+            status_icon = "🟢" if board.get("is_active") else "⚪"
+            st.markdown(f"**{status_icon} {board['name']}** ({board['mac_address']})")
+
+            col1, col2, col3 = st.columns([2, 2, 1])
+
             with col1:
                 new_name = st.text_input(
                     "Name",
                     value=board["name"],
                     key=f"board_name_{board['board_id']}",
+                    label_visibility="collapsed",
                 )
+
+            with col2:
                 if env_options:
                     current_env_name = env_lookup.get(board.get("environment_id", ""), "")
                     env_names = list(env_options.keys())
@@ -275,48 +287,48 @@ if boards:
                         env_names,
                         index=current_idx,
                         key=f"board_env_{board['board_id']}",
+                        label_visibility="collapsed",
                     )
                 else:
                     new_env = None
-                    st.warning("No environments available")
 
-            with col2:
-                st.write("")  # Spacer
-                st.write("")
-                if st.button("Update", key=f"board_update_{board['board_id']}"):
-                    try:
-                        update_data = {"name": new_name}
-                        if new_env and env_options:
-                            update_data["environment_id"] = env_options[new_env]
-                        response = requests.put(
-                            f"{ANALYSIS_LAYER_URL}/boards/{board['board_id']}",
-                            json=update_data,
-                            timeout=10,
-                        )
-                        if response.status_code == 200:
-                            st.success("Updated!")
-                            st.cache_data.clear()
-                            st.rerun()
-                        else:
-                            st.error(f"Failed: {response.text}")
-                    except requests.exceptions.RequestException as e:
-                        st.error(f"Error: {e}")
+            with col3:
+                col_update, col_delete = st.columns(2)
+                with col_update:
+                    if st.button("💾", key=f"board_update_{board['board_id']}", help="Save"):
+                        try:
+                            update_data = {"name": new_name}
+                            if new_env and env_options:
+                                update_data["environment_id"] = env_options[new_env]
+                            response = requests.put(
+                                f"{ANALYSIS_LAYER_URL}/boards/{board['board_id']}",
+                                json=update_data,
+                                timeout=10,
+                            )
+                            if response.status_code == 200:
+                                st.success("Updated!")
+                                st.cache_data.clear()
+                                st.rerun()
+                            else:
+                                st.error(f"Failed: {response.text}")
+                        except requests.exceptions.RequestException as e:
+                            st.error(f"Error: {e}")
 
-                if st.button("Delete", key=f"board_delete_{board['board_id']}", type="secondary"):
-                    try:
-                        response = requests.delete(
-                            f"{ANALYSIS_LAYER_URL}/boards/{board['board_id']}",
-                            timeout=10,
-                        )
-                        if response.status_code == 200:
-                            st.success("Deleted!")
-                            st.cache_data.clear()
-                            st.rerun()
-                        else:
-                            st.error(f"Failed: {response.text}")
-                    except requests.exceptions.RequestException as e:
-                        st.error(f"Error: {e}")
+                with col_delete:
+                    if st.button("🗑️", key=f"board_delete_{board['board_id']}", help="Delete"):
+                        try:
+                            response = requests.delete(
+                                f"{ANALYSIS_LAYER_URL}/boards/{board['board_id']}",
+                                timeout=10,
+                            )
+                            if response.status_code == 200:
+                                st.success("Deleted!")
+                                st.cache_data.clear()
+                                st.rerun()
+                            else:
+                                st.error(f"Failed: {response.text}")
+                        except requests.exceptions.RequestException as e:
+                            st.error(f"Error: {e}")
 
-            # Show additional info
-            st.caption(f"Board ID: {board['board_id']}")
-            st.caption(f"Port: {board.get('port', 0) or 'Not assigned'}")
+            st.caption(f"Board ID: {board['board_id']} | Port: {board.get('port', 'N/A')}")
+            st.markdown("---")

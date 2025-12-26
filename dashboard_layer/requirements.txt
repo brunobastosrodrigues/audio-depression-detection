@@ -1,4 +1,5 @@
 streamlit
+streamlit-webrtc
 pymongo
 pandas
 matplotlib
@@ -10,3 +11,4 @@ paho-mqtt
 numpy
 scipy
 torchaudio==2.5.1
+av

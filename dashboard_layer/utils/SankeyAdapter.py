@@ -2,6 +2,18 @@ import pandas as pd
 import json
 import plotly.graph_objects as go
 
+# Import theme colors if available, fallback to defaults
+try:
+    from utils.theme import COLORS
+except ImportError:
+    COLORS = {
+        "danger": "#E74C3C",
+        "warning": "#F39C12",
+        "success": "#27AE60",
+        "border": "#DEE2E6",
+    }
+
+
 class SankeyAdapter:
     def __init__(self, config_path="core/mapping/config.json"):
         with open(config_path, "r") as f:
@@ -122,11 +134,11 @@ class SankeyAdapter:
 
             # Color based on state
             if states[i] == "mdd_support":
-                node_colors.append("#FF4136") # Red
+                node_colors.append(COLORS["danger"])
             elif states[i] == "no_support":
-                node_colors.append("#2ECC40") # Green
+                node_colors.append(COLORS["success"])
             else:
-                node_colors.append("#FF851B") # Orange (Symptom)
+                node_colors.append(COLORS["warning"])  # Symptom
 
             if i > 0:
                 # Link from prev to current
