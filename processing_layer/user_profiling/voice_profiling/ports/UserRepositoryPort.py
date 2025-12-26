@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
+from typing import Union
 
 
 class UserRepositoryPort(ABC):
@@ -8,9 +9,11 @@ class UserRepositoryPort(ABC):
         pass
 
     @abstractmethod
-    def save_user_embedding(self, user_id: int, embedding: np.ndarray):
+    def save_user_embedding(
+        self, user_id: Union[int, str], embedding: np.ndarray, overwrite: bool = False
+    ):
         pass
 
     @abstractmethod
-    def delete_user_embedding(self, user_id: int, embedding: np.ndarray):
+    def delete_user_embedding(self, user_id: Union[int, str], embedding: np.ndarray):
         pass
