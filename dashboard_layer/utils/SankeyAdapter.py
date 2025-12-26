@@ -35,6 +35,10 @@ class SankeyAdapter:
         df = indicator_records_df.copy()
         df['timestamp'] = pd.to_datetime(df['timestamp'])
 
+        # Handle missing mdd_signal (backward compatibility)
+        if 'mdd_signal' not in df.columns:
+            df['mdd_signal'] = False
+
         # Flatten indicator_scores
         indicators_df = pd.concat(
             [
