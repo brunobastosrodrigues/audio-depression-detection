@@ -12,9 +12,14 @@ from datetime import datetime
 import pandas as pd
 import plotly.express as px
 
-from utils.database import get_database, render_mode_selector
+from utils.database import get_database, render_mode_selector, get_current_mode
 
 st.set_page_config(page_title="Data Tools", page_icon="🔧", layout="wide")
+
+# Mode Check
+if get_current_mode() != "dataset":
+    st.info("This page is only available in Dataset mode.")
+    st.stop()
 
 st.title("🔧 Data Tools")
 st.markdown("Debug tools for audio loading, baseline viewing, and data export.")

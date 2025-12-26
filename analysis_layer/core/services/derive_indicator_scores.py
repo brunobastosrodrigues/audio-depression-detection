@@ -73,8 +73,8 @@ def derive_indicator_scores(
     # If no history, this batch might contain the first day.
     if not first_record_date and records:
         # Assuming sorted by date, use the first one.
-        # Note: records_by_date is ordered.
-        first_record_date = list(records_by_date.keys())[0]
+        # Note: records_by_date_mode is ordered.
+        first_record_date = list(records_by_date_mode.keys())[0][0]
 
     # Calculate default alpha for 14-day EMA
     # Alpha (smoothing) = 2 / (N + 1)

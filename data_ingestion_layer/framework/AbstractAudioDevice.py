@@ -16,11 +16,17 @@ class AbstractAudioDevice(AbstractEdgeDevice):
         topic="miscellaneous",
         mqtthostname="localhost",
         mqttport=1883,
+        board_id=None,
+        user_id=None,
+        system_mode="live",
     ):
         super().__init__(topic=topic, mqtthostname=mqtthostname, mqttport=mqttport)
         self.sample_rate = sample_rate
         self.channels = channels
         self.dtype = dtype
+        self.board_id = board_id
+        self.user_id = user_id
+        self.system_mode = system_mode
 
     @abstractmethod
     def collect(self) -> np.ndarray:
@@ -44,6 +50,9 @@ class AbstractAudioDevice(AbstractEdgeDevice):
             timestamp=time.time(),
             sample_rate=self.sample_rate,
             quality_metrics=metrics,
+            board_id=self.board_id,
+            user_id=self.user_id,
+            system_mode=self.system_mode,
         )
 
         payload_str = json.dumps(payload.to_dict())

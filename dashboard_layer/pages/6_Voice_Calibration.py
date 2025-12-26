@@ -13,9 +13,14 @@ import wave
 import io
 from datetime import datetime
 
-from utils.database import get_database, render_mode_selector
+from utils.database import get_database, render_mode_selector, get_current_mode
 
 st.set_page_config(page_title="Voice Calibration", page_icon="🎤", layout="wide")
+
+# Mode Check
+if get_current_mode() != "live":
+    st.info("This page is only available in Live mode.")
+    st.stop()
 
 st.title("🎤 Voice Enrollment & Calibration")
 st.markdown("Create and manage voice profiles for speaker verification using d-vectors.")

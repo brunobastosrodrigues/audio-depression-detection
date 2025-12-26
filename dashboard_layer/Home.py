@@ -9,7 +9,7 @@ import os
 
 from utils.refresh_procedure import refresh_procedure
 from utils.setup_db import setup_indexes
-from utils.database import get_database, render_mode_selector, render_mode_badge
+from utils.database import get_database, render_mode_selector, render_mode_badge, get_current_mode
 
 # Initialize database indexes
 try:
@@ -146,83 +146,85 @@ st.divider()
 # Navigation hints
 st.markdown("### Quick Navigation")
 
-col1, col2, col3 = st.columns(3)
+# Define all available cards
+cards = [
+    {
+        "icon": "🏠", 
+        "title": "Overview", 
+        "desc": "Simple wellness summary with patient-friendly indicators", 
+        "color": "#EBF5FB",
+        "visible": True
+    },
+    {
+        "icon": "📊", 
+        "title": "Indicators", 
+        "desc": "Detailed DSM-5 analysis with clinical drill-down", 
+        "color": "#FEF9E7",
+        "visible": True
+    },
+    {
+        "icon": "📈", 
+        "title": "Trends", 
+        "desc": "Track symptom progression over time", 
+        "color": "#E8F8F5",
+        "visible": True
+    },
+    {
+        "icon": "📋", 
+        "title": "Self-Report", 
+        "desc": "PHQ-9 questionnaire and history", 
+        "color": "#FDEDEC",
+        "visible": True
+    },
+]
 
-with col1:
-    st.markdown(
-        """
-        <div style="padding: 1.5rem; background: #EBF5FB; border-radius: 8px; height: 100%;">
-            <div style="font-size: 2rem; margin-bottom: 0.5rem;">🏠</div>
-            <div style="font-weight: 600; margin-bottom: 0.5rem;">Overview</div>
-            <div style="color: #7F8C8D; font-size: 0.9rem;">Simple wellness summary with patient-friendly indicators</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+# Add mode-specific cards
+current_mode = get_current_mode()
 
-with col2:
-    st.markdown(
-        """
-        <div style="padding: 1.5rem; background: #FEF9E7; border-radius: 8px; height: 100%;">
-            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📊</div>
-            <div style="font-weight: 600; margin-bottom: 0.5rem;">Indicators</div>
-            <div style="color: #7F8C8D; font-size: 0.9rem;">Detailed DSM-5 analysis with clinical drill-down</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+if current_mode == "live":
+    cards.append({
+        "icon": "📡", 
+        "title": "Boards", 
+        "desc": "Configure ReSpeaker IoT boards", 
+        "color": "#F4ECF7",
+        "visible": True
+    })
+    cards.append({
+        "icon": "🎤", 
+        "title": "Voice Calibration", 
+        "desc": "Enroll voice for speaker verification", 
+        "color": "#EAECEE",
+        "visible": True
+    })
 
-with col3:
-    st.markdown(
-        """
-        <div style="padding: 1.5rem; background: #E8F8F5; border-radius: 8px; height: 100%;">
-            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📈</div>
-            <div style="font-weight: 600; margin-bottom: 0.5rem;">Trends</div>
-            <div style="color: #7F8C8D; font-size: 0.9rem;">Track symptom progression over time</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+if current_mode == "dataset":
+    cards.append({
+        "icon": "💾",
+        "title": "Data Tools",
+        "desc": "Audio loader, baseline viewer, export",
+        "color": "#E8DAEF",
+        "visible": True
+    })
 
-st.markdown("<br>", unsafe_allow_html=True)
-
-col4, col5, col6 = st.columns(3)
-
-with col4:
-    st.markdown(
-        """
-        <div style="padding: 1.5rem; background: #FDEDEC; border-radius: 8px; height: 100%;">
-            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📋</div>
-            <div style="font-weight: 600; margin-bottom: 0.5rem;">Self-Report</div>
-            <div style="color: #7F8C8D; font-size: 0.9rem;">PHQ-9 questionnaire and history</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-with col5:
-    st.markdown(
-        """
-        <div style="padding: 1.5rem; background: #F4ECF7; border-radius: 8px; height: 100%;">
-            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📡</div>
-            <div style="font-weight: 600; margin-bottom: 0.5rem;">Boards</div>
-            <div style="color: #7F8C8D; font-size: 0.9rem;">Configure ReSpeaker IoT boards</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-with col6:
-    st.markdown(
-        """
-        <div style="padding: 1.5rem; background: #EAECEE; border-radius: 8px; height: 100%;">
-            <div style="font-size: 2rem; margin-bottom: 0.5rem;">🎤</div>
-            <div style="font-weight: 600; margin-bottom: 0.5rem;">Voice Calibration</div>
-            <div style="color: #7F8C8D; font-size: 0.9rem;">Enroll voice for speaker verification</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+# Render cards in rows of 3
+cols_per_row = 3
+for i in range(0, len(cards), cols_per_row):
+    row_cards = cards[i:i + cols_per_row]
+    cols = st.columns(cols_per_row)
+    
+    for j, card in enumerate(row_cards):
+        with cols[j]:
+            st.markdown(
+                f"""
+                <div style="padding: 1.5rem; background: {card['color']}; border-radius: 8px; height: 100%;">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">{card['icon']}</div>
+                    <div style="font-weight: 600; margin-bottom: 0.5rem;">{card['title']}</div>
+                    <div style="color: #7F8C8D; font-size: 0.9rem;">{card['desc']}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+    st.markdown("<br>", unsafe_allow_html=True)
 
 st.divider()
 

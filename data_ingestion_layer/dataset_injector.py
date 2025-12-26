@@ -27,6 +27,8 @@ import librosa
 import torch
 import paho.mqtt.client as mqtt
 from paho.mqtt.client import CallbackAPIVersion
+from pymongo import MongoClient
+from datetime import datetime
 
 from framework.payloads.AudioPayload import AudioPayload
 from framework.audio_utils import encode_audio_to_base64, calculate_audio_metrics, int2float
@@ -39,6 +41,7 @@ class DatasetInjector:
         self,
         mqtt_host: str = "mqtt",
         mqtt_port: int = 1883,
+        mongo_url: str = "mongodb://mongodb:27017",
         user_id: int = 1,
         board_id: str = "dataset-injector",
         environment_name: str = "research",
@@ -47,11 +50,20 @@ class DatasetInjector:
     ):
         self.mqtt_host = mqtt_host
         self.mqtt_port = mqtt_port
+        self.mongo_url = mongo_url
         self.user_id = user_id
         self.board_id = board_id
         self.environment_name = environment_name
         self.use_vad = use_vad
         self.sample_rate = sample_rate
+
+        # MongoDB connection for board registration
+        try:
+            self.mongo_client = MongoClient(self.mongo_url)
+            self.db = self.mongo_client["iotsensing_dataset"]
+            self._register_virtual_board()
+        except Exception as e:
+            print(f"Warning: Could not connect to MongoDB to register board: {e}")
 
         # MQTT client
         self.client = mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION2)
@@ -79,9 +91,55 @@ class DatasetInjector:
 
         print(f"Dataset Injector initialized")
         print(f"  MQTT: {mqtt_host}:{mqtt_port}")
+        print(f"  MongoDB: {mongo_url}")
         print(f"  Topic: {self.topic}")
         print(f"  System Mode: dataset")
         print(f"  VAD: {'enabled' if use_vad and self.vad_model else 'disabled'}")
+
+    def _register_virtual_board(self):
+        """Register a virtual board and environment in iotsensing_dataset."""
+        try:
+            # 1. Ensure Environment
+            env_id = f"env_{self.environment_name.lower().replace(' ', '_')}"
+            existing_env = self.db["environments"].find_one({"environment_id": env_id})
+            
+            if not existing_env:
+                self.db["environments"].insert_one({
+                    "environment_id": env_id,
+                    "user_id": self.user_id,
+                    "name": self.environment_name,
+                    "description": "Virtual environment for dataset injection",
+                    "created_at": datetime.utcnow(),
+                    "system_mode": "dataset"
+                })
+                print(f"  Registered environment: {self.environment_name}")
+
+            # 2. Ensure Board
+            existing_board = self.db["boards"].find_one({"board_id": self.board_id})
+            
+            # Always update last_seen to make it appear active
+            board_doc = {
+                "board_id": self.board_id,
+                "user_id": self.user_id,
+                "mac_address": "00:00:00:00:00:00",
+                "name": "Dataset Injector",
+                "environment_id": env_id,
+                "port": 0,
+                "is_active": True,
+                "last_seen": datetime.utcnow(),
+                "created_at": datetime.utcnow() if not existing_board else existing_board.get("created_at"),
+                "system_mode": "dataset"
+            }
+            
+            self.db["boards"].replace_one(
+                {"board_id": self.board_id},
+                board_doc,
+                upsert=True
+            )
+            print(f"  Registered virtual board: {self.board_id}")
+            
+        except Exception as e:
+            print(f"Error registering virtual board: {e}")
 
     def load_audio(self, filepath: str) -> np.ndarray:
         """Load and normalize audio file to 16kHz mono int16."""
@@ -249,17 +307,20 @@ def main():
     parser.add_argument("--delay", type=float, default=0.5, help="Delay between segments (seconds)")
     parser.add_argument("--mqtt-host", default=None, help="MQTT host (default: from env or 'mqtt')")
     parser.add_argument("--mqtt-port", type=int, default=None, help="MQTT port (default: from env or 1883)")
+    parser.add_argument("--mongo-url", default=None, help="MongoDB URL (default: from env or 'mongodb://mongodb:27017')")
 
     args = parser.parse_args()
 
-    # Get MQTT settings from environment or arguments
+    # Get settings from environment or arguments
     mqtt_host = args.mqtt_host or os.environ.get("MQTT_HOST", "mqtt")
     mqtt_port = args.mqtt_port or int(os.environ.get("MQTT_PORT", 1883))
+    mongo_url = args.mongo_url or os.environ.get("MONGO_URL", "mongodb://mongodb:27017")
 
     # Create injector
     injector = DatasetInjector(
         mqtt_host=mqtt_host,
         mqtt_port=mqtt_port,
+        mongo_url=mongo_url,
         user_id=args.user_id,
         board_id=args.board_id,
         environment_name=args.environment,

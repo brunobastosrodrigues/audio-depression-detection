@@ -99,7 +99,7 @@ class ReSpeakerService:
         else:
             self.mongo = MongoClient(mongo_url)
 
-        self.db = self.mongo["iotsensing"]
+        self.db = self.mongo["iotsensing_live"]
         self.boards_collection = self.db["boards"]
         self.environments_collection = self.db["environments"]
 

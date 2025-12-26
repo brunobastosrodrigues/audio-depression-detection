@@ -92,7 +92,7 @@ def render_mode_selector():
     """
     # Initialize session state if not set
     if "system_mode" not in st.session_state:
-        st.session_state.system_mode = "live"
+        st.session_state.system_mode = "demo"
 
     current_mode = st.session_state.system_mode
     config = MODE_CONFIG.get(current_mode, MODE_CONFIG["live"])
@@ -147,6 +147,40 @@ def render_mode_selector():
     if selected_mode != current_mode:
         st.session_state.system_mode = selected_mode
         st.rerun()
+
+    # Dynamic CSS to hide sidebar pages based on mode
+    css_to_inject = ""
+    
+    if current_mode == "demo":
+        css_to_inject = """
+            <style>
+                div[data-testid="stSidebarNav"] a[href*="Boards"],
+                div[data-testid="stSidebarNav"] a[href*="Voice_Calibration"],
+                div[data-testid="stSidebarNav"] a[href*="Data_Tools"] {
+                    display: none !important;
+                }
+            </style>
+        """
+    elif current_mode == "live":
+        css_to_inject = """
+            <style>
+                div[data-testid="stSidebarNav"] a[href*="Data_Tools"] {
+                    display: none !important;
+                }
+            </style>
+        """
+    elif current_mode == "dataset":
+        css_to_inject = """
+            <style>
+                div[data-testid="stSidebarNav"] a[href*="Boards"],
+                div[data-testid="stSidebarNav"] a[href*="Voice_Calibration"] {
+                    display: none !important;
+                }
+            </style>
+        """
+    
+    if css_to_inject:
+        st.markdown(css_to_inject, unsafe_allow_html=True)
 
     st.sidebar.divider()
 

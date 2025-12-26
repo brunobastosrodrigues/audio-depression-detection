@@ -2,14 +2,11 @@
 """
 Demo Data Seeder for iotsensing_demo database.
 
-This script deletes the existing iotsensing_demo database and seeds it with
-"Golden Data" - realistic depression symptom patterns for showcase purposes.
+Seeds "Alice" (Depressed) and "Bob" (Healthy) with comprehensive acoustic metrics
+covering all DSM-5 indicators.
 
 Usage:
     python scripts/seed_demo_data.py
-
-    # Or with custom parameters:
-    python scripts/seed_demo_data.py --days 60 --user-id 999
 """
 
 import argparse
@@ -36,28 +33,35 @@ INDICATORS = [
 
 CORE_INDICATORS = ["1_depressed_mood", "2_loss_of_interest"]
 
-# Acoustic metrics that map to indicators
+# Complete Acoustic Metrics List
 ACOUSTIC_METRICS = [
-    "mean_f0",
-    "std_f0",
-    "f0_range",
-    "jitter_local",
-    "shimmer_local",
-    "hnr",
-    "speech_rate",
-    "pause_ratio",
-    "energy_mean",
-    "energy_std",
-    "formant_f1_mean",
+    "mean_f0", "std_f0", "f0_range", "f0_avg",
+    "jitter_local", "jitter",
+    "shimmer_local", "shimmer",
+    "hnr", "hnr_mean",
+    "speech_rate", "rate_of_speech",
+    "pause_ratio", "pause_count", "pause_duration",
+    "energy_mean", "energy_std",
+    "rms_energy_range", "rms_energy_std",
+    "formant_f1_mean", "formant_f1_frequencies_mean",
     "formant_f2_mean",
-    "mfcc_1_mean",
-    "mfcc_2_mean",
+    "mfcc_1_mean", "mfcc_2_mean",
     "spectral_centroid",
     "spectral_rolloff",
+    "spectral_flatness",
     "zero_crossing_rate",
     "articulation_rate",
     "phonation_ratio",
     "intensity_mean",
+    "temporal_modulation",
+    "spectral_modulation",
+    "voice_onset_time",
+    "glottal_pulse_rate",
+    "psd-4", "psd-5", "psd-7",
+    "t13",
+    "voiced16_20",
+    "f2_transition_speed",
+    "snr"
 ]
 
 
@@ -67,39 +71,29 @@ def generate_depression_progression(
 ) -> list[float]:
     """
     Generate a realistic depression severity progression over time.
-
-    Patterns:
-    - gradual_onset: Slowly increasing severity
-    - episodic: Fluctuating with depressive episodes
-    - recovery: High severity decreasing over time
-    - stable_moderate: Consistent moderate depression
     """
     if pattern == "gradual_onset":
-        # Start low, gradually increase with some noise
-        base = np.linspace(0.2, 0.75, days)
+        # Start low, gradually increase to high
+        base = np.linspace(0.2, 0.85, days)
         noise = np.random.normal(0, 0.05, days)
         return np.clip(base + noise, 0, 1).tolist()
 
-    elif pattern == "episodic":
-        # Fluctuating pattern with episodes
-        base = 0.4 + 0.3 * np.sin(np.linspace(0, 3 * np.pi, days))
-        noise = np.random.normal(0, 0.08, days)
-        return np.clip(base + noise, 0, 1).tolist()
+    elif pattern == "healthy":
+        # Consistently low
+        base = np.full(days, 0.1)
+        noise = np.random.normal(0, 0.05, days)
+        return np.clip(base + noise, 0, 0.25).tolist() # Cap at 0.25
 
-    elif pattern == "recovery":
-        # Starting high, showing improvement
-        base = np.linspace(0.8, 0.35, days)
-        noise = np.random.normal(0, 0.06, days)
-        return np.clip(base + noise, 0, 1).tolist()
-
-    elif pattern == "stable_moderate":
-        # Consistent moderate depression
-        base = np.full(days, 0.55)
-        noise = np.random.normal(0, 0.1, days)
-        return np.clip(base + noise, 0, 1).tolist()
+    elif pattern == "severe":
+        # Consistently high
+        base = np.full(days, 0.8)
+        noise = np.random.normal(0, 0.05, days)
+        return np.clip(base + noise, 0.6, 1).tolist()
 
     else:
-        raise ValueError(f"Unknown pattern: {pattern}")
+        # Default fallback
+        base = np.full(days, 0.5)
+        return base.tolist()
 
 
 def generate_indicator_scores(
@@ -109,26 +103,28 @@ def generate_indicator_scores(
 ) -> dict[str, float]:
     """
     Generate indicator scores based on overall severity.
-
-    Core symptoms (1, 2) are always more prominent.
-    Other symptoms vary with some correlation to severity.
     """
     scores = {}
 
     for indicator in INDICATORS:
+        # User requirement: Weight changes cannot be measured by sound
+        if indicator == "3_significant_weight_changes":
+            scores[indicator] = 0.0
+            continue
+
         if indicator in CORE_INDICATORS:
             # Core symptoms track severity closely
-            base = base_severity * random.uniform(0.9, 1.1)
+            base = base_severity * random.uniform(0.95, 1.05)
         elif indicator == "9_recurrent_thoughts_of_death_or_being_suicidal":
-            # This indicator only appears at high severity
-            if base_severity > 0.7:
-                base = (base_severity - 0.5) * random.uniform(0.6, 1.0)
+            # Only appears at very high severity
+            if base_severity > 0.8:
+                base = (base_severity - 0.6) * random.uniform(0.8, 1.2)
             else:
-                base = random.uniform(0, 0.15)
+                base = random.uniform(0, 0.1)
         else:
-            # Other symptoms vary more independently
-            correlation = random.uniform(0.5, 0.9)
-            base = base_severity * correlation + random.uniform(-0.1, 0.1)
+            # Other symptoms vary
+            correlation = random.uniform(0.7, 0.95)
+            base = base_severity * correlation + random.uniform(-0.05, 0.05)
 
         scores[indicator] = max(0.0, min(1.0, base))
 
@@ -137,9 +133,7 @@ def generate_indicator_scores(
 
 def check_mdd_signal(indicator_scores: dict[str, float], threshold: float = 0.5) -> bool:
     """
-    Check if MDD criteria are met:
-    - At least 5 indicators above threshold
-    - At least one core symptom (1 or 2) above threshold
+    Check if MDD criteria are met: 5+ active, at least 1 core.
     """
     active_count = sum(1 for v in indicator_scores.values() if v >= threshold)
     core_active = any(
@@ -155,61 +149,102 @@ def generate_acoustic_metrics(
 ) -> dict[str, float]:
     """
     Generate realistic acoustic metrics correlated with depression severity.
-
-    Depression typically shows:
-    - Lower mean F0 (fundamental frequency)
-    - Reduced F0 variability
-    - Higher jitter/shimmer
-    - Lower HNR
-    - Slower speech rate
-    - More pauses
-    - Lower energy
+    Now includes all missing metrics.
     """
     metrics = {}
+    
+    # Noise/Randomness factor
+    noise = lambda x: random.gauss(0, x)
 
-    # F0 metrics (depression = lower, less variable)
-    metrics["mean_f0"] = 180 - (base_severity * 50) + random.gauss(0, 10)
-    metrics["std_f0"] = 40 - (base_severity * 20) + random.gauss(0, 5)
-    metrics["f0_range"] = 100 - (base_severity * 40) + random.gauss(0, 10)
-
-    # Voice quality (depression = higher jitter/shimmer, lower HNR)
-    metrics["jitter_local"] = 0.01 + (base_severity * 0.02) + random.gauss(0, 0.003)
-    metrics["shimmer_local"] = 0.03 + (base_severity * 0.04) + random.gauss(0, 0.01)
-    metrics["hnr"] = 20 - (base_severity * 8) + random.gauss(0, 2)
-
-    # Temporal metrics (depression = slower, more pauses)
-    metrics["speech_rate"] = 4.5 - (base_severity * 1.5) + random.gauss(0, 0.3)
-    metrics["pause_ratio"] = 0.15 + (base_severity * 0.2) + random.gauss(0, 0.03)
-    metrics["articulation_rate"] = 5.0 - (base_severity * 1.2) + random.gauss(0, 0.4)
-    metrics["phonation_ratio"] = 0.7 - (base_severity * 0.15) + random.gauss(0, 0.05)
-
-    # Energy metrics (depression = lower energy)
-    metrics["energy_mean"] = 0.5 - (base_severity * 0.2) + random.gauss(0, 0.05)
-    metrics["energy_std"] = 0.15 - (base_severity * 0.05) + random.gauss(0, 0.02)
-    metrics["intensity_mean"] = 65 - (base_severity * 10) + random.gauss(0, 3)
-
-    # Formants (slight changes with depression)
-    metrics["formant_f1_mean"] = 500 + random.gauss(0, 30)
-    metrics["formant_f2_mean"] = 1500 + random.gauss(0, 50)
-
-    # MFCCs (abstract features)
-    metrics["mfcc_1_mean"] = -5 + (base_severity * 2) + random.gauss(0, 1)
-    metrics["mfcc_2_mean"] = 3 - (base_severity * 1) + random.gauss(0, 0.5)
-
-    # Spectral features
-    metrics["spectral_centroid"] = 2000 - (base_severity * 300) + random.gauss(0, 100)
-    metrics["spectral_rolloff"] = 4000 - (base_severity * 500) + random.gauss(0, 200)
-    metrics["zero_crossing_rate"] = 0.05 + random.gauss(0, 0.01)
+    # --- F0 / Pitch ---
+    # Depression: Lower mean, reduced variability, reduced range
+    metrics["mean_f0"] = 180 - (base_severity * 60) + noise(10)
+    metrics["f0_avg"] = metrics["mean_f0"] # Alias
+    metrics["std_f0"] = 45 - (base_severity * 25) + noise(5)
+    metrics["f0_range"] = 120 - (base_severity * 50) + noise(10)
+    
+    # --- Jitter / Shimmer (Voice Quality) ---
+    # Depression: Higher jitter/shimmer (rougher voice)
+    metrics["jitter_local"] = 0.01 + (base_severity * 0.03) + noise(0.005)
+    metrics["jitter"] = metrics["jitter_local"] # Alias
+    metrics["shimmer_local"] = 0.03 + (base_severity * 0.05) + noise(0.01)
+    metrics["shimmer"] = metrics["shimmer_local"] # Alias
+    
+    # --- HNR / SNR ---
+    # Depression: Lower HNR/SNR (breathier)
+    metrics["hnr"] = 22 - (base_severity * 10) + noise(2)
+    metrics["hnr_mean"] = metrics["hnr"]
+    metrics["snr"] = 18 - (base_severity * 8) + noise(2)
+    
+    # --- Tempo / Rate ---
+    # Depression: Slower speech, more pauses
+    metrics["speech_rate"] = 4.8 - (base_severity * 2.0) + noise(0.3)
+    metrics["rate_of_speech"] = metrics["speech_rate"]
+    metrics["articulation_rate"] = 5.2 - (base_severity * 1.5) + noise(0.4)
+    metrics["pause_ratio"] = 0.1 + (base_severity * 0.3) + noise(0.05)
+    metrics["pause_count"] = 5 + (base_severity * 10) + noise(2) # per minute-ish
+    metrics["pause_duration"] = 0.4 + (base_severity * 0.6) + noise(0.1) # avg duration
+    
+    # --- Energy ---
+    # Depression: Lower energy, monotonic
+    metrics["energy_mean"] = 0.6 - (base_severity * 0.3) + noise(0.05)
+    metrics["energy_std"] = 0.2 - (base_severity * 0.1) + noise(0.02)
+    metrics["intensity_mean"] = 70 - (base_severity * 15) + noise(3)
+    metrics["rms_energy_range"] = 0.4 - (base_severity * 0.2) + noise(0.05)
+    metrics["rms_energy_std"] = 0.15 - (base_severity * 0.08) + noise(0.02)
+    
+    # --- Formants ---
+    # Depression: Centralized vowels (slight shifts)
+    metrics["formant_f1_mean"] = 550 + noise(30)
+    metrics["formant_f1_frequencies_mean"] = metrics["formant_f1_mean"]
+    metrics["formant_f2_mean"] = 1600 + noise(50)
+    metrics["f2_transition_speed"] = 80 - (base_severity * 30) + noise(10) # Slower transitions
+    
+    # --- Spectral Features ---
+    # Depression: Dull voice
+    metrics["spectral_centroid"] = 2500 - (base_severity * 500) + noise(100)
+    metrics["spectral_rolloff"] = 4500 - (base_severity * 800) + noise(200)
+    metrics["spectral_flatness"] = 0.4 - (base_severity * 0.2) + noise(0.05) # Less flat (more tonal? or less?) - actually usually implies noise. 
+    # Let's say depression = breathy = higher flatness in high freq, but monotonic = lower flatness dynamics. 
+    # For this model: higher severity -> lower flatness (dull)
+    
+    metrics["zero_crossing_rate"] = 0.08 - (base_severity * 0.03) + noise(0.01)
+    
+    metrics["phonation_ratio"] = 0.7 - (base_severity * 0.2) + noise(0.05)
+    
+    # --- Modulation (Fatigue/Insomnia) ---
+    # Depression: Reduced modulation
+    metrics["temporal_modulation"] = 15 - (base_severity * 8) + noise(2)
+    metrics["spectral_modulation"] = 2.5 - (base_severity * 1.0) + noise(0.3)
+    
+    # --- Psychomotor ---
+    metrics["voice_onset_time"] = 0.03 + (base_severity * 0.04) + noise(0.01) # Slower onset
+    
+    # --- Concentration / Tension ---
+    metrics["glottal_pulse_rate"] = 100 - (base_severity * 30) + noise(10) # Irregularity or slowing
+    
+    # --- Suicidal (PSD Bands) ---
+    # Abstract mapping: Changes in power spectral density bands
+    metrics["psd-4"] = -30 + (base_severity * 10) + noise(2)
+    metrics["psd-5"] = -35 + (base_severity * 8) + noise(2)
+    metrics["psd-7"] = -40 + (base_severity * 5) + noise(2)
+    
+    metrics["t13"] = -15 + (base_severity * 5) + noise(1) # MFCC-related or spectral tilt
+    metrics["voiced16_20"] = -20 + (base_severity * 5) + noise(1)
+    
+    # --- MFCCs ---
+    metrics["mfcc_1_mean"] = -5 + (base_severity * 3) + noise(1)
+    metrics["mfcc_2_mean"] = 5 - (base_severity * 2) + noise(1)
 
     return metrics
 
 
 def generate_phq9_submission(
     indicator_scores: dict[str, float],
-    timestamp: datetime
+    timestamp: datetime,
+    user_id: str
 ) -> dict:
-    """Generate a PHQ-9 submission correlated with indicator scores."""
-
+    """Generate a PHQ-9 submission."""
     # Map indicators to PHQ-9 questions
     indicator_to_question = {
         "2_loss_of_interest": "q1",
@@ -228,7 +263,11 @@ def generate_phq9_submission(
 
     for indicator, question in indicator_to_question.items():
         score = indicator_scores.get(indicator, 0)
-        # Convert 0-1 score to 0-3 PHQ-9 scale with some noise
+        # Weight changes override: if indicator is forced to 0, PHQ might still be non-zero for realism?
+        # User said "weight changes we cannot measure using sound".
+        # But user might still report it in PHQ-9.
+        # For Demo consistency, let's keep it aligned with the (zero) indicator score for now.
+        
         phq_value = int(round(score * 3 + random.uniform(-0.3, 0.3)))
         phq_value = max(0, min(3, phq_value))
         raw_scores[question] = phq_value
@@ -236,39 +275,19 @@ def generate_phq9_submission(
 
     total_score = sum(raw_scores.values())
 
-    # Determine severity
-    if total_score <= 4:
-        severity = "Minimal"
-    elif total_score <= 9:
-        severity = "Mild"
-    elif total_score <= 14:
-        severity = "Moderate"
-    elif total_score <= 19:
-        severity = "Moderately Severe"
-    else:
-        severity = "Severe"
+    # Functional impact
+    if total_score <= 4: impact_score = 0
+    elif total_score <= 14: impact_score = 1
+    else: impact_score = random.choice([2, 3])
 
-    # Functional impact correlates with total score
-    if total_score <= 9:
-        impact_score = random.choice([0, 1])
-    elif total_score <= 14:
-        impact_score = random.choice([1, 2])
-    else:
-        impact_score = random.choice([2, 3])
-
-    impact_labels = [
-        "Not difficult at all",
-        "Somewhat difficult",
-        "Very difficult",
-        "Extremely difficult"
-    ]
+    impact_labels = ["Not difficult", "Somewhat difficult", "Very difficult", "Extremely difficult"]
 
     return {
-        "user_id": "demo_user",
+        "user_id": user_id,
         "phq9_scores": phq9_scores,
         "raw_scores": raw_scores,
         "total_score": total_score,
-        "severity": severity,
+        "severity": "N/A", # Calculated in UI
         "functional_impact": {
             "score": impact_score,
             "label": impact_labels[impact_score]
@@ -278,41 +297,20 @@ def generate_phq9_submission(
     }
 
 
-def seed_demo_database(
-    mongo_uri: str = "mongodb://localhost:27017",
-    days: int = 30,
-    user_id: str = "demo_user",
-    pattern: str = "gradual_onset",
-    samples_per_day: int = 10,
-    verbose: bool = True
+def seed_user_data(
+    db,
+    user_id: str,
+    pattern: str,
+    days: int,
+    samples_per_day: int,
+    verbose: bool
 ):
-    """
-    Seed the iotsensing_demo database with golden demo data.
-
-    Args:
-        mongo_uri: MongoDB connection URI
-        days: Number of days of data to generate
-        user_id: Demo user ID
-        pattern: Depression progression pattern
-        samples_per_day: Number of raw metric samples per day
-        verbose: Print progress messages
-    """
-    client = MongoClient(mongo_uri)
-    db_name = "iotsensing_demo"
-
-    # Step 1: Drop existing demo database
+    """Seed data for a single user."""
     if verbose:
-        print(f"Dropping existing {db_name} database...")
-    client.drop_database(db_name)
+        print(f"--- Seeding User: {user_id} (Pattern: {pattern}) ---")
 
-    db = client[db_name]
-
-    # Step 2: Generate severity progression
-    if verbose:
-        print(f"Generating {days}-day depression progression ({pattern})...")
     severities = generate_depression_progression(days, pattern)
-
-    # Step 3: Generate data for each day
+    
     end_date = datetime.utcnow().replace(hour=12, minute=0, second=0, microsecond=0)
     start_date = end_date - timedelta(days=days)
 
@@ -322,220 +320,197 @@ def seed_demo_database(
     indicator_scores_list = []
     phq9_submissions = []
 
-    if verbose:
-        print("Generating daily data...")
-
     for day_idx in range(days):
         current_date = start_date + timedelta(days=day_idx)
         severity = severities[day_idx]
 
-        # Generate indicator scores for this day
+        # 1. Indicators
         day_indicators = generate_indicator_scores(severity, day_idx, days)
         mdd_signal = check_mdd_signal(day_indicators)
 
-        # Generate raw metrics (multiple samples per day)
+        # 2. Raw Metrics
         daily_raw = []
-        for sample_idx in range(samples_per_day):
-            sample_time = current_date + timedelta(
-                hours=random.randint(8, 22),
-                minutes=random.randint(0, 59)
-            )
-
+        for _ in range(samples_per_day):
+            sample_time = current_date + timedelta(hours=random.randint(8, 22), minutes=random.randint(0, 59))
             acoustic = generate_acoustic_metrics(day_indicators, severity)
-
-            for metric_name, metric_value in acoustic.items():
+            
+            for m_name, m_val in acoustic.items():
                 raw_metrics.append({
                     "user_id": user_id,
-                    "metric_name": metric_name,
-                    "metric_value": metric_value,
+                    "metric_name": m_name,
+                    "metric_value": m_val,
                     "timestamp": sample_time,
-                    "system_mode": "demo",
+                    "system_mode": "demo"
                 })
-                daily_raw.append((metric_name, metric_value))
+                daily_raw.append((m_name, m_val))
 
-        # Generate aggregated metrics (daily average)
+        # 3. Aggregated Metrics
         metric_values = {}
         for name, value in daily_raw:
-            if name not in metric_values:
-                metric_values[name] = []
+            if name not in metric_values: metric_values[name] = []
             metric_values[name].append(value)
 
-        for metric_name, values in metric_values.items():
+        for m_name, vals in metric_values.items():
             aggregated_metrics.append({
                 "user_id": user_id,
-                "metric_name": metric_name,
-                "metric_value": np.mean(values),
+                "metric_name": m_name,
+                "metric_value": np.mean(vals),
                 "timestamp": current_date,
-                "system_mode": "demo",
+                "system_mode": "demo"
             })
 
-        # Generate contextual metrics (EMA-smoothed)
-        # Use exponential moving average simulation
-        alpha = 0.3  # EMA smoothing factor
-        for metric_name, values in metric_values.items():
-            # Simulate EMA smoothing
-            ema_value = np.mean(values)
+        # 4. Contextual Metrics (EMA)
+        alpha = 0.3
+        for m_name, vals in metric_values.items():
+            ema_val = np.mean(vals)
+            # Simple simulation: blend with "previous" day (using generated severity)
             if day_idx > 0:
-                # Blend with previous (simulated)
-                prev_severity = severities[day_idx - 1]
-                prev_acoustic = generate_acoustic_metrics({}, prev_severity)
-                if metric_name in prev_acoustic:
-                    ema_value = alpha * ema_value + (1 - alpha) * prev_acoustic[metric_name]
-
+                prev_sev = severities[day_idx - 1]
+                prev_ac = generate_acoustic_metrics({}, prev_sev)
+                if m_name in prev_ac:
+                    ema_val = alpha * ema_val + (1 - alpha) * prev_ac[m_name]
+            
             contextual_metrics.append({
                 "user_id": user_id,
-                "metric_name": metric_name,
-                "metric_value": ema_value,
+                "metric_name": m_name,
+                "metric_value": ema_val,
                 "timestamp": current_date,
                 "context_window": "7d",
                 "smoothing_alpha": alpha,
-                "system_mode": "demo",
+                "system_mode": "demo"
             })
 
-        # Generate indicator scores
+        # 5. Indicator Scores
         indicator_scores_list.append({
             "user_id": user_id,
             "indicator_scores": day_indicators,
             "mdd_signal": mdd_signal,
             "timestamp": current_date,
             "system_mode": "demo",
+            "binary_scores": {k: (1 if v >= 0.5 else 0) for k, v in day_indicators.items()}
         })
 
-        # Generate PHQ-9 submission (weekly, on Sundays)
-        if current_date.weekday() == 6:  # Sunday
-            phq9 = generate_phq9_submission(day_indicators, current_date)
-            phq9["user_id"] = user_id
+        # 6. PHQ-9 (Weekly)
+        if current_date.weekday() == 6:
+            phq9 = generate_phq9_submission(day_indicators, current_date, user_id)
             phq9_submissions.append(phq9)
 
-    # Step 4: Insert all data
-    if verbose:
-        print(f"Inserting {len(raw_metrics)} raw_metrics...")
-    if raw_metrics:
-        db["raw_metrics"].insert_many(raw_metrics)
+    # Insert Batch
+    if raw_metrics: db["raw_metrics"].insert_many(raw_metrics)
+    if aggregated_metrics: db["aggregated_metrics"].insert_many(aggregated_metrics)
+    if contextual_metrics: db["contextual_metrics"].insert_many(contextual_metrics)
+    if indicator_scores_list: db["indicator_scores"].insert_many(indicator_scores_list)
+    if phq9_submissions: db["phq9_submissions"].insert_many(phq9_submissions)
 
-    if verbose:
-        print(f"Inserting {len(aggregated_metrics)} aggregated_metrics...")
-    if aggregated_metrics:
-        db["aggregated_metrics"].insert_many(aggregated_metrics)
+    # 7. Baseline & Analyzed Metrics
+    # Calculate baseline from the generated raw metrics
+    baseline_stats = {}
+    for metric in ACOUSTIC_METRICS:
+        vals = [m["metric_value"] for m in raw_metrics if m["metric_name"] == metric]
+        if vals:
+            baseline_stats[metric] = {
+                "mean": np.mean(vals),
+                "std": np.std(vals),
+                "count": len(vals)
+            }
+        else:
+             baseline_stats[metric] = {"mean": 0, "std": 1, "count": 0}
 
-    if verbose:
-        print(f"Inserting {len(contextual_metrics)} contextual_metrics...")
-    if contextual_metrics:
-        db["contextual_metrics"].insert_many(contextual_metrics)
-
-    if verbose:
-        print(f"Inserting {len(indicator_scores_list)} indicator_scores...")
-    if indicator_scores_list:
-        db["indicator_scores"].insert_many(indicator_scores_list)
-
-    if verbose:
-        print(f"Inserting {len(phq9_submissions)} phq9_submissions...")
-    if phq9_submissions:
-        db["phq9_submissions"].insert_many(phq9_submissions)
-
-    # Step 5: Create baseline
-    baseline = {
+    baseline_doc = {
         "user_id": user_id,
         "schema_version": 2,
         "context_partitions": {
-            "default": {
-                metric: {
-                    "mean": np.mean([m["metric_value"] for m in raw_metrics if m["metric_name"] == metric]),
-                    "std": np.std([m["metric_value"] for m in raw_metrics if m["metric_name"] == metric]),
-                    "count": len([m for m in raw_metrics if m["metric_name"] == metric]),
-                }
-                for metric in ACOUSTIC_METRICS
-            }
+            "default": baseline_stats,
+            "morning": baseline_stats, # Simplify for demo
+            "evening": baseline_stats
         },
         "timestamp": datetime.utcnow(),
-        "system_mode": "demo",
+        "system_mode": "demo"
     }
+    db["baseline"].insert_one(baseline_doc)
 
+    # Generate Analyzed Metrics (Z-scores)
+    analyzed_metrics = []
+    for cm in contextual_metrics:
+        m_name = cm["metric_name"]
+        val = cm["metric_value"]
+        stats = baseline_stats.get(m_name, {"mean": 0, "std": 1})
+        
+        if stats["std"] > 0:
+            z = (val - stats["mean"]) / stats["std"]
+            z = max(-3.0, min(3.0, z))
+        else:
+            z = 0.0
+            
+        analyzed_metrics.append({
+            "user_id": user_id,
+            "timestamp": cm["timestamp"],
+            "metric_name": m_name,
+            "analyzed_value": z,
+            "system_mode": "demo"
+        })
+    
+    if analyzed_metrics: db["analyzed_metrics"].insert_many(analyzed_metrics)
+    
+    # 8. Environment & Board
+    env_id = f"env_demo_{user_id}"
+    db["environments"].insert_one({
+        "environment_id": env_id,
+        "user_id": user_id,
+        "name": f"{user_id}'s Home",
+        "description": "Demo Environment",
+        "created_at": datetime.utcnow(),
+        "system_mode": "demo"
+    })
+    db["boards"].insert_one({
+        "board_id": f"board_{user_id}",
+        "user_id": user_id,
+        "mac_address": f"DEMO:{user_id[:4].upper()}",
+        "name": f"{user_id}'s Device",
+        "environment_id": env_id,
+        "is_active": True,
+        "last_seen": datetime.utcnow(),
+        "created_at": datetime.utcnow(),
+        "system_mode": "demo"
+    })
+    
     if verbose:
-        print("Inserting baseline...")
-    db["baseline"].insert_one(baseline)
-
-    # Step 6: Create indexes
-    if verbose:
-        print("Creating indexes...")
-    for collection in ["raw_metrics", "aggregated_metrics", "contextual_metrics", "indicator_scores"]:
-        db[collection].create_index([("user_id", 1), ("timestamp", -1)])
-    db["phq9_submissions"].create_index([("user_id", 1), ("timestamp", -1)])
-    db["baseline"].create_index([("user_id", 1)])
-
-    # Summary
-    if verbose:
-        print("\n" + "=" * 50)
-        print("Demo data seeding complete!")
-        print("=" * 50)
-        print(f"Database: {db_name}")
-        print(f"User ID: {user_id}")
-        print(f"Days of data: {days}")
-        print(f"Pattern: {pattern}")
-        print(f"Raw metrics: {len(raw_metrics)}")
-        print(f"Aggregated metrics: {len(aggregated_metrics)}")
-        print(f"Contextual metrics: {len(contextual_metrics)}")
-        print(f"Indicator scores: {len(indicator_scores_list)}")
-        print(f"PHQ-9 submissions: {len(phq9_submissions)}")
-
-        # Show MDD signal days
-        mdd_days = sum(1 for r in indicator_scores_list if r["mdd_signal"])
-        print(f"Days with MDD signal: {mdd_days}/{days}")
-        print("=" * 50)
-
-    client.close()
-    return True
+        print(f"Done. {len(raw_metrics)} samples, {len(indicator_scores_list)} days.")
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Seed the iotsensing_demo database with golden demo data."
-    )
-    parser.add_argument(
-        "--mongo-uri",
-        default="mongodb://localhost:27017",
-        help="MongoDB connection URI (default: mongodb://localhost:27017)"
-    )
-    parser.add_argument(
-        "--days",
-        type=int,
-        default=30,
-        help="Number of days of data to generate (default: 30)"
-    )
-    parser.add_argument(
-        "--user-id",
-        default="demo_user",
-        help="Demo user ID (default: demo_user)"
-    )
-    parser.add_argument(
-        "--pattern",
-        choices=["gradual_onset", "episodic", "recovery", "stable_moderate"],
-        default="gradual_onset",
-        help="Depression progression pattern (default: gradual_onset)"
-    )
-    parser.add_argument(
-        "--samples-per-day",
-        type=int,
-        default=10,
-        help="Raw metric samples per day (default: 10)"
-    )
-    parser.add_argument(
-        "--quiet",
-        action="store_true",
-        help="Suppress progress messages"
-    )
-
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mongo-uri", default="mongodb://localhost:27017")
+    parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args()
 
-    seed_demo_database(
-        mongo_uri=args.mongo_uri,
-        days=args.days,
-        user_id=args.user_id,
-        pattern=args.pattern,
-        samples_per_day=args.samples_per_day,
-        verbose=not args.quiet
-    )
+    client = MongoClient(args.mongo_uri)
+    db_name = "iotsensing_demo"
+    
+    if not args.quiet:
+        print(f"Re-seeding {db_name}...")
+        
+    client.drop_database(db_name)
+    db = client[db_name]
 
+    # Seed Alice (Depressed)
+    seed_user_data(db, "Alice", "gradual_onset", 30, 15, not args.quiet)
+
+    # Seed Bob (Healthy)
+    seed_user_data(db, "Bob", "healthy", 30, 15, not args.quiet)
+
+    # Indexes
+    if not args.quiet: print("Creating indexes...")
+    for col in ["raw_metrics", "aggregated_metrics", "contextual_metrics", "indicator_scores", "analyzed_metrics"]:
+        db[col].create_index([("user_id", 1), ("timestamp", -1)])
+    db["phq9_submissions"].create_index([("user_id", 1), ("timestamp", -1)])
+    db["baseline"].create_index([("user_id", 1)])
+
+    if not args.quiet:
+        print("\nDemo Data Seeding Complete!")
+        print("Users: Alice (Depressed), Bob (Healthy)")
+    
+    client.close()
 
 if __name__ == "__main__":
     main()
