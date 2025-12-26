@@ -1,6 +1,7 @@
 from ports.UserRepositoryPort import UserRepositoryPort
 from pymongo import MongoClient
 import numpy as np
+from typing import Union
 
 
 class MongoUserRepositoryAdapter(UserRepositoryPort):
@@ -17,12 +18,17 @@ class MongoUserRepositoryAdapter(UserRepositoryPort):
             profiles.setdefault(uid, []).append(emb)
         return profiles
 
-    def save_user_embedding(self, user_id: int, embedding: np.ndarray):
+    def save_user_embedding(
+        self, user_id: Union[int, str], embedding: np.ndarray, overwrite: bool = False
+    ):
+        if overwrite:
+            self.collection.delete_many({"user_id": user_id})
+
         self.collection.insert_one(
             {"user_id": user_id, "embedding": embedding.tolist()}
         )
 
-    def delete_user_embedding(self, user_id: int, embedding: np.ndarray):
+    def delete_user_embedding(self, user_id: Union[int, str], embedding: np.ndarray):
         target_embedding = embedding.tolist()
         result = self.collection.delete_one(
             {"user_id": user_id, "embedding": target_embedding}

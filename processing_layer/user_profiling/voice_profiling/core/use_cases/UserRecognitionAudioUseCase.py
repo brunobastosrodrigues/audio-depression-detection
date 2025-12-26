@@ -5,42 +5,65 @@ from ports.UserRepositoryPort import UserRepositoryPort
 
 
 class UserRecognitionAudioUseCase:
-    def __init__(self, repository: UserRepositoryPort, similarity_threshold=0.7):
+    def __init__(self, repository: UserRepositoryPort, similarity_threshold=0.75):
         self.repository = repository
         self.similarity_threshold = similarity_threshold
+        # Adaptive learning constants (optional, but keeping structure if needed later)
         self.MAX_EMBEDDINGS = 20
         self.MAX_SIMILARITY_THRESHOLD_SAVE = 0.95
+
         self.user_profiles = self.repository.load_all_user_embeddings()
         self.encoder = VoiceEncoder()
 
     def recognize_user(self, audio_bytes: bytes) -> dict:
         wav, _ = wav_bytes_to_np_float32(audio_bytes)
-        embedding = np.array(
+
+        # Generate query vector for the short incoming chunk
+        query_embedding = np.array(
             self.encoder.embed_utterance(wav).tolist(), dtype=np.float32
         )
-        matched_user = self._match_user(embedding)
+
+        # Compare against known profiles
+        matched_user = self._match_user(query_embedding)
 
         if matched_user:
-            max_sim = self._max_similarity(embedding, self.user_profiles[matched_user])
-            if max_sim < self.MAX_SIMILARITY_THRESHOLD_SAVE:
-                self._update_user_profile(matched_user, embedding)
+            # OPTIONAL: Adaptive learning could go here
+            # For now, we just recognize the user
             print(f"User {matched_user} recognized.")
             return {"status": "recognized", "user_id": matched_user}
         else:
-            new_user = max(self.user_profiles.keys(), default=0) + 1
-            self.user_profiles[new_user] = [embedding]
-            self.repository.save_user_embedding(new_user, embedding)
-            print(f"New user {new_user} created.")
-            return {"status": "new_user_created", "user_id": new_user}
+            # CRITICAL CHANGE: Do NOT create new users.
+            # Return None to signal "Ignore this audio"
+            print("Unknown speaker detected. Ignoring.")
+            return None
 
     def _match_user(self, embedding):
+        """
+        Finds the user with the maximum similarity score that exceeds the threshold.
+        """
+        best_user = None
+        max_similarity = -1.0
+
         for user_id, embeddings in self.user_profiles.items():
+            # Calculate max similarity against all embeddings for this user
             sims = [
                 np.dot(embedding, e) / (np.linalg.norm(embedding) * np.linalg.norm(e))
                 for e in embeddings
             ]
-            if np.mean(sims) > self.similarity_threshold:
-                return user_id
+
+            if not sims:
+                continue
+
+            user_max_sim = max(sims)
+
+            if user_max_sim > max_similarity:
+                max_similarity = user_max_sim
+                best_user = user_id
+
+        # Strict verification: only return if the best match is above threshold
+        if max_similarity >= self.similarity_threshold:
+            return best_user
+
         return None
 
     def _max_similarity(self, embedding, embeddings):
