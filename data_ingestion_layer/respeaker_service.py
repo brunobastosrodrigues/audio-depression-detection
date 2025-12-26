@@ -13,6 +13,7 @@ Environment variables:
     MQTT_HOST: MQTT broker hostname (default: mqtt)
     MQTT_PORT: MQTT broker port (default: 1883)
     BASE_PORT: Starting port for board connections (default: 8010)
+    MONGO_MOCK: Set to "true" to use mongomock (default: false)
 """
 
 import socket
@@ -263,9 +264,16 @@ class ReSpeakerService:
             conn.settimeout(10.0)
 
             # Receive MAC address as handshake (17 chars: AA:BB:CC:DD:EE:FF)
-            mac_data = conn.recv(17)
-            if not mac_data:
-                print(f"Connection from {addr} closed before handshake")
+            mac_data = b""
+            # Loop to ensure we get exactly 17 bytes
+            while len(mac_data) < 17:
+                chunk = conn.recv(17 - len(mac_data))
+                if not chunk:
+                    break
+                mac_data += chunk
+
+            if len(mac_data) < 17:
+                print(f"Connection from {addr} closed before complete handshake (got {len(mac_data)} bytes)")
                 conn.close()
                 return
 
