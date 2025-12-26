@@ -146,20 +146,17 @@ class MetricsComputationService:
         else:
             timestamp = datetime.now(timezone.utc)
 
-        # Convert all metrics to a list of records with board/environment metadata
-        metric_records = [
-            {
-                "user_id": user_id,
-                "timestamp": timestamp,
-                "metric_name": key,
-                "metric_value": value,
-                "origin": "metrics_computation",
-                "board_id": metadata.get("board_id"),
-                "environment_id": metadata.get("environment_id"),
-                "environment_name": metadata.get("environment_name"),
-                "system_mode": metadata.get("system_mode", "live"),
-            }
-            for key, value in flat_metrics.items()
-        ]
+        # OPTIMIZED: Return a single grouped record containing all metrics
+        # This reduces database writes from ~25 documents to 1 document per audio chunk.
+        grouped_record = {
+            "user_id": user_id,
+            "timestamp": timestamp,
+            "metrics": flat_metrics,
+            "origin": "metrics_computation",
+            "board_id": metadata.get("board_id"),
+            "environment_id": metadata.get("environment_id"),
+            "environment_name": metadata.get("environment_name"),
+            "system_mode": metadata.get("system_mode", "live"),
+        }
 
-        return metric_records
+        return [grouped_record]

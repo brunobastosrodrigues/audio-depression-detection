@@ -31,6 +31,10 @@ class MongoPersistenceAdapter(PersistencePort):
         return self.client[db_name]
 
     def save_metrics(self, metrics: list[dict]) -> None:
+        """
+        Saves metrics to MongoDB.
+        Supports both legacy flat format and new grouped format.
+        """
         if not metrics:
             print("No metrics to save.")
             return
@@ -39,23 +43,43 @@ class MongoPersistenceAdapter(PersistencePort):
         metrics_by_mode = defaultdict(list)
 
         for m in metrics:
-            value = m.get("metric_value")
-            system_mode = m.pop("system_mode", None)  # Extract and remove system_mode
+            # Check for new grouped format (has "metrics" dict instead of "metric_value")
+            if "metrics" in m and isinstance(m["metrics"], dict):
+                # New Grouped Format
+                system_mode = m.pop("system_mode", None)
 
-            try:
-                numeric_value = float(value)
+                # Sanitize numeric values in the metrics dictionary
+                sanitized_metrics = {}
+                for k, v in m["metrics"].items():
+                    try:
+                        numeric_val = float(v)
+                        if not (numeric_val != numeric_val or numeric_val in [float("inf"), float("-inf")]):
+                             sanitized_metrics[k] = numeric_val
+                    except (TypeError, ValueError):
+                        pass # Skip invalid
 
-                if not (
-                    numeric_value != numeric_value
-                    or numeric_value in [float("inf"), float("-inf")]
-                ):
-                    m["metric_value"] = numeric_value
-                    metrics_by_mode[system_mode].append(m)
-                else:
-                    print(f"Skipped invalid (NaN/inf) metric: {m}")
+                m["metrics"] = sanitized_metrics
+                metrics_by_mode[system_mode].append(m)
 
-            except (TypeError, ValueError):
-                print(f"Skipped non-numeric or malformed metric: {m}")
+            else:
+                # Legacy Flat Format
+                value = m.get("metric_value")
+                system_mode = m.pop("system_mode", None)
+
+                try:
+                    numeric_value = float(value)
+
+                    if not (
+                        numeric_value != numeric_value
+                        or numeric_value in [float("inf"), float("-inf")]
+                    ):
+                        m["metric_value"] = numeric_value
+                        metrics_by_mode[system_mode].append(m)
+                    else:
+                        print(f"Skipped invalid (NaN/inf) metric: {m}")
+
+                except (TypeError, ValueError):
+                    print(f"Skipped non-numeric or malformed metric: {m}")
 
         if not any(metrics_by_mode.values()):
             print("No valid numeric metrics to save.")
