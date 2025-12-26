@@ -326,9 +326,30 @@ with tab_export:
                         cursor = cursor.limit(limit)
 
                     docs = list(cursor)
+
+                    # Handle Grouped Metrics Unpacking for Export
+                    if export_collection == "raw_metrics":
+                        unpacked_docs = []
+                        for doc in docs:
+                            if "metrics" in doc and isinstance(doc["metrics"], dict):
+                                # It's a grouped document, unpack it
+                                base_info = {
+                                    k: v for k, v in doc.items()
+                                    if k not in ["metrics", "_id"]
+                                }
+                                for metric_name, metric_value in doc["metrics"].items():
+                                    row = base_info.copy()
+                                    row["metric_name"] = metric_name
+                                    row["metric_value"] = metric_value
+                                    unpacked_docs.append(row)
+                            else:
+                                # Legacy or already flat
+                                unpacked_docs.append(doc)
+                        docs = unpacked_docs
+
                     df = pd.DataFrame(docs)
 
-                    # Remove MongoDB _id
+                    # Remove MongoDB _id if it slipped through
                     if "_id" in df.columns:
                         df = df.drop(columns=["_id"])
 

@@ -74,7 +74,10 @@ class MongoPersistenceAdapter(PersistencePort):
         user_id: int,
         start_date: Optional[datetime] = None,
     ) -> List[RawMetricRecord]:
-        """Query all databases and combine results."""
+        """
+        Query all databases and combine results.
+        Supports both legacy flat format and new grouped format by unpacking grouped records.
+        """
         query = {"user_id": user_id}
         if start_date:
             query["timestamp"] = {"$gte": start_date}
@@ -86,15 +89,31 @@ class MongoPersistenceAdapter(PersistencePort):
             system_mode = next((k for k, v in DB_MAP.items() if v == db_name and k is not None), "live")
             docs = db["raw_metrics"].find(query)
             for doc in docs:
-                all_records.append(
-                    RawMetricRecord(
-                        user_id=doc["user_id"],
-                        timestamp=doc["timestamp"],
-                        metric_name=doc["metric_name"],
-                        metric_value=doc["metric_value"],
-                        system_mode=doc.get("system_mode", system_mode),
-                    )
-                )
+                # Check for new grouped format (has "metrics" dict)
+                if "metrics" in doc and isinstance(doc["metrics"], dict):
+                    # Unpack grouped metrics into individual RawMetricRecord objects
+                    for metric_name, metric_value in doc["metrics"].items():
+                        all_records.append(
+                            RawMetricRecord(
+                                user_id=doc["user_id"],
+                                timestamp=doc["timestamp"],
+                                metric_name=metric_name,
+                                metric_value=float(metric_value),
+                                system_mode=doc.get("system_mode", system_mode),
+                            )
+                        )
+                else:
+                    # Legacy flat format
+                    if "metric_name" in doc and "metric_value" in doc:
+                        all_records.append(
+                            RawMetricRecord(
+                                user_id=doc["user_id"],
+                                timestamp=doc["timestamp"],
+                                metric_name=doc["metric_name"],
+                                metric_value=doc["metric_value"],
+                                system_mode=doc.get("system_mode", system_mode),
+                            )
+                        )
         return all_records
 
     def save_aggregated_metrics(self, records: List[AggregatedMetricRecord]) -> None:
