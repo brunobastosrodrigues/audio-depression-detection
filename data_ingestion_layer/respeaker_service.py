@@ -23,6 +23,7 @@ import time
 import uuid
 from typing import Dict, Optional
 from datetime import datetime
+from collections import deque
 import os
 
 from pymongo import MongoClient
@@ -116,6 +117,7 @@ class ReSpeakerService:
         # Board management
         self.board_configs: Dict[str, BoardConfig] = {}  # mac_address -> config
         self.active_connections: Dict[str, dict] = {}  # board_id -> connection info
+        self.noise_floors: Dict[str, dict] = {}  # board_id -> {"rms_history": deque, "noise_floor": float}
         self.lock = threading.Lock()
 
         # Load initial configurations
@@ -196,6 +198,37 @@ class ReSpeakerService:
             {"$set": {"is_active": is_active, "last_seen": datetime.utcnow()}},
         )
 
+    def update_noise_floor(self, board_id: str, rms: float):
+        """
+        Update noise floor tracking for a board.
+        Keeps track of RMS values over the last 60 seconds (12 chunks of 5s each).
+        The noise floor is the minimum RMS seen in this window.
+        """
+        with self.lock:
+            if board_id not in self.noise_floors:
+                self.noise_floors[board_id] = {
+                    "rms_history": deque(maxlen=12),  # 60 seconds / 5 seconds per chunk
+                    "noise_floor": None
+                }
+            
+            # Add current RMS to history
+            self.noise_floors[board_id]["rms_history"].append(rms)
+            
+            # Calculate noise floor as minimum RMS in history (excluding zeros)
+            history = self.noise_floors[board_id]["rms_history"]
+            non_zero_rms = [r for r in history if r > 0]
+            if non_zero_rms:
+                self.noise_floors[board_id]["noise_floor"] = min(non_zero_rms)
+            else:
+                self.noise_floors[board_id]["noise_floor"] = None
+
+    def get_noise_floor(self, board_id: str) -> Optional[float]:
+        """Get the current noise floor for a board."""
+        with self.lock:
+            if board_id in self.noise_floors:
+                return self.noise_floors[board_id]["noise_floor"]
+            return None
+
     def handle_board_connection(self, conn: socket.socket, addr: tuple, config: BoardConfig):
         """Handle audio streaming from a single board."""
         topic = self.get_mqtt_topic(config)
@@ -222,11 +255,21 @@ class ReSpeakerService:
                     # Convert raw bytes to numpy array (16-bit PCM)
                     audio_np = np.frombuffer(audio_bytes, dtype=np.int16)
 
+                    # Calculate RMS first for noise floor tracking
+                    audio_float = audio_np.astype(np.float32) / 32768.0
+                    rms = np.sqrt(np.mean(audio_float**2))
+                    
+                    # Update noise floor tracking
+                    self.update_noise_floor(config.board_id, float(rms))
+                    
+                    # Get current noise floor for SNR calculation
+                    noise_floor = self.get_noise_floor(config.board_id)
+
                     # Encode to base64 WAV
                     audio_b64 = encode_audio_to_base64(audio_np, SAMPLE_RATE)
 
-                    # Calculate quality metrics
-                    metrics = calculate_audio_metrics(audio_np, SAMPLE_RATE)
+                    # Calculate quality metrics with noise floor
+                    metrics = calculate_audio_metrics(audio_np, SAMPLE_RATE, noise_floor)
 
                     # Create payload with metadata
                     payload = AudioPayload(
@@ -255,6 +298,9 @@ class ReSpeakerService:
             with self.lock:
                 if config.board_id in self.active_connections:
                     del self.active_connections[config.board_id]
+                # Clean up noise floor tracking
+                if config.board_id in self.noise_floors:
+                    del self.noise_floors[config.board_id]
             print(f"Board {config.name} handler terminated")
 
     def handle_new_connection(self, conn: socket.socket, addr: tuple):
