@@ -36,7 +36,7 @@ except ImportError:
     MockMongoClient = None
 
 from framework.payloads.AudioPayload import AudioPayload
-from framework.audio_utils import encode_audio_to_base64
+from framework.audio_utils import encode_audio_to_base64, calculate_audio_metrics
 
 # Configuration
 MONGO_URL = "mongodb://mongodb:27017"
@@ -224,6 +224,9 @@ class ReSpeakerService:
                     # Encode to base64 WAV
                     audio_b64 = encode_audio_to_base64(audio_np, SAMPLE_RATE)
 
+                    # Calculate quality metrics
+                    metrics = calculate_audio_metrics(audio_np, SAMPLE_RATE)
+
                     # Create payload with metadata
                     payload = AudioPayload(
                         data=audio_b64,
@@ -233,6 +236,7 @@ class ReSpeakerService:
                         user_id=config.user_id,
                         environment_id=config.environment_id,
                         environment_name=config.environment_name,
+                        quality_metrics=metrics,
                     )
 
                     # Publish to MQTT
