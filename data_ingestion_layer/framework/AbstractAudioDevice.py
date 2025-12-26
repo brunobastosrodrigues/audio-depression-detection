@@ -4,7 +4,7 @@ from framework.AbstractEdgeDevice import AbstractEdgeDevice
 from framework.payloads.AudioPayload import AudioPayload
 import time
 import numpy as np
-from framework.audio_utils import encode_audio_to_base64
+from framework.audio_utils import encode_audio_to_base64, calculate_audio_metrics
 
 
 class AbstractAudioDevice(AbstractEdgeDevice):
@@ -37,8 +37,13 @@ class AbstractAudioDevice(AbstractEdgeDevice):
             audio_np = filtered_data
         audio_b64 = encode_audio_to_base64(audio_np, self.sample_rate)
 
+        metrics = calculate_audio_metrics(audio_np, self.sample_rate)
+
         payload = AudioPayload(
-            data=audio_b64, timestamp=time.time(), sample_rate=self.sample_rate
+            data=audio_b64,
+            timestamp=time.time(),
+            sample_rate=self.sample_rate,
+            quality_metrics=metrics,
         )
 
         payload_str = json.dumps(payload.to_dict())

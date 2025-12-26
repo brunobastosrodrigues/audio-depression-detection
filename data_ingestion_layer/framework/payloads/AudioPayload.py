@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal, Optional, Dict, Any
 
 
 @dataclass
@@ -13,6 +13,7 @@ class AudioPayload:
     user_id: Optional[int] = None
     environment_id: Optional[str] = None
     environment_name: Optional[str] = None
+    quality_metrics: Optional[Dict[str, Any]] = None
 
     def to_dict(self):
         result = {
@@ -30,4 +31,6 @@ class AudioPayload:
             result["environment_id"] = self.environment_id
         if self.environment_name is not None:
             result["environment_name"] = self.environment_name
+        if self.quality_metrics is not None:
+            result["quality_metrics"] = self.quality_metrics
         return result

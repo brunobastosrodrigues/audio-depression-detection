@@ -53,3 +53,46 @@ def int2float(sound):
         sound *= 1 / 32768
     sound = sound.squeeze()
     return sound
+
+
+def calculate_audio_metrics(audio_np: np.ndarray, sample_rate: int) -> dict:
+    """
+    Calculates audio quality metrics: RMS, Peak, Clipping, dBFS.
+    Assumes audio_np is int16 or float32.
+    """
+    metrics = {
+        "rms": 0.0,
+        "peak_amplitude": 0.0,
+        "clipping_count": 0,
+        "db_fs": -96.0  # approximate silence floor
+    }
+
+    if len(audio_np) == 0:
+        return metrics
+
+    # Normalize to float for calculations
+    if audio_np.dtype == np.int16:
+        # Check for clipping in int16
+        metrics["clipping_count"] = int(np.sum((audio_np == 32767) | (audio_np == -32768)))
+        audio_float = audio_np.astype(np.float32) / 32768.0
+    else:
+        # Assumed float between -1.0 and 1.0
+        audio_float = audio_np
+        # Estimation for clipping in float domain (usually > 0.99 or >= 1.0)
+        metrics["clipping_count"] = int(np.sum(np.abs(audio_float) >= 1.0))
+
+    # Peak Amplitude
+    peak = np.max(np.abs(audio_float))
+    metrics["peak_amplitude"] = float(peak)
+
+    # RMS
+    rms = np.sqrt(np.mean(audio_float**2))
+    metrics["rms"] = float(rms)
+
+    # dBFS (decibels relative to full scale)
+    if rms > 0:
+        metrics["db_fs"] = float(20 * np.log10(rms))
+    else:
+        metrics["db_fs"] = -96.0  # approximate silence floor
+
+    return metrics
