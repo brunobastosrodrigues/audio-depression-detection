@@ -70,6 +70,21 @@ services:
          - MQTT_PORT=1883
          - BASE_PORT=8010
 
+   quality_metrics_service:
+      build:
+         context: ./data_ingestion_layer
+         dockerfile: Dockerfile.respeaker
+      command: python quality_metrics_service.py
+      volumes:
+         - ./data_ingestion_layer:/app
+      depends_on:
+         - mqtt
+         - mongodb
+      environment:
+         - MONGO_URL=mongodb://mongodb:27017
+         - MQTT_HOST=mqtt
+         - MQTT_PORT=1883
+
    temporal_context_modeling_layer:
       build:
          context: ./temporal_context_modeling_layer

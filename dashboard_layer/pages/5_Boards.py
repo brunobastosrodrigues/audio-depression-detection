@@ -8,6 +8,13 @@ import pandas as pd
 import requests
 from datetime import datetime, timedelta
 import os
+import traceback
+import queue
+import json
+import base64
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from utils.database import get_database, render_mode_selector, get_current_mode
 
@@ -26,6 +33,7 @@ db = get_database()
 boards_collection = db["boards"]
 environments_collection = db["environments"]
 raw_metrics_collection = db["raw_metrics"]
+audio_quality_metrics_collection = db["audio_quality_metrics"]
 
 ANALYSIS_LAYER_URL = "http://analysis_layer:8083"
 
@@ -100,7 +108,6 @@ if boards:
             for d in activity_data
         ])
         
-        import plotly.express as px
         fig = px.bar(
             df_activity, 
             x="Board", 
@@ -324,9 +331,6 @@ if boards:
                 with st.spinner("Listening for audio stream (10s timeout)..."):
                     try:
                         import paho.mqtt.client as mqtt
-                        import queue
-                        import json
-                        import base64
                         
                         # Helper to capture one message with timeout
                         def capture_single_message(topic, hostname="mqtt", port=1883, timeout=10):
@@ -535,10 +539,164 @@ if boards:
             
             # --- ANALYTICS TAB ---
             with tab_analytics:
-                st.caption("Activity over the last 24 hours")
+                st.caption("Board quality metrics and statistics")
                 
-                # Fetch recent metrics
+                # Time window selector
+                st.markdown("##### Time Window Selection")
+                time_window_options = {
+                    "Last 10 seconds": 10,
+                    "Last 20 seconds": 20,
+                    "Last 30 seconds": 30,
+                    "Last 40 seconds": 40,
+                    "Last 50 seconds": 50,
+                    "Last 60 seconds": 60,
+                }
+                selected_window = st.selectbox(
+                    "Select time window for statistics",
+                    list(time_window_options.keys()),
+                    index=5,  # Default to 60 seconds
+                    key=f"time_window_{board['board_id']}"
+                )
+                window_seconds = time_window_options[selected_window]
+                
+                # Fetch quality metrics for the selected time window
                 try:
+                    time_threshold = datetime.utcnow() - timedelta(seconds=window_seconds)
+                    
+                    quality_cursor = audio_quality_metrics_collection.find(
+                        {
+                            "board_id": board["board_id"],
+                            "timestamp": {"$gte": time_threshold}
+                        },
+                        {
+                            "timestamp": 1,
+                            "rms": 1,
+                            "peak_amplitude": 1,
+                            "clipping_count": 1,
+                            "db_fs": 1,
+                            "dynamic_range": 1,
+                            "snr": 1,
+                            "_id": 0
+                        }
+                    ).sort("timestamp", 1)
+                    
+                    quality_data = list(quality_cursor)
+                    
+                    if quality_data:
+                        st.markdown(f"##### Audio Quality Metrics ({selected_window})")
+                        
+                        # Calculate statistics
+                        avg_rms = sum(d.get("rms", 0) for d in quality_data) / len(quality_data)
+                        avg_peak = sum(d.get("peak_amplitude", 0) for d in quality_data) / len(quality_data)
+                        avg_dbfs = sum(d.get("db_fs", -96) for d in quality_data) / len(quality_data)
+                        total_clipping = sum(d.get("clipping_count", 0) for d in quality_data)
+                        
+                        # Dynamic Range statistics (filter out zeros)
+                        dynamic_ranges = [d.get("dynamic_range", 0) for d in quality_data if d.get("dynamic_range", 0) > 0]
+                        avg_dynamic_range = sum(dynamic_ranges) / len(dynamic_ranges) if dynamic_ranges else 0
+                        
+                        # SNR statistics (filter out None values)
+                        snr_values = [d.get("snr") for d in quality_data if d.get("snr") is not None]
+                        avg_snr = sum(snr_values) / len(snr_values) if snr_values else None
+                        
+                        # Display metrics in columns
+                        col1, col2, col3, col4 = st.columns(4)
+                        
+                        with col1:
+                            st.metric("Avg RMS", f"{avg_rms:.4f}")
+                            st.metric("Avg dBFS", f"{avg_dbfs:.2f} dB")
+                        
+                        with col2:
+                            st.metric("Avg Peak", f"{avg_peak:.4f}")
+                            st.metric("Total Clipping", int(total_clipping))
+                        
+                        with col3:
+                            st.metric("Avg Dynamic Range", f"{avg_dynamic_range:.2f} dB" if avg_dynamic_range > 0 else "N/A")
+                        
+                        with col4:
+                            if avg_snr is not None:
+                                st.metric("Avg SNR", f"{avg_snr:.2f} dB")
+                            else:
+                                st.metric("Avg SNR", "N/A", help="SNR available after 60s of data")
+                        
+                        # Plot metrics over time
+                        st.markdown("##### Metrics Over Time")
+                        
+                        # Create DataFrame for plotting
+                        df_quality = pd.DataFrame(quality_data)
+                        
+                        # Create subplots
+                        fig = make_subplots(
+                            rows=2, cols=2,
+                            subplot_titles=("dBFS", "Dynamic Range", "RMS", "Clipping Events"),
+                            vertical_spacing=0.12,
+                            horizontal_spacing=0.1
+                        )
+                        
+                        # dBFS plot
+                        fig.add_trace(
+                            go.Scatter(x=df_quality["timestamp"], y=df_quality["db_fs"],
+                                      mode='lines+markers', name='dBFS', line=dict(color='blue')),
+                            row=1, col=1
+                        )
+                        
+                        # Dynamic Range plot
+                        if "dynamic_range" in df_quality.columns:
+                            fig.add_trace(
+                                go.Scatter(x=df_quality["timestamp"], y=df_quality["dynamic_range"],
+                                          mode='lines+markers', name='Dynamic Range', line=dict(color='green')),
+                                row=1, col=2
+                            )
+                        
+                        # RMS plot
+                        fig.add_trace(
+                            go.Scatter(x=df_quality["timestamp"], y=df_quality["rms"],
+                                      mode='lines+markers', name='RMS', line=dict(color='orange')),
+                            row=2, col=1
+                        )
+                        
+                        # Clipping Count plot
+                        fig.add_trace(
+                            go.Scatter(x=df_quality["timestamp"], y=df_quality["clipping_count"],
+                                      mode='lines+markers', name='Clipping', line=dict(color='red')),
+                            row=2, col=2
+                        )
+                        
+                        # Update axes labels
+                        fig.update_xaxes(title_text="Time", row=2, col=1)
+                        fig.update_xaxes(title_text="Time", row=2, col=2)
+                        fig.update_yaxes(title_text="dB", row=1, col=1)
+                        fig.update_yaxes(title_text="dB", row=1, col=2)
+                        fig.update_yaxes(title_text="RMS", row=2, col=1)
+                        fig.update_yaxes(title_text="Count", row=2, col=2)
+                        
+                        fig.update_layout(height=500, showlegend=False, template="plotly_white")
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # SNR plot if available
+                        if snr_values:
+                            st.markdown("##### Signal-to-Noise Ratio (SNR)")
+                            df_snr = df_quality[df_quality["snr"].notna()]
+                            fig_snr = go.Figure()
+                            fig_snr.add_trace(
+                                go.Scatter(x=df_snr["timestamp"], y=df_snr["snr"],
+                                          mode='lines+markers', name='SNR', line=dict(color='purple'))
+                            )
+                            fig_snr.update_layout(
+                                xaxis_title="Time",
+                                yaxis_title="SNR (dB)",
+                                height=250,
+                                template="plotly_white"
+                            )
+                            st.plotly_chart(fig_snr, use_container_width=True)
+                        
+                    else:
+                        st.info(f"No quality metrics available for the selected time window ({selected_window}).")
+                        st.caption("Quality metrics are collected in real-time from the audio stream. Start streaming to see data.")
+                    
+                    # Activity statistics
+                    st.markdown("---")
+                    st.markdown("##### Activity Statistics (Last 24 Hours)")
                     last_24h = datetime.utcnow() - timedelta(hours=24)
                     
                     # We only need timestamps to count activity
@@ -566,8 +724,6 @@ if boards:
                     
                     with col_chart:
                         if count > 0:
-                            import plotly.express as px
-                            
                             # Create hourly bins
                             df_activity = pd.DataFrame(timestamps, columns=["timestamp"])
                             df_activity["hour"] = df_activity["timestamp"].dt.floor("H")
@@ -587,5 +743,6 @@ if boards:
                             
                 except Exception as e:
                     st.error(f"Error loading analytics: {e}")
+                    st.code(traceback.format_exc())
 
             st.markdown("---")
