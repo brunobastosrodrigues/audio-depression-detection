@@ -45,6 +45,8 @@ services:
          resources:
             limits:
                memory: 2G
+      environment:
+         - SYSTEM_MODE=live
       volumes:
          - ./processing_layer/metrics_computation/voice_metrics:/app
       depends_on:

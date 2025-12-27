@@ -58,6 +58,17 @@ from core.extractors.myprosody_extractors import MyprosodyMetrics
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+# Scene Analysis Imports
+try:
+    from processing_layer.scene_analysis.SceneResolver import SceneResolver
+    from processing_layer.user_profiling.voice_profiling.adapters.outbound.MongoUserRepositoryAdapter import MongoUserRepositoryAdapter
+except ImportError:
+    # Fallback for local testing where paths might differ
+    import sys
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../..")))
+    from processing_layer.scene_analysis.SceneResolver import SceneResolver
+    from processing_layer.user_profiling.voice_profiling.adapters.outbound.MongoUserRepositoryAdapter import MongoUserRepositoryAdapter
+
 
 class MetricsComputationService:
     def __init__(self):
@@ -67,6 +78,28 @@ class MetricsComputationService:
 
         if self.simulation_mode:
             print("⚠️ WARNING: SIMULATION MODE ENABLED. Timestamps will be artificial ⚠️")
+
+        # Initialize Scene Analysis Gatekeeper
+        try:
+            print("Initializing Scene Analysis Gatekeeper...")
+            repo = MongoUserRepositoryAdapter()
+            self.scene_resolver = SceneResolver(repo)
+            
+            # WARMUP: Perform dummy inference to load models into memory
+            print("Warming up SceneResolver models...")
+            dummy_audio = np.zeros(16000, dtype=np.float32)
+            # Use a dummy ID that likely won't exist to trigger embedding fetch (fail fast)
+            # or just to run the encoder inside resolve.
+            # Ideally we just want to run the encoder.
+            try:
+                self.scene_resolver.encoder.embed_utterance(dummy_audio)
+                print("SceneResolver models warmed up.")
+            except Exception as w_e:
+                print(f"SceneResolver warmup warning: {w_e}")
+
+        except Exception as e:
+            print(f"⚠️ Warning: SceneResolver initialization failed: {e}. Gatekeeper disabled.")
+            self.scene_resolver = None
 
         # Initialize OpenSMILE extractor once at startup
         # Optimization: Use a single comprehensive yet lightweight set (eGeMAPSv02)
@@ -100,6 +133,40 @@ class MetricsComputationService:
         audio_np, sample_rate = audio_bytes_to_nparray(audio_bytes)
         audio_np = np.clip(audio_np, -1.0, 1.0)
 
+        # --- SCENE ANALYSIS GATEKEEPER ---
+        # Only active in LIVE mode
+        system_mode = metadata.get("system_mode", "live")
+        
+        if self.scene_resolver and system_mode == "live":
+            resolution = self.scene_resolver.resolve(audio_np, str(user_id))
+            decision = resolution["decision"]
+            context = resolution["context"]
+            
+            # Persist Scene Context Log (regardless of decision)
+            try:
+                # Use the repository from the resolver to save logs
+                log_entry = {
+                    "user_id": user_id,
+                    "timestamp": datetime.now(timezone.utc),
+                    "context": context,
+                    "classification": resolution["classification"],
+                    "similarity": resolution["similarity"],
+                    "decision": decision,
+                    "board_id": metadata.get("board_id"),
+                    "environment_name": metadata.get("environment_name")
+                }
+                self.scene_resolver.repository.db["scene_logs"].insert_one(log_entry)
+            except Exception as e:
+                print(f"⚠️ Failed to save scene log: {e}")
+
+            # Inject context into metadata for downstream awareness
+            metadata["scene_context"] = context
+            metadata["speaker_classification"] = resolution["classification"]
+
+            if decision == "discard":
+                print(f"🛡️ Gatekeeper: Discarding audio for user {user_id} (Context: {context}, Class: {resolution['classification']})")
+                return [], {}
+        
         # Single OpenSMILE extraction (LLD level)
         # eGeMAPSv02 LLD contains F0, HNR, Jitter, Shimmer, Formants, etc.
         features_LLD = self.smile_extractor.process_signal(audio_np, sample_rate)
