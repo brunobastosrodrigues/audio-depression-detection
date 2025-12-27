@@ -256,41 +256,44 @@ with tab_analytics:
             st.markdown("### 🎯 Signal Quality Matrix")
             st.caption("Compare total clipping events across all boards. High clipping indicates overdriven signal or hardware issues.")
             
-            # Calculate total clipping per board
-            clipping_by_board = df_heatmap.groupby("board_name")["clipping_count"].sum().reset_index()
-            clipping_by_board.columns = ["Board", "Total Clipping Events"]
-            
-            # Determine color based on clipping
-            def get_clip_color(count):
-                if count == 0:
-                    return "#22c55e"  # Green
-                elif count < 10:
-                    return "#eab308"  # Yellow
-                else:
-                    return "#ef4444"  # Red
-            
-            clipping_by_board["Color"] = clipping_by_board["Total Clipping Events"].apply(get_clip_color)
-            
-            fig_clipping = go.Figure(data=[
-                go.Bar(
-                    x=clipping_by_board["Board"],
-                    y=clipping_by_board["Total Clipping Events"],
-                    marker_color=clipping_by_board["Color"],
-                    text=clipping_by_board["Total Clipping Events"],
-                    textposition="outside",
+            # Calculate total clipping per board (with error handling)
+            if not df_heatmap.empty and "clipping_count" in df_heatmap.columns:
+                clipping_by_board = df_heatmap.groupby("board_name")["clipping_count"].sum().reset_index()
+                clipping_by_board.columns = ["Board", "Total Clipping Events"]
+                
+                # Determine color based on clipping
+                def get_clip_color(count):
+                    if count == 0:
+                        return "#22c55e"  # Green
+                    elif count < 10:
+                        return "#eab308"  # Yellow
+                    else:
+                        return "#ef4444"  # Red
+                
+                clipping_by_board["Color"] = clipping_by_board["Total Clipping Events"].apply(get_clip_color)
+                
+                fig_clipping = go.Figure(data=[
+                    go.Bar(
+                        x=clipping_by_board["Board"],
+                        y=clipping_by_board["Total Clipping Events"],
+                        marker_color=clipping_by_board["Color"],
+                        text=clipping_by_board["Total Clipping Events"],
+                        textposition="outside",
+                    )
+                ])
+                
+                fig_clipping.update_layout(
+                    title=f"Clipping Events by Board - {selected_window_label}",
+                    xaxis_title="Board",
+                    yaxis_title="Total Clipping Events",
+                    height=400,
+                    template="plotly_white",
+                    showlegend=False,
                 )
-            ])
-            
-            fig_clipping.update_layout(
-                title=f"Clipping Events by Board - {selected_window_label}",
-                xaxis_title="Board",
-                yaxis_title="Total Clipping Events",
-                height=400,
-                template="plotly_white",
-                showlegend=False,
-            )
-            
-            st.plotly_chart(fig_clipping, use_container_width=True)
+                
+                st.plotly_chart(fig_clipping, use_container_width=True)
+            else:
+                st.info("No clipping data available for the selected time window.")
             
             st.markdown("---")
             
@@ -304,48 +307,65 @@ with tab_analytics:
             df_dominance = df_heatmap.copy()
             df_dominance["time_bin"] = df_dominance["timestamp"].dt.floor("5min")
             
-            # Find board with max RMS in each time bin
-            dominant_boards = df_dominance.loc[
-                df_dominance.groupby("time_bin")["rms"].idxmax()
-            ][["time_bin", "board_name"]]
+            # Find board with max RMS in each time bin (with error handling)
+            try:
+                grouped = df_dominance.groupby("time_bin")["rms"]
+                if len(grouped) > 0:
+                    dominant_boards = df_dominance.loc[grouped.idxmax()][["time_bin", "board_name"]]
+                else:
+                    dominant_boards = pd.DataFrame(columns=["time_bin", "board_name"])
+            except (ValueError, KeyError):
+                # Handle case where groupby returns empty or idxmax fails
+                dominant_boards = pd.DataFrame(columns=["time_bin", "board_name"])
             
             # Count dominance per board
-            dominance_counts = dominant_boards["board_name"].value_counts()
-            total_intervals = len(dominant_boards)
+            if len(dominant_boards) > 0:
+                dominance_counts = dominant_boards["board_name"].value_counts()
+                total_intervals = len(dominant_boards)
+                
+                dominance_pct = (dominance_counts / total_intervals * 100).reset_index()
+                dominance_pct.columns = ["Board", "Percentage"]
+            else:
+                # No dominant boards found, create empty dataframe
+                dominance_pct = pd.DataFrame(columns=["Board", "Percentage"])
             
-            dominance_pct = (dominance_counts / total_intervals * 100).reset_index()
-            dominance_pct.columns = ["Board", "Percentage"]
+            # Create pie chart only if we have data
+            if len(dominance_pct) > 0 and not dominance_pct.empty:
+                fig_dominance = px.pie(
+                    dominance_pct,
+                    values="Percentage",
+                    names="Board",
+                    title=f"Speech Distribution by Location - {selected_window_label}",
+                    template="plotly_white",
+                    hole=0.3,
+                )
+                
+                fig_dominance.update_traces(textposition='inside', textinfo='percent+label')
+                fig_dominance.update_layout(height=500)
+                
+                st.plotly_chart(fig_dominance, use_container_width=True)
+            else:
+                st.info("Insufficient activity data for distribution visualization. Data appears when boards are actively streaming.")
             
-            fig_dominance = px.pie(
-                dominance_pct,
-                values="Percentage",
-                names="Board",
-                title=f"Speech Distribution by Location - {selected_window_label}",
-                template="plotly_white",
-                hole=0.3,
-            )
-            
-            fig_dominance.update_traces(textposition='inside', textinfo='percent+label')
-            fig_dominance.update_layout(height=500)
-            
-            st.plotly_chart(fig_dominance, use_container_width=True)
-            
-            # Additional insights
-            st.markdown("#### 📈 Key Insights")
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                most_active = dominance_counts.idxmax()
-                most_active_pct = (dominance_counts.max() / total_intervals * 100)
-                st.metric("Most Active Board", most_active, f"{most_active_pct:.1f}%")
-            
-            with col2:
-                total_samples = len(quality_metrics)
-                st.metric("Total Samples", f"{total_samples:,}")
-            
-            with col3:
-                avg_samples_per_board = total_samples / len(boards)
-                st.metric("Avg per Board", f"{avg_samples_per_board:.0f}")
+            # Additional insights (only show if we have data)
+            if len(dominance_pct) > 0 and not dominance_pct.empty:
+                st.markdown("#### 📈 Key Insights")
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    dominance_counts = dominant_boards["board_name"].value_counts()
+                    total_intervals = len(dominant_boards)
+                    most_active = dominance_counts.idxmax()
+                    most_active_pct = (dominance_counts.max() / total_intervals * 100)
+                    st.metric("Most Active Board", most_active, f"{most_active_pct:.1f}%")
+                
+                with col2:
+                    total_samples = len(quality_metrics)
+                    st.metric("Total Samples", f"{total_samples:,}")
+                
+                with col3:
+                    avg_samples_per_board = total_samples / len(boards)
+                    st.metric("Avg per Board", f"{avg_samples_per_board:.0f}")
 
 # ============================================================================
 # TAB 3: CONFIGURATION
@@ -632,21 +652,37 @@ with tab_config:
                                 ts = cap["timestamp"]
                                 ts_dt = datetime.utcfromtimestamp(ts)
                                 
-                                # Range query (1 second window to be safe)
+                                # Range query (6 second window to capture related metrics)
                                 window_start = ts_dt - timedelta(seconds=0.5)
                                 window_end = ts_dt + timedelta(seconds=5.5)
                                 
-                                result = raw_metrics_collection.delete_many({
+                                # Delete from raw_metrics
+                                raw_result = raw_metrics_collection.delete_many({
                                     "board_id": monitor_board_id,
                                     "timestamp": {"$gte": window_start, "$lte": window_end}
                                 })
                                 
-                                st.success(f"Discarded {result.deleted_count} metric records.")
+                                # Also delete from audio_quality_metrics to keep consistency
+                                quality_result = audio_quality_metrics_collection.delete_many({
+                                    "board_id": monitor_board_id,
+                                    "timestamp": {"$gte": window_start, "$lte": window_end}
+                                })
+                                
+                                total_deleted = raw_result.deleted_count + quality_result.deleted_count
+                                
+                                if total_deleted > 0:
+                                    st.success(f"✓ Discarded {raw_result.deleted_count} raw metrics and {quality_result.deleted_count} quality metrics.")
+                                else:
+                                    st.warning("No metrics found in the time window. Data may have already been deleted.")
+                                    
+                                # Clear captured audio from session
                                 del st.session_state["captured_audio"]
                                 st.rerun()
                                 
                             except Exception as e:
                                 st.error(f"Error discarding data: {e}")
+                                import traceback
+                                st.code(traceback.format_exc())
 
                     with col_keep:
                         if st.button("💾 Keep & Clear", type="primary"):
