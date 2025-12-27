@@ -21,7 +21,12 @@ st.markdown("Configure analysis parameters and view system information.")
 
 # --- DATABASE CONNECTION ---
 db = get_database()
-settings_collection = db["system_settings"]
+
+# Config mode is GLOBAL (not per-mode), so use base iotsensing database
+from pymongo import MongoClient
+_mongo_client = MongoClient(os.getenv("MONGO_URI", "mongodb://mongodb:27017"))
+_base_db = _mongo_client["iotsensing"]
+settings_collection = _base_db["system_settings"]
 
 
 def get_config_mode():
@@ -80,28 +85,14 @@ with tab_analysis:
         key="config_mode_selector"
     )
 
-    # Save button
-    col_save, col_sync = st.columns([1, 1])
+    # Save button - Apply and Sync in one action
+    if selected_mode != current_mode:
+        if st.button("💾 Apply & Sync", type="primary"):
+            # Save to MongoDB
+            set_config_mode(selected_mode)
 
-    with col_save:
-        if selected_mode != current_mode:
-            if st.button("💾 Apply Changes", type="primary", use_container_width=True):
-                set_config_mode(selected_mode)
-                # Trigger backend reload
-                try:
-                    analysis_host = os.getenv("ANALYSIS_LAYER_HOST", "analysis_layer")
-                    analysis_port = os.getenv("ANALYSIS_LAYER_PORT", "8083")
-                    requests.post(
-                        f"http://{analysis_host}:{analysis_port}/config/reload",
-                        timeout=5
-                    )
-                except Exception:
-                    pass  # Backend will pick it up on next request anyway
-                st.success(f"Configuration mode changed to **{selected_mode.upper()}**")
-                st.rerun()
-
-    with col_sync:
-        if st.button("🔄 Sync Backend", use_container_width=True):
+            # Trigger backend reload
+            sync_success = False
             try:
                 analysis_host = os.getenv("ANALYSIS_LAYER_HOST", "analysis_layer")
                 analysis_port = os.getenv("ANALYSIS_LAYER_PORT", "8083")
@@ -111,11 +102,18 @@ with tab_analysis:
                 )
                 if response.status_code == 200:
                     result = response.json()
-                    st.success(f"Backend synced: Mode = **{result.get('mode', 'unknown').upper()}**")
-                else:
-                    st.error("Failed to sync backend")
+                    sync_success = True
+                    st.success(f"✅ Mode changed to **{selected_mode.upper()}** and backend synced (metrics: {result.get('metrics_count', 'N/A')})")
             except Exception as e:
-                st.error(f"Could not connect to backend: {e}")
+                st.warning(f"Mode saved but backend sync failed: {e}")
+
+            if sync_success:
+                st.info("💡 Click **Refresh Analysis** on the Indicators page to recalculate scores with the new config.")
+
+            st.rerun()
+    else:
+        # Show current status
+        st.success(f"✅ Current mode: **{current_mode.upper()}**")
 
     st.divider()
 
