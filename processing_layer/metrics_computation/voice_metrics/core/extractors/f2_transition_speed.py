@@ -13,7 +13,8 @@ def get_f2_transition_speed(audio_np, sample_rate):
     formant = call(snd, "To Formant (burg)", 0.0, 5, 5500, 0.025, 50)
     n_frames = call(formant, "Get number of frames")
     
-    # Pre-allocate arrays with max size
+    # Pre-allocate arrays with max size to avoid list.append() overhead
+    # Some over-allocation is acceptable since we trim to actual size below
     times = np.zeros(n_frames)
     f2_values = np.zeros(n_frames)
     valid_count = 0
@@ -29,7 +30,7 @@ def get_f2_transition_speed(audio_np, sample_rate):
     if valid_count < 2:
         return 0.0  # Not enough data
     
-    # Trim arrays to actual size
+    # Trim arrays to actual size (frees over-allocated memory)
     times = times[:valid_count]
     f2_values = f2_values[:valid_count]
 

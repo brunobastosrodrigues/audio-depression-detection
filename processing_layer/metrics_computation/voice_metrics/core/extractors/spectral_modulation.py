@@ -13,10 +13,10 @@ def get_spectral_modulation(audio_np, sample_rate):
     )
     log_S = librosa.power_to_db(S)
 
-    # Vectorized zero-mean operation
+    # Vectorized zero-mean operation per frequency bin (axis=0 centers each time frame's spectrum)
     log_S_centered = log_S - np.mean(log_S, axis=0, keepdims=True)
     
-    # Vectorized FFT across all time frames
+    # Vectorized FFT along frequency axis for all time frames
     fft_result = np.fft.fft(log_S_centered, axis=0)
     power = np.abs(fft_result) ** 2
     

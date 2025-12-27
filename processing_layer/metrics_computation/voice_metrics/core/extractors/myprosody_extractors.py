@@ -96,5 +96,6 @@ def myprosody_extractors_handler(
         if os.path.exists(temp_wav_path):
             try:
                 os.remove(temp_wav_path)
-            except OSError:
-                pass  # File already removed or permissions issue
+            except OSError as e:
+                # Log but don't fail on cleanup errors (file permissions, etc.)
+                print(f"Warning: Could not remove temporary file {temp_wav_path}: {e}")
