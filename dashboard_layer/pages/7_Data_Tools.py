@@ -118,7 +118,6 @@ def load_users_data_tools():
             users.update(db[col_name].distinct("user_id"))
         except Exception as e:
             # Log the error but continue - some collections may not exist yet
-            import sys
             print(f"Warning: Could not load users from {col_name}: {e}", file=sys.stderr)
     users_list = sorted(list(users))
     if not users_list:

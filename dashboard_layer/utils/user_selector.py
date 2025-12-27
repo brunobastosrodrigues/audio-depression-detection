@@ -5,6 +5,7 @@ This module provides functions to load users and render a user selector that pro
 maintains the selected user across page navigation using Streamlit session state.
 """
 
+import sys
 import streamlit as st
 from utils.database import get_database
 
@@ -24,7 +25,6 @@ def load_users():
         except Exception as e:
             # Log the error but continue - some collections may not exist yet
             # This is expected during initial setup or when collections are empty
-            import sys
             print(f"Warning: Could not load users from {col_name}: {e}", file=sys.stderr)
     return sorted(list(users))
 
