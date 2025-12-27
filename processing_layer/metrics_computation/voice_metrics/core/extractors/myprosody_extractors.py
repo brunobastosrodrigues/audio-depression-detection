@@ -7,7 +7,12 @@ import contextlib
 import io
 import pandas as pd
 
-MYPROSODY_DIR_PATH = "/app/core/myprosody/myprosody"
+# Get the absolute path to the directory containing this file
+EXTRACTORS_DIR = os.path.dirname(os.path.abspath(__file__))
+# Navigate up to the core directory (processing_layer/metrics_computation/voice_metrics/core)
+CORE_DIR = os.path.dirname(EXTRACTORS_DIR)
+# Define path to myprosody/myprosody
+MYPROSODY_DIR_PATH = os.path.join(CORE_DIR, "myprosody", "myprosody")
 
 
 class MyprosodyMetrics(Enum):
@@ -58,8 +63,8 @@ def myprosody_extractors_handler(
         sample_rate = 16000
 
     temp_wav_name = "temp"
-    temp_wav_path = (
-        f"/app/core/myprosody/myprosody/dataset/audioFiles/{temp_wav_name}.wav"
+    temp_wav_path = os.path.join(
+        MYPROSODY_DIR_PATH, "dataset", "audioFiles", f"{temp_wav_name}.wav"
     )
 
     # Write temporary file and ensure cleanup
