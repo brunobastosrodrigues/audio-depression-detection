@@ -1,9 +1,14 @@
 """
-Scene Forensics Dashboard
+Scene Forensics Dashboard - Advanced Diagnostics
 
-Real-time visualization of Live Mode gatekeeper decisions, speaker verification,
-and context classification. Enables verification that the Scene Analysis pipeline
-is working correctly.
+Detailed forensics view for debugging and tuning the Scene Analysis pipeline.
+For everyday monitoring, use the Live Monitor page.
+
+This page provides:
+- Detailed similarity score analysis
+- Configuration verification
+- Raw log inspection
+- System health diagnostics
 """
 
 import streamlit as st
@@ -15,7 +20,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from utils.database import get_database, render_mode_selector, get_current_mode
-from utils.user_selector import render_user_selector, get_user_display_name
+from utils.user_selector import render_user_selector, get_user_display_name, is_selected_user_calibrated
+from utils.alerts import render_actionable_banner
 
 st.set_page_config(page_title="Scene Forensics", page_icon="🔬", layout="wide")
 
@@ -25,7 +31,7 @@ if get_current_mode() != "live":
     st.stop()
 
 st.title("🔬 Scene Forensics")
-st.markdown("Real-time verification of Live Mode speaker identification and context classification.")
+st.caption("Advanced diagnostics for Scene Analysis pipeline. For everyday monitoring, use **Live Monitor**.")
 
 # --- SIDEBAR ---
 render_mode_selector()
@@ -37,7 +43,18 @@ if not selected_user:
 
 # Display selected user info in header
 user_display_name = get_user_display_name(selected_user)
-st.info(f"Analyzing scene data for: **{user_display_name}** (`{selected_user}`)")
+
+# Calibration check with actionable banner
+if not is_selected_user_calibrated():
+    render_actionable_banner(
+        message=f"Voice profile missing for {user_display_name}. Speaker verification is disabled.",
+        alert_type="error",
+        action_label="Calibrate Now",
+        action_page="pages/8_User_Management.py",
+        key="forensics_cal_warning",
+    )
+else:
+    st.success(f"Analyzing scene data for: **{user_display_name}**")
 
 # --- DATABASE CONNECTION ---
 db = get_database()

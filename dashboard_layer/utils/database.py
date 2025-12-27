@@ -179,38 +179,52 @@ def render_mode_selector():
             st.rerun()
 
     # Dynamic CSS to hide sidebar pages based on mode
+    # Live Mode: Full access to monitoring and management tools
+    # Demo Mode: Hide live-only features (Boards, User Management, Scene Forensics)
+    # Dataset Mode: Hide live-only features, show Data Tools
     css_to_inject = ""
-    
+
+    # Common pages to hide in non-live modes
+    live_only_pages = [
+        "Boards",
+        "User_Management",
+        "Scene_Forensics",
+    ]
+
+    # Legacy page always hidden
+    legacy_hidden = ["Indicators_Legacy"]
+
     if current_mode == "demo":
-        css_to_inject = """
+        hidden_pages = live_only_pages + ["Data_Tools"] + legacy_hidden
+        selectors = ", ".join([f'div[data-testid="stSidebarNav"] a[href*="{p}"]' for p in hidden_pages])
+        css_to_inject = f"""
             <style>
-                div[data-testid="stSidebarNav"] a[href*="Boards"],
-                div[data-testid="stSidebarNav"] a[href*="User_Management"],
-                div[data-testid="stSidebarNav"] a[href*="Data_Tools"],
-                div[data-testid="stSidebarNav"] a[href*="Scene_Forensics"] {
+                {selectors} {{
                     display: none !important;
-                }
+                }}
             </style>
         """
     elif current_mode == "live":
-        css_to_inject = """
+        hidden_pages = ["Data_Tools"] + legacy_hidden
+        selectors = ", ".join([f'div[data-testid="stSidebarNav"] a[href*="{p}"]' for p in hidden_pages])
+        css_to_inject = f"""
             <style>
-                div[data-testid="stSidebarNav"] a[href*="Data_Tools"] {
+                {selectors} {{
                     display: none !important;
-                }
+                }}
             </style>
         """
     elif current_mode == "dataset":
-        css_to_inject = """
+        hidden_pages = live_only_pages + legacy_hidden
+        selectors = ", ".join([f'div[data-testid="stSidebarNav"] a[href*="{p}"]' for p in hidden_pages])
+        css_to_inject = f"""
             <style>
-                div[data-testid="stSidebarNav"] a[href*="Boards"],
-                div[data-testid="stSidebarNav"] a[href*="User_Management"],
-                div[data-testid="stSidebarNav"] a[href*="Scene_Forensics"] {
+                {selectors} {{
                     display: none !important;
-                }
+                }}
             </style>
         """
-    
+
     if css_to_inject:
         st.markdown(css_to_inject, unsafe_allow_html=True)
 
