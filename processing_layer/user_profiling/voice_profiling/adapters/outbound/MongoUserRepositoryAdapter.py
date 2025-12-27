@@ -3,6 +3,10 @@ from pymongo import MongoClient
 import numpy as np
 from typing import Union, Dict, List
 from datetime import datetime
+import logging
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 class MongoUserRepositoryAdapter(UserRepositoryPort):
@@ -66,7 +70,7 @@ class MongoUserRepositoryAdapter(UserRepositoryPort):
             
             return True
         except Exception as e:
-            print(f"Error adding user: {e}")
+            logger.error(f"Error adding user: {e}")
             return False
 
     def delete_user(self, user_id: Union[int, str]) -> bool:
@@ -80,7 +84,7 @@ class MongoUserRepositoryAdapter(UserRepositoryPort):
             
             return True
         except Exception as e:
-            print(f"Error deleting user: {e}")
+            logger.error(f"Error deleting user: {e}")
             return False
 
     def get_all_users(self) -> List[Dict]:
@@ -93,5 +97,5 @@ class MongoUserRepositoryAdapter(UserRepositoryPort):
                     user["_id"] = str(user["_id"])
             return users
         except Exception as e:
-            print(f"Error getting users: {e}")
+            logger.error(f"Error getting users: {e}")
             return []

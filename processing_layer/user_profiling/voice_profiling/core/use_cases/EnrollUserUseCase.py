@@ -9,7 +9,7 @@ class EnrollUserUseCase:
         self.repository = repository
         self.encoder = VoiceEncoder()
 
-    def execute(self, user_id: str, audio_path: str, name: str = None, role: str = "patient", **kwargs):
+    def execute(self, user_id: str, audio_path: str, name: Optional[str] = None, role: str = "patient", **kwargs):
         """
         Generates a reference embedding (d-vector) for a specific user
         from a long audio sample (e.g., 30s reading) and saves it with full profile.

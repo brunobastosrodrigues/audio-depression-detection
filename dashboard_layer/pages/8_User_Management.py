@@ -15,13 +15,19 @@ import numpy as np
 
 from utils.database import get_database, render_mode_selector, get_current_mode
 
-# Board recorder
+# Import BoardRecorder
 try:
     from utils.board_recorder import BoardRecorder
+    BOARD_RECORDER_AVAILABLE = True
 except ImportError:
     import sys
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from utils.board_recorder import BoardRecorder
+    try:
+        from utils.board_recorder import BoardRecorder
+        BOARD_RECORDER_AVAILABLE = True
+    except ImportError:
+        BOARD_RECORDER_AVAILABLE = False
+        BoardRecorder = None
 
 st.set_page_config(page_title="User Management", page_icon="👥", layout="wide")
 
@@ -355,7 +361,11 @@ a boiling pot of gold at one end. People look, but no one ever finds it."""
     st.divider()
     st.subheader("3️⃣ Complete Enrollment")
     
-    can_enroll = user_name and audio_ready or ("enrollment_audio_data" in st.session_state or "enrollment_audio_file" in st.session_state)
+    can_enroll = user_name and (
+        audio_ready or 
+        ("enrollment_audio_data" in st.session_state) or 
+        ("enrollment_audio_file" in st.session_state)
+    )
     
     if st.button(
         "✅ Register User",

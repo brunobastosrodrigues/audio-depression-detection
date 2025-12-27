@@ -1,9 +1,9 @@
 from fastapi import FastAPI, HTTPException
-from ports.UserManagementPort import UserManagementPort
+from ports.UserRepositoryPort import UserRepositoryPort
 import logging
 
 
-def create_user_management_service(repository):
+def create_user_management_service(repository: UserRepositoryPort) -> FastAPI:
     app = FastAPI()
 
     @app.get("/users")
