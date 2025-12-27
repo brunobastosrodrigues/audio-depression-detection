@@ -125,28 +125,6 @@ docker-compose up --build
 
 -  Click "Refresh Analysis" button to trigger the data analysis.
 
-## Running Tests
-
-Tests use Python's unittest framework:
-
-```bash
-# Analysis layer tests
-cd analysis_layer && python -m unittest tests.test_config_manager
-cd analysis_layer && python -m unittest tests.test_calibration_service
-
-# Dashboard layer tests
-cd dashboard_layer && python -m unittest tests.test_sankey_adapter
-
-# Board analytics tests (comprehensive)
-cd dashboard_layer && python tests/run_board_tests.py
-
-# Run specific board analytics scenario
-cd dashboard_layer && python tests/run_board_tests.py --scenario multi_board_comparison
-
-# See all available scenarios
-cd dashboard_layer && python tests/run_board_tests.py --list-scenarios
-```
-
 ### Board Analytics Test Suite
 
 The dashboard layer includes a comprehensive test suite for board analytics with synthetic data generation:
