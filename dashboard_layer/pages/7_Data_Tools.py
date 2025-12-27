@@ -15,6 +15,7 @@ import pandas as pd
 import plotly.express as px
 
 from utils.database import get_database, render_mode_selector, get_current_mode
+from utils.user_selector import USER_ID_KEY
 
 st.set_page_config(page_title="Data Tools", page_icon="🔧", layout="wide")
 
@@ -138,18 +139,18 @@ st.sidebar.subheader("Select User")
 users = load_users_data_tools()
 
 # Ensure a user is selected
-if "user_id" not in st.session_state:
-     st.session_state.user_id = users[0] if users else "test-user1"
+if USER_ID_KEY not in st.session_state:
+     st.session_state[USER_ID_KEY] = users[0] if users else "test-user1"
 
 # Determine the index for the selectbox (same logic as render_user_selector)
-current_user = st.session_state.user_id
+current_user = st.session_state[USER_ID_KEY]
 if current_user in users:
     default_index = users.index(current_user)
 else:
     default_index = 0
-    st.session_state.user_id = users[0] if users else "test-user1"
+    st.session_state[USER_ID_KEY] = users[0] if users else "test-user1"
 
-selected_user = st.sidebar.selectbox("User", users, index=default_index, key="user_id")
+selected_user = st.sidebar.selectbox("User", users, index=default_index, key=USER_ID_KEY)
 
 # --- TABS ---
 tab_audio, tab_baseline, tab_export = st.tabs(["🎵 Audio Loader", "📊 Baseline Viewer", "📥 Data Export"])
