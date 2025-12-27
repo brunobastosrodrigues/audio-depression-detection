@@ -9,7 +9,9 @@ import sys
 import streamlit as st
 from utils.database import get_database
 
-# Session state key for user selection - used across all dashboard pages
+# Session state key for user selection
+# This constant ensures consistent user selection persistence across all dashboard pages.
+# All pages use this same key to share the selected user in st.session_state.
 USER_ID_KEY = "user_id"
 
 
@@ -74,10 +76,11 @@ def render_user_selector(sidebar=True, label="Select User"):
     if sidebar:
         st.sidebar.subheader(label)
         selected_user = st.sidebar.selectbox(
-            "User", 
+            label,  # Use the same label for consistency
             users, 
             index=default_index,
-            key=USER_ID_KEY
+            key=USER_ID_KEY,
+            label_visibility="collapsed"  # Hide the label since we show the subheader
         )
     else:
         selected_user = st.selectbox(

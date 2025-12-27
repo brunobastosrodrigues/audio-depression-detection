@@ -131,13 +131,17 @@ render_mode_selector()
 st.sidebar.title("Actions")
 
 st.sidebar.subheader("Select User")
+
+# Note: This page uses its own user loading function instead of render_user_selector()
+# because it needs @st.cache_data for performance and provides a default test user
+# when no users exist in the database (common in dataset mode during initial setup).
 users = load_users_data_tools()
 
 # Ensure a user is selected
 if "user_id" not in st.session_state:
      st.session_state.user_id = users[0] if users else "test-user1"
 
-# Determine the index for the selectbox
+# Determine the index for the selectbox (same logic as render_user_selector)
 current_user = st.session_state.user_id
 if current_user in users:
     default_index = users.index(current_user)
@@ -146,8 +150,6 @@ else:
     st.session_state.user_id = users[0] if users else "test-user1"
 
 selected_user = st.sidebar.selectbox("User", users, index=default_index, key="user_id")
-
-# Note: No need to manually sync - the key="user_id" handles it automatically
 
 # --- TABS ---
 tab_audio, tab_baseline, tab_export = st.tabs(["🎵 Audio Loader", "📊 Baseline Viewer", "📥 Data Export"])
