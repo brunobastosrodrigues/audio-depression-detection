@@ -356,6 +356,7 @@ with tab_indicators:
         latest_doc = indicator_docs[0]
         latest_scores = latest_doc.get("indicator_scores", {})
         latest_ts = latest_doc.get("timestamp")
+        explanations = latest_doc.get("explanations", {})
 
         # MDD Status calculation
         from utils.DSM5Descriptions import DSM5Descriptions
@@ -387,51 +388,127 @@ with tab_indicators:
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Indicator cards with visual hierarchy
+        # Indicator drill-down cards with expanders
         indicators = sorted(latest_scores.keys())
-        cols_per_row = 3
 
-        for i in range(0, len(indicators), cols_per_row):
-            cols = st.columns(cols_per_row)
-            for j, col in enumerate(cols):
-                if i + j < len(indicators):
-                    ind = indicators[i + j]
-                    score = latest_scores.get(ind)
+        for ind in indicators:
+            score = latest_scores.get(ind)
+            if score is None:
+                score = 0
 
-                    if score is None:
-                        score = 0
+            is_active = score >= 0.5
+            display_name = INDICATOR_CLINICAL_NAMES.get(ind, ind)
+            color = get_severity_color(score)
 
-                    is_active = score >= 0.5
-                    display_name = INDICATOR_CLINICAL_NAMES.get(ind, ind)
-                    color = get_severity_color(score)
+            # Get explanation for this indicator
+            ind_explanation = explanations.get(ind, {})
+            explanation_text = ind_explanation.get("text", "No detailed analysis available.")
+            confidence = ind_explanation.get("confidence", 1.0)
+            data_quality = ind_explanation.get("data_quality", "full")
+            top_contributors = ind_explanation.get("top_contributors", [])
 
-                    # Visual hierarchy: active indicators are prominent
-                    opacity = "1" if is_active else "0.6"
-                    bg_alpha = "20" if is_active else "08"
+            # Visual hierarchy and confidence styling
+            opacity = "1" if is_active else "0.7"
+            low_confidence = confidence < 0.5
 
-                    with col:
+            # Confidence badge
+            if low_confidence:
+                confidence_badge = f'<span style="background: #fef3c7; color: #b45309; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-left: 0.5rem;">⚠️ Low Confidence ({confidence:.0%})</span>'
+            elif data_quality == "partial":
+                confidence_badge = f'<span style="background: #e0f2fe; color: #0369a1; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-left: 0.5rem;">📊 Partial Data ({confidence:.0%})</span>'
+            else:
+                confidence_badge = ""
+
+            # Create expander header
+            header_icon = "🔴" if is_active else "⚪"
+            header_text = f"{header_icon} {display_name}: {score:.2f}"
+
+            with st.expander(header_text, expanded=is_active):
+                # Score and confidence row
+                col_score, col_conf = st.columns([2, 1])
+
+                with col_score:
+                    # Score bar visualization
+                    bar_width = int(score * 100)
+                    st.markdown(
+                        f"""
+                        <div style="margin-bottom: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <div style="flex: 1; background: #e5e7eb; border-radius: 4px; height: 8px;">
+                                    <div style="width: {bar_width}%; background: {color}; height: 100%; border-radius: 4px; opacity: {opacity};"></div>
+                                </div>
+                                <span style="font-weight: 700; color: {color}; min-width: 50px;">{score:.2f}</span>
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+                with col_conf:
+                    if low_confidence:
+                        st.warning(f"⚠️ {confidence:.0%} confidence")
+                    elif data_quality == "partial":
+                        st.info(f"📊 {confidence:.0%} confidence")
+                    else:
+                        st.success(f"✅ {confidence:.0%} confidence")
+
+                # Explanation text (with visual dimming for low confidence)
+                text_opacity = "0.6" if low_confidence else "1"
+                st.markdown(
+                    f"""
+                    <div style="
+                        padding: 0.75rem;
+                        background: {'#fef3c7' if low_confidence else '#f3f4f6'};
+                        border-radius: 8px;
+                        margin: 0.5rem 0;
+                        opacity: {text_opacity};
+                        border-left: 3px solid {('#f59e0b' if low_confidence else color)};
+                    ">
+                        <p style="margin: 0; color: #374151; font-size: 0.9rem;">
+                            {explanation_text}
+                        </p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+                # Top contributing metrics (if available)
+                if top_contributors:
+                    st.markdown("**Top Contributing Factors:**")
+                    for contrib in top_contributors[:3]:
+                        metric_name = contrib.get("friendly_name", contrib.get("metric", "Unknown"))
+                        z_score = contrib.get("z_score", 0)
+                        contribution = contrib.get("contribution", 0)
+
+                        # Direction indicator
+                        if z_score > 0.5:
+                            direction_icon = "📈"
+                            direction_color = "#ef4444"
+                        elif z_score < -0.5:
+                            direction_icon = "📉"
+                            direction_color = "#22c55e"
+                        else:
+                            direction_icon = "➡️"
+                            direction_color = "#6b7280"
+
                         st.markdown(
                             f"""
-                            <div style="
-                                padding: 1rem;
-                                background: {color}{bg_alpha};
-                                border: 2px solid {color}{'60' if is_active else '20'};
-                                border-radius: 12px;
-                                opacity: {opacity};
-                                margin-bottom: 0.5rem;
-                            ">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span style="font-weight: 600; color: {color if is_active else '#666'};">
-                                        {'🔴' if is_active else '⚪'} {display_name}
-                                    </span>
-                                    <span style="font-size: 1.5rem; font-weight: 700; color: {color};">
-                                        {score:.2f}
-                                    </span>
-                                </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0;">
+                                <span>{direction_icon}</span>
+                                <span style="flex: 1;">{metric_name}</span>
+                                <span style="color: {direction_color}; font-weight: 500;">
+                                    {z_score:+.2f}σ
+                                </span>
                             </div>
                             """,
                             unsafe_allow_html=True,
                         )
+
+                # DSM-5 criterion info
+                criterion_code = DSM5Descriptions.get_criterion_code(ind)
+                if criterion_code:
+                    with st.container():
+                        st.caption(f"DSM-5 Criterion {criterion_code}")
 
 # --- SCENE ANALYSIS TAB ---
 with tab_scene:

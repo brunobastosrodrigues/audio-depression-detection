@@ -1,13 +1,13 @@
 import pandas as pd
-from typing import List
+from typing import List, Dict
 from core.models.AnalyzedMetricRecord import AnalyzedMetricRecord
 from core.models.IndicatorScoreRecord import IndicatorScoreRecord
 import json
 import math
 from collections import OrderedDict, defaultdict
 
-
 from core.mapping.ConfigManager import ConfigManager
+from core.services.explanation_generator import generate_all_explanations
 
 def derive_indicator_scores(
     user_id: int,
@@ -210,6 +210,13 @@ def derive_indicator_scores(
             # Also suppress individual binary indicators to avoid "7/9 active" scares during calibration
             binary_scores = {k: 0 for k in binary_scores}
 
+        # Generate XAI explanations for each indicator
+        explanations = generate_all_explanations(
+            mapping_config=mapping_config,
+            analyzed_values=analyzed_value,
+            indicator_scores=current_smoothed_scores,
+        )
+
         all_scores.append(
             IndicatorScoreRecord(
                 user_id=user_id,
@@ -218,6 +225,7 @@ def derive_indicator_scores(
                 mdd_signal=mdd_signal,
                 binary_scores=binary_scores,
                 system_mode=system_mode,
+                explanations=explanations,
             )
         )
 
