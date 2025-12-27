@@ -53,7 +53,7 @@ except ImportError:
 class StoppableVoiceFromFile:
     """Wrapper for VoiceFromFile with start/stop controls."""
 
-    def __init__(self, filepath, topic="voice/mic1", mqtthostname="mqtt", mqttport=1883):
+    def __init__(self, filepath, topic="voice/mic1", mqtthostname="mqtt", mqttport=1883, user_id="test-user1"):
         if VoiceFromFile is None:
             raise ImportError("VoiceFromFile class is not available.")
 
@@ -64,6 +64,8 @@ class StoppableVoiceFromFile:
                 topic=topic,
                 mqtthostname=mqtthostname,
                 mqttport=mqttport,
+                user_id=user_id,
+                system_mode="dataset"
             )
         self.running = False
         self.thread = None
@@ -111,7 +113,10 @@ def load_users():
             users.update(db[col_name].distinct("user_id"))
         except Exception:
             pass
-    return sorted(list(users))
+    users_list = sorted(list(users))
+    if not users_list:
+        return ["test-user1"]
+    return users_list
 
 
 # --- SIDEBAR ---
@@ -121,10 +126,14 @@ st.sidebar.title("Actions")
 
 st.sidebar.subheader("Select User")
 users = load_users()
-if users:
-    selected_user = st.sidebar.selectbox("User", users, key="user_id")
-else:
-    selected_user = st.sidebar.text_input("User ID", value="1")
+# Ensure a user is selected
+if "user_id" not in st.session_state:
+     st.session_state.user_id = users[0] if users else "test-user1"
+
+selected_user = st.sidebar.selectbox("User", users, key="user_id_select")
+# Sync sidebar selection with session state
+if selected_user != st.session_state.get("user_id"):
+    st.session_state.user_id = selected_user
 
 # --- TABS ---
 tab_audio, tab_baseline, tab_export = st.tabs(["🎵 Audio Loader", "📊 Baseline Viewer", "📥 Data Export"])
@@ -170,49 +179,63 @@ with tab_audio:
 
             st.code(filepath, language=None)
 
-            # Initialize session state
+            # Initialize session state for streamer
             if "streamer" not in st.session_state:
                 st.session_state.streamer = None
 
             col1, col2, col3 = st.columns([1, 1, 2])
+            
+            # Check streaming state
+            is_streaming = st.session_state.streamer is not None and st.session_state.streamer.running
 
             with col1:
-                if st.button("▶️ Start", type="primary", use_container_width=True):
-                    if st.session_state.streamer is not None and st.session_state.streamer.running:
-                        st.warning("Already streaming!")
-                    else:
-                        try:
-                            mqtthost = os.getenv("MQTT_HOST", "mqtt")
-                            st.session_state.streamer = StoppableVoiceFromFile(
-                                filepath=filepath, mqtthostname=mqtthost
-                            )
-                            st.session_state.streamer.start()
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Failed to start: {e}")
+                # Use a placeholder to ensure clean button rendering
+                start_placeholder = st.empty()
+                if start_placeholder.button(
+                    "▶️ Start", 
+                    type="primary", 
+                    use_container_width=True, 
+                    disabled=is_streaming,
+                    key="start_stream_btn"
+                ):
+                    try:
+                        mqtthost = os.getenv("MQTT_HOST", "mqtt")
+                        st.session_state.streamer = StoppableVoiceFromFile(
+                            filepath=filepath, 
+                            mqtthostname=mqtthost,
+                            user_id=selected_user
+                        )
+                        st.session_state.streamer.start()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to start: {e}")
 
             with col2:
-                if st.button("⏹️ Stop", use_container_width=True):
+                stop_placeholder = st.empty()
+                if stop_placeholder.button(
+                    "⏹️ Stop", 
+                    use_container_width=True,
+                    disabled=not is_streaming,
+                    key="stop_stream_btn"
+                ):
                     if st.session_state.streamer:
                         st.session_state.streamer.stop()
                         st.session_state.streamer = None
                         st.rerun()
+
 
             # Status Display
             if st.session_state.streamer:
                 if st.session_state.streamer.running:
                     st.success(f"🔊 Streaming Active: {os.path.basename(filepath)}")
                     st.caption("ℹ️ Streaming runs in the background. You can navigate to other pages.")
-                    time.sleep(1)
-                    st.rerun()
                 elif st.session_state.streamer.completed:
                     st.success("✅ Playback completed.")
-                    st.session_state.streamer = None
-                    st.rerun()
+                    # Optional: clean up the streamer object if you want to reset UI
+                    # st.session_state.streamer = None
                 elif st.session_state.streamer.error:
                     st.error(f"Error: {st.session_state.streamer.error}")
                     st.session_state.streamer = None
-                    st.rerun()
 
 # ============================================================================
 # BASELINE VIEWER TAB

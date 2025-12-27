@@ -14,7 +14,7 @@ class DeriveIndicatorScoresUseCase:
         # Use provided config_manager or create a new one (but preferably provided)
         self.config_manager = config_manager if config_manager else ConfigManager()
 
-    def derive_indicator_scores(self, user_id: int) -> List[IndicatorScoreRecord]:
+    def derive_indicator_scores(self, user_id: str) -> List[IndicatorScoreRecord]:
 
         latest = self.repository.get_latest_indicator_score_date(user_id)
         start_date = None

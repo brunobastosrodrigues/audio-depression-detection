@@ -403,19 +403,43 @@ elif view_mode == "Clinical Analysis":
                     )
                     st.plotly_chart(fig_wf, use_container_width=True)
 
-                    # Feature explanations
+                    # Feature explanations with explainability
                     st.markdown("#### Feature Details")
 
                     metrics_config = config.get(selected_indicator, {}).get("metrics", {})
 
+                    # Build metric contributions dict for explainability
+                    metric_contributions = {}
+                    for m in metric_records:
+                        if m.get("metric_name") in metrics_config:
+                            metric_contributions[m.get("metric_name")] = m.get("analyzed_value", 0)
+
+                    # Show explainability summary
+                    if metric_contributions:
+                        explainability_text = MetricExplainerAdapter.format_explainability_tooltip(
+                            selected_indicator, metric_contributions
+                        )
+                        st.info(explainability_text)
+
                     for metric_name in list(metrics_config.keys())[:5]:  # Show top 5
                         metric_info = MetricExplainerAdapter.get_explanation(metric_name)
                         if metric_info:
+                            # Add badges for dynamic metrics and key indicators
+                            is_key = MetricExplainerAdapter.is_key_indicator(metric_name)
+                            is_dynamic = MetricExplainerAdapter.is_dynamic_metric(metric_name)
+                            badge = "⭐ " if is_key else ("🆕 " if is_dynamic else "📊 ")
+
                             with st.expander(
-                                f"📊 {metric_info.get('name', metric_name)}"
+                                f"{badge}{metric_info.get('name', metric_name)}"
                             ):
                                 st.markdown(f"**What it measures:** {metric_info.get('simple', 'N/A')}")
                                 st.markdown(f"**Clinical relevance:** {metric_info.get('clinical', 'N/A')}")
+
+                                # Show direction meaning if available
+                                direction_meaning = metric_info.get("direction_meaning", {})
+                                if direction_meaning:
+                                    direction_key = list(direction_meaning.keys())[0]
+                                    st.markdown(f"**Interpretation:** {direction_meaning[direction_key]}")
 
                                 # Get current value
                                 current_val = next(
@@ -427,6 +451,10 @@ elif view_mode == "Clinical Analysis":
                                     None,
                                 )
                                 if current_val is not None:
+                                    # Color code based on value
+                                    val_color = COLORS["danger"] if abs(current_val) > 1.5 else (
+                                        COLORS["warning"] if abs(current_val) > 0.5 else COLORS["success"]
+                                    )
                                     st.metric("Current Z-Score", f"{current_val:.2f}")
                 else:
                     st.info("No metrics defined for this indicator.")
@@ -522,11 +550,42 @@ elif view_mode == "Research Data":
             )
 
             available_metrics = list(chart_data.columns)
+
+            # Get grouped metrics for categorized display
+            grouped_metrics = MetricExplainerAdapter.get_grouped_metric_options(available_metrics)
+
+            # Create metric options with category labels
+            metric_options = []
+            format_map = {}
+
+            # First add key indicators
+            key_metrics = [m for m in available_metrics if MetricExplainerAdapter.is_key_indicator(m)]
+            if key_metrics:
+                for m in key_metrics:
+                    metric_options.append(m)
+                    format_map[m] = f"⭐ {MetricExplainerAdapter.get_friendly_name(m)}"
+
+            # Then add other metrics
+            for m in available_metrics:
+                if m not in key_metrics:
+                    metric_options.append(m)
+                    is_dynamic = MetricExplainerAdapter.is_dynamic_metric(m)
+                    category = MetricExplainerAdapter.get_category(m)
+                    prefix = "🆕 " if is_dynamic else ""
+                    format_map[m] = f"{prefix}{MetricExplainerAdapter.get_friendly_name(m)} ({category})"
+
+            # Default to key indicators first, then first 5
+            default_metrics = key_metrics[:3] if key_metrics else []
+            if len(default_metrics) < 5:
+                remaining = [m for m in available_metrics if m not in default_metrics]
+                default_metrics.extend(remaining[:5 - len(default_metrics)])
+
             selected_metrics = st.multiselect(
                 "Select Metrics:",
-                options=available_metrics,
-                default=available_metrics[:5] if len(available_metrics) > 5 else available_metrics,
-                format_func=lambda x: MetricExplainerAdapter.get_friendly_name(x),
+                options=metric_options,
+                default=default_metrics,
+                format_func=lambda x: format_map.get(x, MetricExplainerAdapter.get_friendly_name(x)),
+                help="⭐ = Key DSM-5 Indicator | 🆕 = Dynamic Behavioral Metric",
             )
 
             if selected_metrics:

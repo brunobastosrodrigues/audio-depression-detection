@@ -10,7 +10,7 @@ class AggregateMetricsUseCase:
     def __init__(self, repository: PersistencePort):
         self.repository = repository
 
-    def aggregate_metrics(self, user_id: int) -> List[AggregatedMetricRecord]:
+    def aggregate_metrics(self, user_id: str) -> List[AggregatedMetricRecord]:
 
         latest = self.repository.get_latest_aggregated_metric_date(user_id)
         start_date = None

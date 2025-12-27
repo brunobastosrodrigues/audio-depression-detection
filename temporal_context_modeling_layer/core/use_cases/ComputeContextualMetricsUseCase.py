@@ -12,7 +12,7 @@ class ComputeContextualMetricsUseCase:
         self.repository = repository
 
     def compute(
-        self, user_id: int, method: str = "ema"
+        self, user_id: str, method: str = "ema"
     ) -> List[ContextualMetricRecord]:
 
         latest = self.repository.get_latest_contextual_metric_date(user_id)

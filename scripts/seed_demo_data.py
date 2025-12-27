@@ -3,7 +3,7 @@
 Demo Data Seeder for iotsensing_demo database.
 
 Seeds "Alice" (Depressed) and "Bob" (Healthy) with comprehensive acoustic metrics
-covering all DSM-5 indicators.
+covering all DSM-5 indicators, including the new Phase 1/2 dynamic behavioral metrics.
 
 Usage:
     python scripts/seed_demo_data.py
@@ -40,35 +40,50 @@ NON_VOICE_MONITORABLE_INDICATORS = [
     "7_feelings_of_worthlessness_guilt",  # Primarily cognitive/emotional, no acoustic correlates
 ]
 
-# Complete Acoustic Metrics List
+# Complete Acoustic Metrics List (including Phase 1/2 dynamic metrics)
 ACOUSTIC_METRICS = [
-    "mean_f0", "std_f0", "f0_range", "f0_avg",
-    "jitter_local", "jitter",
-    "shimmer_local", "shimmer",
-    "hnr", "hnr_mean",
-    "speech_rate", "rate_of_speech",
-    "pause_ratio", "pause_count", "pause_duration",
-    "energy_mean", "energy_std",
+    # Legacy F0 metrics
+    "f0_avg", "f0_std", "f0_range",
+    # NEW: F0 Dynamic metrics (Phase 1)
+    "f0_cv", "f0_iqr", "f0_entropy",
+
+    # Legacy voice quality
+    "jitter", "shimmer",
+
+    # Legacy HNR
+    "hnr_mean",
+    # NEW: HNR Dynamic metrics (Phase 1)
+    "hnr_std", "hnr_cv", "hnr_iqr", "hnr_entropy",
+
+    # Legacy energy
     "rms_energy_range", "rms_energy_std",
-    "formant_f1_mean", "formant_f1_frequencies_mean",
-    "formant_f2_mean",
-    "mfcc_1_mean", "mfcc_2_mean",
-    "spectral_centroid",
-    "spectral_rolloff",
-    "spectral_flatness",
-    "zero_crossing_rate",
-    "articulation_rate",
-    "phonation_ratio",
-    "intensity_mean",
-    "temporal_modulation",
-    "spectral_modulation",
-    "voice_onset_time",
-    "glottal_pulse_rate",
+    # NEW: RMS Energy Dynamic metrics (Phase 1)
+    "rms_energy_mean", "rms_energy_cv", "rms_energy_iqr", "rms_energy_entropy",
+
+    # Legacy formants
+    "formant_f1_frequencies_mean",
+    # NEW: Formant Dynamic metrics (Phase 1)
+    "formant_f1_std", "formant_f1_cv", "formant_f1_iqr", "formant_f1_entropy",
+
+    # Legacy prosody
+    "rate_of_speech", "articulation_rate",
+    "pause_count", "pause_duration",
+
+    # NEW: Interaction Dynamics (Phase 1 - KEY for psychomotor)
+    "silence_ratio", "speech_velocity", "voiced_ratio", "unvoiced_ratio",
+    "pause_count_dynamic", "pause_mean_duration", "pause_std_duration",
+    "pause_max_duration", "pause_total_duration",
+
+    # Legacy spectral
+    "spectral_flatness", "snr",
+    "temporal_modulation", "spectral_modulation",
+
+    # Legacy articulatory/glottal
+    "voice_onset_time", "glottal_pulse_rate", "f2_transition_speed",
+
+    # Legacy voicing patterns
+    "t13", "voiced16_20",
     "psd-4", "psd-5", "psd-7",
-    "t13",
-    "voiced16_20",
-    "f2_transition_speed",
-    "snr"
 ]
 
 
@@ -89,7 +104,7 @@ def generate_depression_progression(
         # Consistently low
         base = np.full(days, 0.1)
         noise = np.random.normal(0, 0.05, days)
-        return np.clip(base + noise, 0, 0.25).tolist() # Cap at 0.25
+        return np.clip(base + noise, 0, 0.25).tolist()  # Cap at 0.25
 
     elif pattern == "severe":
         # Consistently high
@@ -156,92 +171,149 @@ def generate_acoustic_metrics(
 ) -> dict[str, float]:
     """
     Generate realistic acoustic metrics correlated with depression severity.
-    Now includes all missing metrics.
+
+    Phase 1/2 Update: Now includes dynamic behavioral metrics:
+    - CV (Coefficient of Variation): Low CV = monotone = depression
+    - Entropy: Low entropy = predictable/flat intonation
+    - silence_ratio: High = psychomotor retardation
+    - speech_velocity: Low = slower speech dynamics
     """
     metrics = {}
-    
+
     # Noise/Randomness factor
     noise = lambda x: random.gauss(0, x)
 
-    # --- F0 / Pitch ---
-    # Depression: Lower mean, reduced variability, reduced range
-    metrics["mean_f0"] = 180 - (base_severity * 60) + noise(10)
-    metrics["f0_avg"] = metrics["mean_f0"] # Alias
-    metrics["std_f0"] = 45 - (base_severity * 25) + noise(5)
-    metrics["f0_range"] = 120 - (base_severity * 50) + noise(10)
-    
-    # --- Jitter / Shimmer (Voice Quality) ---
+    # =========================================================================
+    # F0 / PITCH (Legacy + Dynamic)
+    # Depression: Lower mean, reduced variability, reduced range, LOW CV, LOW entropy
+    # =========================================================================
+    f0_mean = 148 - (base_severity * 40) + noise(10)
+    f0_std = 26 - (base_severity * 15) + noise(3)
+
+    metrics["f0_avg"] = f0_mean
+    metrics["f0_std"] = f0_std
+    metrics["f0_range"] = 135 - (base_severity * 60) + noise(15)
+
+    # NEW Dynamic metrics
+    # CV = std/mean. Depression -> LOW CV (monotone)
+    # Healthy: ~0.17, Depressed: ~0.08
+    metrics["f0_cv"] = max(0.03, 0.18 - (base_severity * 0.12) + noise(0.02))
+    # IQR correlates with range
+    metrics["f0_iqr"] = 35 - (base_severity * 20) + noise(5)
+    # Entropy: Healthy = high (~0.72), Depressed = low (~0.45)
+    metrics["f0_entropy"] = max(0.2, 0.75 - (base_severity * 0.35) + noise(0.05))
+
+    # =========================================================================
+    # JITTER / SHIMMER (Voice Quality)
     # Depression: Higher jitter/shimmer (rougher voice)
-    metrics["jitter_local"] = 0.01 + (base_severity * 0.03) + noise(0.005)
-    metrics["jitter"] = metrics["jitter_local"] # Alias
-    metrics["shimmer_local"] = 0.03 + (base_severity * 0.05) + noise(0.01)
-    metrics["shimmer"] = metrics["shimmer_local"] # Alias
-    
-    # --- HNR / SNR ---
-    # Depression: Lower HNR/SNR (breathier)
-    metrics["hnr"] = 22 - (base_severity * 10) + noise(2)
-    metrics["hnr_mean"] = metrics["hnr"]
-    metrics["snr"] = 18 - (base_severity * 8) + noise(2)
-    
-    # --- Tempo / Rate ---
+    # =========================================================================
+    metrics["jitter"] = 0.02 + (base_severity * 0.02) + noise(0.003)
+    metrics["shimmer"] = 0.12 + (base_severity * 0.06) + noise(0.01)
+
+    # =========================================================================
+    # HNR (Legacy + Dynamic)
+    # Depression: Lower HNR (breathier), more variable
+    # =========================================================================
+    hnr_mean = -17 - (base_severity * 8) + noise(2)
+
+    metrics["hnr_mean"] = hnr_mean
+    # NEW Dynamic metrics
+    metrics["hnr_std"] = 15 + (base_severity * 5) + noise(2)  # More variable when depressed
+    metrics["hnr_cv"] = 0.8 + (base_severity * 0.3) + noise(0.1)  # Higher CV when depressed
+    metrics["hnr_iqr"] = 20 + (base_severity * 8) + noise(3)
+    metrics["hnr_entropy"] = max(0.3, 0.68 - (base_severity * 0.2) + noise(0.05))
+
+    # =========================================================================
+    # RMS ENERGY (Legacy + Dynamic)
+    # Depression: Lower energy, less variability (flat affect)
+    # =========================================================================
+    rms_mean = 0.045 - (base_severity * 0.02) + noise(0.005)
+    rms_std = 0.016 - (base_severity * 0.008) + noise(0.002)
+
+    metrics["rms_energy_mean"] = max(0.01, rms_mean)
+    metrics["rms_energy_std"] = max(0.002, rms_std)
+    metrics["rms_energy_range"] = 0.09 - (base_severity * 0.05) + noise(0.01)
+
+    # NEW Dynamic metrics
+    # CV: Healthy = ~0.35, Depressed = ~0.15 (consistent low effort)
+    metrics["rms_energy_cv"] = max(0.05, 0.38 - (base_severity * 0.25) + noise(0.04))
+    metrics["rms_energy_iqr"] = 0.022 - (base_severity * 0.012) + noise(0.003)
+    metrics["rms_energy_entropy"] = max(0.2, 0.6 - (base_severity * 0.25) + noise(0.06))
+
+    # =========================================================================
+    # FORMANTS (Legacy + Dynamic)
+    # Depression: Centralized vowels, less variability
+    # =========================================================================
+    formant_mean = 1636 + noise(30)
+
+    metrics["formant_f1_frequencies_mean"] = formant_mean
+    # NEW Dynamic metrics
+    metrics["formant_f1_std"] = 75 - (base_severity * 30) + noise(8)
+    metrics["formant_f1_cv"] = max(0.02, 0.05 - (base_severity * 0.02) + noise(0.005))
+    metrics["formant_f1_iqr"] = 100 - (base_severity * 40) + noise(10)
+    metrics["formant_f1_entropy"] = max(0.3, 0.7 - (base_severity * 0.25) + noise(0.05))
+
+    # =========================================================================
+    # PROSODY (Legacy)
     # Depression: Slower speech, more pauses
-    metrics["speech_rate"] = 4.8 - (base_severity * 2.0) + noise(0.3)
-    metrics["rate_of_speech"] = metrics["speech_rate"]
-    metrics["articulation_rate"] = 5.2 - (base_severity * 1.5) + noise(0.4)
-    metrics["pause_ratio"] = 0.1 + (base_severity * 0.3) + noise(0.05)
-    metrics["pause_count"] = 5 + (base_severity * 10) + noise(2) # per minute-ish
-    metrics["pause_duration"] = 0.4 + (base_severity * 0.6) + noise(0.1) # avg duration
-    
-    # --- Energy ---
-    # Depression: Lower energy, monotonic
-    metrics["energy_mean"] = 0.6 - (base_severity * 0.3) + noise(0.05)
-    metrics["energy_std"] = 0.2 - (base_severity * 0.1) + noise(0.02)
-    metrics["intensity_mean"] = 70 - (base_severity * 15) + noise(3)
-    metrics["rms_energy_range"] = 0.4 - (base_severity * 0.2) + noise(0.05)
-    metrics["rms_energy_std"] = 0.15 - (base_severity * 0.08) + noise(0.02)
-    
-    # --- Formants ---
-    # Depression: Centralized vowels (slight shifts)
-    metrics["formant_f1_mean"] = 550 + noise(30)
-    metrics["formant_f1_frequencies_mean"] = metrics["formant_f1_mean"]
-    metrics["formant_f2_mean"] = 1600 + noise(50)
-    metrics["f2_transition_speed"] = 80 - (base_severity * 30) + noise(10) # Slower transitions
-    
-    # --- Spectral Features ---
-    # Depression: Dull voice
-    metrics["spectral_centroid"] = 2500 - (base_severity * 500) + noise(100)
-    metrics["spectral_rolloff"] = 4500 - (base_severity * 800) + noise(200)
-    metrics["spectral_flatness"] = 0.4 - (base_severity * 0.2) + noise(0.05) # Less flat (more tonal? or less?) - actually usually implies noise. 
-    # Let's say depression = breathy = higher flatness in high freq, but monotonic = lower flatness dynamics. 
-    # For this model: higher severity -> lower flatness (dull)
-    
-    metrics["zero_crossing_rate"] = 0.08 - (base_severity * 0.03) + noise(0.01)
-    
-    metrics["phonation_ratio"] = 0.7 - (base_severity * 0.2) + noise(0.05)
-    
-    # --- Modulation (Fatigue/Insomnia) ---
-    # Depression: Reduced modulation
-    metrics["temporal_modulation"] = 15 - (base_severity * 8) + noise(2)
-    metrics["spectral_modulation"] = 2.5 - (base_severity * 1.0) + noise(0.3)
-    
-    # --- Psychomotor ---
-    metrics["voice_onset_time"] = 0.03 + (base_severity * 0.04) + noise(0.01) # Slower onset
-    
-    # --- Concentration / Tension ---
-    metrics["glottal_pulse_rate"] = 100 - (base_severity * 30) + noise(10) # Irregularity or slowing
-    
-    # --- Suicidal (PSD Bands) ---
-    # Abstract mapping: Changes in power spectral density bands
-    metrics["psd-4"] = -30 + (base_severity * 10) + noise(2)
-    metrics["psd-5"] = -35 + (base_severity * 8) + noise(2)
-    metrics["psd-7"] = -40 + (base_severity * 5) + noise(2)
-    
-    metrics["t13"] = -15 + (base_severity * 5) + noise(1) # MFCC-related or spectral tilt
-    metrics["voiced16_20"] = -20 + (base_severity * 5) + noise(1)
-    
-    # --- MFCCs ---
-    metrics["mfcc_1_mean"] = -5 + (base_severity * 3) + noise(1)
-    metrics["mfcc_2_mean"] = 5 - (base_severity * 2) + noise(1)
+    # =========================================================================
+    metrics["rate_of_speech"] = 3.5 - (base_severity * 1.2) + noise(0.2)
+    metrics["articulation_rate"] = 4.2 - (base_severity * 1.0) + noise(0.2)
+    metrics["pause_count"] = 1.3 + (base_severity * 2.0) + noise(0.3)
+    metrics["pause_duration"] = 0.95 + (base_severity * 0.8) + noise(0.15)
+
+    # =========================================================================
+    # INTERACTION DYNAMICS (NEW - Phase 1)
+    # These are KEY metrics for DSM-5 Psychomotor Retardation
+    # =========================================================================
+
+    # silence_ratio: Healthy ~0.20, Depressed ~0.50
+    metrics["silence_ratio"] = 0.18 + (base_severity * 0.35) + noise(0.05)
+    metrics["silence_ratio"] = max(0.05, min(0.7, metrics["silence_ratio"]))
+
+    # speech_velocity: Healthy ~18, Depressed ~8 transitions/sec
+    metrics["speech_velocity"] = max(3.0, 18 - (base_severity * 12) + noise(2))
+
+    # voiced_ratio: Healthy ~0.60, Depressed ~0.35
+    metrics["voiced_ratio"] = max(0.15, 0.60 - (base_severity * 0.30) + noise(0.05))
+
+    # unvoiced_ratio: Healthy ~0.20, Depressed ~0.15 (less varied consonants)
+    metrics["unvoiced_ratio"] = max(0.08, 0.22 - (base_severity * 0.08) + noise(0.03))
+
+    # Pause statistics (dynamic)
+    metrics["pause_count_dynamic"] = int(max(0, 2 + (base_severity * 5) + noise(1)))
+    metrics["pause_mean_duration"] = 0.30 + (base_severity * 0.40) + noise(0.08)
+    metrics["pause_std_duration"] = 0.15 + (base_severity * 0.20) + noise(0.05)
+    metrics["pause_max_duration"] = 0.70 + (base_severity * 0.80) + noise(0.15)
+    metrics["pause_total_duration"] = 0.8 + (base_severity * 1.5) + noise(0.2)
+
+    # =========================================================================
+    # SPECTRAL (Legacy)
+    # =========================================================================
+    metrics["spectral_flatness"] = 0.016 + (base_severity * 0.008) + noise(0.002)
+    metrics["snr"] = 3.6 - (base_severity * 1.5) + noise(0.3)
+
+    # Modulation (Fatigue/Insomnia)
+    metrics["temporal_modulation"] = 47 - (base_severity * 25) + noise(5)
+    metrics["spectral_modulation"] = 850 - (base_severity * 400) + noise(80)
+
+    # =========================================================================
+    # ARTICULATORY / GLOTTAL (Legacy)
+    # =========================================================================
+    metrics["voice_onset_time"] = -14 + (base_severity * 30) + noise(10)
+    metrics["glottal_pulse_rate"] = 104 - (base_severity * 35) + noise(10)
+    metrics["f2_transition_speed"] = 22 - (base_severity * 10) + noise(2)
+
+    # =========================================================================
+    # VOICING PATTERNS (Legacy)
+    # =========================================================================
+    metrics["t13"] = 0.003 + (base_severity * 0.008) + noise(0.001)
+    metrics["voiced16_20"] = 0.018 - (base_severity * 0.012) + noise(0.003)
+
+    # PSD bands (abstract markers)
+    metrics["psd-4"] = 3.76e-7 + (base_severity * 2e-7) + noise(1e-7)
+    metrics["psd-5"] = 1.4e-7 + (base_severity * 1e-7) + noise(5e-8)
+    metrics["psd-7"] = 7.5e-8 + (base_severity * 5e-8) + noise(2e-8)
 
     return metrics
 
@@ -270,11 +342,7 @@ def generate_phq9_submission(
 
     for indicator, question in indicator_to_question.items():
         score = indicator_scores.get(indicator, 0)
-        # Weight changes override: if indicator is forced to 0, PHQ might still be non-zero for realism?
-        # User said "weight changes we cannot measure using sound".
-        # But user might still report it in PHQ-9.
-        # For Demo consistency, let's keep it aligned with the (zero) indicator score for now.
-        
+
         phq_value = int(round(score * 3 + random.uniform(-0.3, 0.3)))
         phq_value = max(0, min(3, phq_value))
         raw_scores[question] = phq_value
@@ -283,9 +351,12 @@ def generate_phq9_submission(
     total_score = sum(raw_scores.values())
 
     # Functional impact
-    if total_score <= 4: impact_score = 0
-    elif total_score <= 14: impact_score = 1
-    else: impact_score = random.choice([2, 3])
+    if total_score <= 4:
+        impact_score = 0
+    elif total_score <= 14:
+        impact_score = 1
+    else:
+        impact_score = random.choice([2, 3])
 
     impact_labels = ["Not difficult", "Somewhat difficult", "Very difficult", "Extremely difficult"]
 
@@ -294,7 +365,7 @@ def generate_phq9_submission(
         "phq9_scores": phq9_scores,
         "raw_scores": raw_scores,
         "total_score": total_score,
-        "severity": "N/A", # Calculated in UI
+        "severity": "N/A",
         "functional_impact": {
             "score": impact_score,
             "label": impact_labels[impact_score]
@@ -317,7 +388,7 @@ def seed_user_data(
         print(f"--- Seeding User: {user_id} (Pattern: {pattern}) ---")
 
     severities = generate_depression_progression(days, pattern)
-    
+
     end_date = datetime.utcnow().replace(hour=12, minute=0, second=0, microsecond=0)
     start_date = end_date - timedelta(days=days)
 
@@ -340,7 +411,7 @@ def seed_user_data(
         for _ in range(samples_per_day):
             sample_time = current_date + timedelta(hours=random.randint(8, 22), minutes=random.randint(0, 59))
             acoustic = generate_acoustic_metrics(day_indicators, severity)
-            
+
             for m_name, m_val in acoustic.items():
                 raw_metrics.append({
                     "user_id": user_id,
@@ -354,7 +425,8 @@ def seed_user_data(
         # 3. Aggregated Metrics
         metric_values = {}
         for name, value in daily_raw:
-            if name not in metric_values: metric_values[name] = []
+            if name not in metric_values:
+                metric_values[name] = []
             metric_values[name].append(value)
 
         for m_name, vals in metric_values.items():
@@ -376,12 +448,12 @@ def seed_user_data(
                 prev_ac = generate_acoustic_metrics({}, prev_sev)
                 if m_name in prev_ac:
                     ema_val = alpha * ema_val + (1 - alpha) * prev_ac[m_name]
-            
+
             contextual_metrics.append({
                 "user_id": user_id,
                 "metric_name": m_name,
                 "contextual_value": ema_val,
-                "metric_dev": 0.0,  # Placeholder for metric deviation
+                "metric_dev": 0.0,
                 "timestamp": current_date,
                 "system_mode": "demo"
             })
@@ -402,11 +474,16 @@ def seed_user_data(
             phq9_submissions.append(phq9)
 
     # Insert Batch
-    if raw_metrics: db["raw_metrics"].insert_many(raw_metrics)
-    if aggregated_metrics: db["aggregated_metrics"].insert_many(aggregated_metrics)
-    if contextual_metrics: db["contextual_metrics"].insert_many(contextual_metrics)
-    if indicator_scores_list: db["indicator_scores"].insert_many(indicator_scores_list)
-    if phq9_submissions: db["phq9_submissions"].insert_many(phq9_submissions)
+    if raw_metrics:
+        db["raw_metrics"].insert_many(raw_metrics)
+    if aggregated_metrics:
+        db["aggregated_metrics"].insert_many(aggregated_metrics)
+    if contextual_metrics:
+        db["contextual_metrics"].insert_many(contextual_metrics)
+    if indicator_scores_list:
+        db["indicator_scores"].insert_many(indicator_scores_list)
+    if phq9_submissions:
+        db["phq9_submissions"].insert_many(phq9_submissions)
 
     # 7. Baseline & Analyzed Metrics
     # Calculate baseline from the generated raw metrics
@@ -420,14 +497,14 @@ def seed_user_data(
                 "count": len(vals)
             }
         else:
-             baseline_stats[metric] = {"mean": 0, "std": 1, "count": 0}
+            baseline_stats[metric] = {"mean": 0, "std": 1, "count": 0}
 
     baseline_doc = {
         "user_id": user_id,
         "schema_version": 2,
         "context_partitions": {
             "default": baseline_stats,
-            "morning": baseline_stats, # Simplify for demo
+            "morning": baseline_stats,
             "evening": baseline_stats
         },
         "timestamp": datetime.utcnow(),
@@ -441,13 +518,13 @@ def seed_user_data(
         m_name = cm["metric_name"]
         val = cm["contextual_value"]
         stats = baseline_stats.get(m_name, {"mean": 0, "std": 1})
-        
+
         if stats["std"] > 0:
             z = (val - stats["mean"]) / stats["std"]
             z = max(-3.0, min(3.0, z))
         else:
             z = 0.0
-            
+
         analyzed_metrics.append({
             "user_id": user_id,
             "timestamp": cm["timestamp"],
@@ -455,9 +532,10 @@ def seed_user_data(
             "analyzed_value": z,
             "system_mode": "demo"
         })
-    
-    if analyzed_metrics: db["analyzed_metrics"].insert_many(analyzed_metrics)
-    
+
+    if analyzed_metrics:
+        db["analyzed_metrics"].insert_many(analyzed_metrics)
+
     # 8. Environment & Board
     env_id = f"env_demo_{user_id}"
     db["environments"].insert_one({
@@ -479,7 +557,7 @@ def seed_user_data(
         "created_at": datetime.utcnow(),
         "system_mode": "demo"
     })
-    
+
     if verbose:
         print(f"Done. {len(raw_metrics)} samples, {len(indicator_scores_list)} days.")
 
@@ -492,10 +570,10 @@ def main():
 
     client = MongoClient(args.mongo_uri)
     db_name = "iotsensing_demo"
-    
+
     if not args.quiet:
         print(f"Re-seeding {db_name}...")
-        
+
     client.drop_database(db_name)
     db = client[db_name]
 
@@ -506,7 +584,8 @@ def main():
     seed_user_data(db, "Bob", "healthy", 30, 15, not args.quiet)
 
     # Indexes
-    if not args.quiet: print("Creating indexes...")
+    if not args.quiet:
+        print("Creating indexes...")
     for col in ["raw_metrics", "aggregated_metrics", "contextual_metrics", "indicator_scores", "analyzed_metrics"]:
         db[col].create_index([("user_id", 1), ("timestamp", -1)])
     db["phq9_submissions"].create_index([("user_id", 1), ("timestamp", -1)])
@@ -515,8 +594,16 @@ def main():
     if not args.quiet:
         print("\nDemo Data Seeding Complete!")
         print("Users: Alice (Depressed), Bob (Healthy)")
-    
+        print("\nNew Dynamic Metrics included:")
+        print("  - F0: f0_cv, f0_iqr, f0_entropy")
+        print("  - HNR: hnr_std, hnr_cv, hnr_iqr, hnr_entropy")
+        print("  - RMS: rms_energy_mean, rms_energy_cv, rms_energy_iqr, rms_energy_entropy")
+        print("  - Formant: formant_f1_std, formant_f1_cv, formant_f1_iqr, formant_f1_entropy")
+        print("  - Interaction: silence_ratio, speech_velocity, voiced_ratio, unvoiced_ratio")
+        print("  - Pause: pause_count_dynamic, pause_mean/std/max/total_duration")
+
     client.close()
+
 
 if __name__ == "__main__":
     main()

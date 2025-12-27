@@ -75,3 +75,34 @@ app.include_router(app_calibration)
 app.include_router(users_router)
 app.include_router(app_boards)
 app.include_router(app_environments)
+
+
+# ---------------------------------------------------------
+# Config Mode Endpoint (Phase 3)
+# ---------------------------------------------------------
+
+@app.get("/config/mode")
+async def get_config_mode():
+    """Return the current configuration mode and related info."""
+    # Reload to pick up any changes from MongoDB
+    config_manager.reload_config()
+    return {
+        "mode": config_manager.get_config_mode(),
+        "available_modes": ["legacy", "dynamic"],
+        "metrics_count": len(config_manager.get_metric_list()),
+        "description": {
+            "legacy": "Original static descriptor mappings (config.json)",
+            "dynamic": "Phase 2 behavioral dynamics mappings (config_dynamic_dsm5.json)",
+        },
+    }
+
+
+@app.post("/config/reload")
+async def reload_config():
+    """Force reload configuration from MongoDB."""
+    new_mode = config_manager.reload_config()
+    return {
+        "status": "reloaded",
+        "mode": new_mode,
+        "metrics_count": len(config_manager.get_metric_list()),
+    }

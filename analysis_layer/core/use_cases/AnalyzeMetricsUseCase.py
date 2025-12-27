@@ -11,7 +11,7 @@ class AnalyzeMetricsUseCase:
         self.repository = repository
 
     def analyze_metrics(
-        self, user_id: int, baseline_manager: BaselineManager
+        self, user_id: str, baseline_manager: BaselineManager
     ) -> List[AnalyzedMetricRecord]:
 
         latest = self.repository.get_latest_analyzed_metric_date(user_id)
