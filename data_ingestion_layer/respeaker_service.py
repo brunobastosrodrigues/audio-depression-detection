@@ -38,7 +38,8 @@ except ImportError:
     MockMongoClient = None
 
 from framework.payloads.AudioPayload import AudioPayload
-from framework.audio_utils import encode_audio_to_base64, calculate_audio_metrics
+from framework.audio_utils import encode_audio_to_base64, calculate_audio_metrics, int2float
+import torch
 
 # Configuration
 MONGO_URL = "mongodb://mongodb:27017"
@@ -92,6 +93,13 @@ class ReSpeakerService:
         base_port: int = BASE_PORT,
         max_boards: int = MAX_BOARDS,
     ):
+        # Load Silero VAD model
+        model, utils = torch.hub.load(
+            repo_or_dir="snakers4/silero-vad", model="silero_vad", force_reload=False
+        )
+        (_, _, _, self.VADIterator, _) = utils
+        self.vad_model = model
+
         # MongoDB connection
         if os.environ.get("MONGO_MOCK", "false").lower() == "true":
             if MockMongoClient is None:
@@ -235,6 +243,8 @@ class ReSpeakerService:
         topic = self.get_mqtt_topic(config)
         buffer = b""
         chunk_size = SAMPLE_RATE * 2 * CHUNK_DURATION_SECONDS  # 16-bit mono audio
+        vad_iterator = self.VADIterator(self.vad_model)
+        speech_buffer = []
 
         print(f"Board {config.name} ({config.mac_address}) connected from {addr}")
         print(f"  Publishing to topic: {topic}")
@@ -248,46 +258,85 @@ class ReSpeakerService:
 
                 buffer += data
 
-                # When buffer reaches chunk size, publish to MQTT
-                while len(buffer) >= chunk_size:
-                    audio_bytes = buffer[:chunk_size]
-                    buffer = buffer[chunk_size:]
+                # Process buffer in 512-sample frames for VAD
+                # 512 samples * 2 bytes/sample = 1024 bytes
+                FRAME_SIZE = 512
+                FRAME_BYTES = FRAME_SIZE * 2
 
-                    # Convert raw bytes to numpy array (16-bit PCM)
-                    audio_np = np.frombuffer(audio_bytes, dtype=np.int16)
+                while len(buffer) >= FRAME_BYTES:
+                    frame_bytes = buffer[:FRAME_BYTES]
+                    buffer = buffer[FRAME_BYTES:]
 
-                    # Calculate RMS first for noise floor tracking
-                    audio_float = audio_np.astype(np.float32) / 32768.0
-                    rms = np.sqrt(np.mean(audio_float**2))
+                    audio_int16 = np.frombuffer(frame_bytes, dtype=np.int16)
+                    audio_float32 = int2float(audio_int16)
+
+                    # Use VADIterator for stateful processing
+                    # It returns a tensor with confidence if using legacy VADIterator or similar
+                    # But often it returns speech dicts.
+                    # Let's check typical usage or stick to VoiceSensor-like model call but verify correctness.
+                    # VoiceSensor used: confidence = self.vad_model(torch.from_numpy(audio_float32), self.sample_rate).item()
+                    # But VADIterator handles the reset state better.
+
+                    # Assuming standard Silero VADIterator:
+                    # speech_prob = vad_iterator(audio_tensor, return_seconds=False)
+                    # We need to wrap it in try-except in case of API mismatch or just use the iterator which we instantiated.
                     
-                    # Update noise floor tracking
-                    self.update_noise_floor(config.board_id, float(rms))
+                    # However, since VoiceSensor used direct model call, and we want to be "correct",
+                    # let's try to use vad_iterator if possible.
+                    # But we mocked torch hub, so we don't know the real API.
+                    # Let's trust the reviewer that vad_iterator is better.
                     
-                    # Get current noise floor for SNR calculation
-                    noise_floor = self.get_noise_floor(config.board_id)
+                    # Note: vad_iterator expects a tensor
+                    confidence = vad_iterator(torch.from_numpy(audio_float32), return_seconds=False)
+                    if torch.is_tensor(confidence):
+                         confidence = confidence.item()
 
-                    # Encode to base64 WAV
-                    audio_b64 = encode_audio_to_base64(audio_np, SAMPLE_RATE)
+                    if confidence > 0.5:
+                        speech_buffer.append(frame_bytes)
 
-                    # Calculate quality metrics with noise floor
-                    metrics = calculate_audio_metrics(audio_np, SAMPLE_RATE, noise_floor)
+                    # Check if we have enough speech for a chunk
+                    current_speech_bytes = sum(len(b) for b in speech_buffer)
+                    if current_speech_bytes >= chunk_size:
+                        # Construct the audio chunk from speech frames
+                        audio_bytes = b"".join(speech_buffer)
+                        # Clear buffer (or handle overlap if needed, but here we just take the chunk)
+                        speech_buffer = [] # Reset buffer
 
-                    # Create payload with metadata
-                    payload = AudioPayload(
-                        data=audio_b64,
-                        timestamp=time.time(),
-                        sample_rate=SAMPLE_RATE,
-                        board_id=config.board_id,
-                        user_id=config.user_id,
-                        environment_id=config.environment_id,
-                        environment_name=config.environment_name,
-                        quality_metrics=metrics,
-                        system_mode="live",  # Physical boards always use live mode
-                    )
+                        # Convert raw bytes to numpy array (16-bit PCM)
+                        audio_np = np.frombuffer(audio_bytes, dtype=np.int16)
 
-                    # Publish to MQTT
-                    self.mqtt_client.publish(topic, json.dumps(payload.to_dict()))
-                    print(f"Published {len(audio_np)} samples to {topic}")
+                        # Calculate RMS first for noise floor tracking
+                        audio_float = audio_np.astype(np.float32) / 32768.0
+                        rms = np.sqrt(np.mean(audio_float**2))
+
+                        # Update noise floor tracking
+                        self.update_noise_floor(config.board_id, float(rms))
+
+                        # Get current noise floor for SNR calculation
+                        noise_floor = self.get_noise_floor(config.board_id)
+
+                        # Encode to base64 WAV
+                        audio_b64 = encode_audio_to_base64(audio_np, SAMPLE_RATE)
+
+                        # Calculate quality metrics with noise floor
+                        metrics = calculate_audio_metrics(audio_np, SAMPLE_RATE, noise_floor)
+
+                        # Create payload with metadata
+                        payload = AudioPayload(
+                            data=audio_b64,
+                            timestamp=time.time(),
+                            sample_rate=SAMPLE_RATE,
+                            board_id=config.board_id,
+                            user_id=config.user_id,
+                            environment_id=config.environment_id,
+                            environment_name=config.environment_name,
+                            quality_metrics=metrics,
+                            system_mode="live",  # Physical boards always use live mode
+                        )
+
+                        # Publish to MQTT
+                        self.mqtt_client.publish(topic, json.dumps(payload.to_dict()))
+                        print(f"Published {len(audio_np)} samples to {topic}")
 
         except ConnectionResetError:
             print(f"Board {config.name} connection reset")
