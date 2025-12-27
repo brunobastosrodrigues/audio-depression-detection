@@ -49,6 +49,8 @@ services:
          - SYSTEM_MODE=live
       volumes:
          - ./processing_layer/metrics_computation/voice_metrics:/app
+         - ./processing_layer/scene_analysis:/app/processing_layer/scene_analysis:ro
+         - ./processing_layer/user_profiling/voice_profiling:/app/processing_layer/user_profiling/voice_profiling:ro
       depends_on:
          - mqtt
          - voice_profiling
@@ -119,6 +121,7 @@ services:
          - ./analysis_layer/core:/app/core:ro
          - ./datasets:/app/datasets:ro
          - ./data_ingestion_layer:/app/data_ingestion_layer:ro
+         - ./processing_layer/scene_analysis:/app/processing_layer/scene_analysis:ro
       depends_on:
          - mongodb
       environment:

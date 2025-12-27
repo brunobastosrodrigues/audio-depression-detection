@@ -5,22 +5,25 @@ from collections import deque
 import logging
 from typing import Optional, Dict, List
 
+from .SceneConfig import SceneConfig
+
+logger = logging.getLogger(__name__)
+
+
 class SceneResolver:
-    def __init__(self, user_repository):
+    def __init__(self, user_repository, config: Optional[SceneConfig] = None):
         print("Initializing SceneResolver...")
         self.encoder = VoiceEncoder()
         self.repository = user_repository
         self.user_embeddings_cache = {}
-        
+
+        # Load configuration (JSON + env overrides)
+        self.config = config if config else SceneConfig.load()
+        print(f"SceneResolver config loaded: {self.config.config_source}")
+
         # Context buffer: Dictionary mapping user_id -> deque of last N classifications
-        # 60 seconds window. Assuming 5s chunks -> 12 items.
-        self.context_buffers = {} 
-        self.BUFFER_SIZE = 12 
-        
-        # Thresholds
-        self.SIMILARITY_THRESHOLD_HIGH = 0.70 # Relaxed slightly for real-world conditions
-        self.SIMILARITY_THRESHOLD_LOW = 0.55 
-        
+        self.context_buffers = {}
+
         print("SceneResolver initialized.")
 
     def _get_user_embedding(self, user_id):
@@ -40,35 +43,44 @@ class SceneResolver:
             
         return None
 
-    def _detect_mechanical_activity(self, audio_np):
+    def _detect_mechanical_activity(self, audio_np, sr=16000):
         """
-        Simple heuristic to detect typing/mechanical clicks.
-        High spectral flatness + high onset strength + low HNR (harmonic-to-noise ratio).
+        Lightweight heuristic to detect typing/mechanical clicks.
+        Uses ZCR + spectral centroid + energy variance instead of expensive HPSS.
+        Target latency: ~5ms (vs ~200ms with HPSS)
+
+        Typing/clicks characteristics:
+        - High zero-crossing rate (impulsive sounds)
+        - High spectral centroid (concentrated high-freq energy)
+        - High energy variance (bursty, non-sustained energy)
         """
         try:
-            # 1. Spectral Flatness (Noise/Clicks are flatter than tone)
+            # 1. Zero-crossing rate (impulsive sounds have high ZCR)
+            zcr = librosa.feature.zero_crossing_rate(audio_np)[0]
+            avg_zcr = np.mean(zcr)
+
+            # 2. Spectral centroid (mechanical clicks have concentrated high-freq energy)
+            centroid = librosa.feature.spectral_centroid(y=audio_np, sr=sr)[0]
+            avg_centroid = np.mean(centroid)
+
+            # 3. Energy variance (typing has bursty, non-sustained energy)
+            rms = librosa.feature.rms(y=audio_np)[0]
+            energy_variance = np.var(rms)
+
+            # 4. Spectral flatness (noise/clicks are spectrally flatter than voice)
             flatness = librosa.feature.spectral_flatness(y=audio_np)[0]
             avg_flatness = np.mean(flatness)
-            
-            # 2. Onset Strength (Percussive events)
-            onset_env = librosa.onset.onset_strength(y=audio_np)
-            avg_onset = np.mean(onset_env)
 
-            # 3. Harmonic-to-Noise Ratio (HNR) Check
-            # Separate harmonic and percussive components
-            y_harm, y_perc = librosa.effects.hpss(audio_np)
-            e_harm = np.mean(y_harm**2)
-            e_noise = np.mean(y_perc**2)
-            
-            if e_noise < 1e-9:
-                hnr = 100
-            else:
-                hnr = 10 * np.log10(e_harm / e_noise)
+            # Heuristic thresholds from config (tuned for typing-like sounds)
+            # Typing: high ZCR + high centroid + high energy variance + high flatness
+            is_mechanical = (
+                avg_zcr > self.config.zcr_threshold and
+                avg_centroid > self.config.centroid_threshold_hz and
+                energy_variance > self.config.energy_variance_threshold and
+                avg_flatness > self.config.flatness_threshold
+            )
 
-            # Heuristic thresholds (tuned for typing-like sounds)
-            # Typing: High onset (percussive), Low HNR (noisy/percussive), High Flatness
-            if avg_flatness > 0.3 and avg_onset > 1.0 and hnr < 20:
-                return True
+            return is_mechanical
         except Exception:
             pass
         return False
@@ -83,12 +95,18 @@ class SceneResolver:
         ref_emb = self._get_user_embedding(user_id)
         if ref_emb is None:
             # Fail Open (Allow) if no enrollment data.
-            # User request: "Default to Solo"
+            # CALIBRATION WARNING: Log visible warning for missing enrollment
+            logging.warning(
+                f"⚠️ CALIBRATION WARNING: User '{user_id}' has no voice enrollment. "
+                "Scene verification disabled - all audio treated as 'solo_activity'. "
+                "Enroll user voice profile to enable speaker verification."
+            )
             return {
-                "decision": "process", 
-                "classification": "unverified", 
-                "context": "solo_activity", # Defaulting to Solo as requested
-                "similarity": 0.0
+                "decision": "process",
+                "classification": "unverified",
+                "context": "solo_activity",
+                "similarity": 0.0,
+                "calibration_status": "missing_enrollment"
             }
 
         # 2. Compute Embedding of incoming chunk
@@ -98,20 +116,21 @@ class SceneResolver:
         except Exception as e:
             logging.error(f"Error generating embedding: {e}")
             return {
-                "decision": "discard", 
-                "classification": "error", 
+                "decision": "discard",
+                "classification": "error",
                 "context": "error",
-                "similarity": 0.0
+                "similarity": 0.0,
+                "calibration_status": "enrolled"
             }
 
         # 3. Compute Similarity (Cosine)
         similarity = np.dot(ref_emb, curr_emb) / (np.linalg.norm(ref_emb) * np.linalg.norm(curr_emb))
         
-        # 4. Classify
+        # 4. Classify using config thresholds
         classification = "unknown"
-        if similarity >= self.SIMILARITY_THRESHOLD_HIGH:
+        if similarity >= self.config.similarity_threshold_high:
             classification = "target_user"
-        elif similarity < self.SIMILARITY_THRESHOLD_LOW:
+        elif similarity < self.config.similarity_threshold_low:
             # Check for mechanical noise (Typing) if it's not the user
             if self._detect_mechanical_activity(audio_np):
                 classification = "mechanical_activity"
@@ -122,7 +141,7 @@ class SceneResolver:
 
         # 5. Update Context
         if user_id not in self.context_buffers:
-            self.context_buffers[user_id] = deque(maxlen=self.BUFFER_SIZE)
+            self.context_buffers[user_id] = deque(maxlen=self.config.buffer_size)
         
         self.context_buffers[user_id].append(classification)
         
@@ -136,10 +155,11 @@ class SceneResolver:
         if total > 0:
             target_ratio = target_count / total
             noise_ratio = noise_count / total
-            
-            if target_ratio > 0.5: # Majority matches user
+
+            # Use config thresholds for context classification
+            if target_ratio > self.config.solo_activity_ratio:
                 context = "solo_activity"
-            elif noise_ratio > 0.6: # Mostly noise/unknown
+            elif noise_ratio > self.config.background_noise_ratio:
                 context = "background_noise_tv"
             else:
                 # Mixed bag -> likely interaction
@@ -161,5 +181,11 @@ class SceneResolver:
             "decision": decision,
             "classification": classification,
             "similarity": float(similarity),
-            "context": context
+            "context": context,
+            "calibration_status": "enrolled",
+            "config_source": self.config.config_source,
         }
+
+    def get_config_dict(self) -> dict:
+        """Return current configuration as dictionary for debugging/dashboard."""
+        return self.config.to_dict()

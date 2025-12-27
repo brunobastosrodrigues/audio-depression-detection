@@ -186,7 +186,8 @@ def render_mode_selector():
             <style>
                 div[data-testid="stSidebarNav"] a[href*="Boards"],
                 div[data-testid="stSidebarNav"] a[href*="User_Management"],
-                div[data-testid="stSidebarNav"] a[href*="Data_Tools"] {
+                div[data-testid="stSidebarNav"] a[href*="Data_Tools"],
+                div[data-testid="stSidebarNav"] a[href*="Scene_Forensics"] {
                     display: none !important;
                 }
             </style>
@@ -203,7 +204,8 @@ def render_mode_selector():
         css_to_inject = """
             <style>
                 div[data-testid="stSidebarNav"] a[href*="Boards"],
-                div[data-testid="stSidebarNav"] a[href*="User_Management"] {
+                div[data-testid="stSidebarNav"] a[href*="User_Management"],
+                div[data-testid="stSidebarNav"] a[href*="Scene_Forensics"] {
                     display: none !important;
                 }
             </style>

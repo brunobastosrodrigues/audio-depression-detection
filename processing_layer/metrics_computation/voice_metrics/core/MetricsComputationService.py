@@ -61,13 +61,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # Scene Analysis Imports
 try:
     from processing_layer.scene_analysis.SceneResolver import SceneResolver
-    from processing_layer.user_profiling.voice_profiling.adapters.outbound.MongoUserRepositoryAdapter import MongoUserRepositoryAdapter
+    from processing_layer.scene_analysis.SceneUserRepository import SceneUserRepository
 except ImportError:
     # Fallback for local testing where paths might differ
     import sys
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../..")))
     from processing_layer.scene_analysis.SceneResolver import SceneResolver
-    from processing_layer.user_profiling.voice_profiling.adapters.outbound.MongoUserRepositoryAdapter import MongoUserRepositoryAdapter
+    from processing_layer.scene_analysis.SceneUserRepository import SceneUserRepository
 
 
 class MetricsComputationService:
@@ -82,18 +82,18 @@ class MetricsComputationService:
         # Initialize Scene Analysis Gatekeeper
         try:
             print("Initializing Scene Analysis Gatekeeper...")
-            repo = MongoUserRepositoryAdapter()
+            repo = SceneUserRepository()
             self.scene_resolver = SceneResolver(repo)
             
-            # WARMUP: Perform dummy inference to load models into memory
-            print("Warming up SceneResolver models...")
-            dummy_audio = np.zeros(16000, dtype=np.float32)
-            # Use a dummy ID that likely won't exist to trigger embedding fetch (fail fast)
-            # or just to run the encoder inside resolve.
-            # Ideally we just want to run the encoder.
+            # WARMUP: Perform multiple dummy inferences to fully load models into memory
+            # Multiple passes with varying lengths ensure all lazy-initialized codepaths are triggered
+            print("Warming up SceneResolver models (multi-pass)...")
+            warmup_durations = [1, 3, 5]  # seconds
             try:
-                self.scene_resolver.encoder.embed_utterance(dummy_audio)
-                print("SceneResolver models warmed up.")
+                for duration_sec in warmup_durations:
+                    dummy_audio = np.zeros(16000 * duration_sec, dtype=np.float32)
+                    self.scene_resolver.encoder.embed_utterance(dummy_audio)
+                print(f"SceneResolver models fully warmed up ({len(warmup_durations)} passes).")
             except Exception as w_e:
                 print(f"SceneResolver warmup warning: {w_e}")
 
@@ -143,6 +143,8 @@ class MetricsComputationService:
             context = resolution["context"]
             
             # Persist Scene Context Log (regardless of decision)
+            calibration_status = resolution.get("calibration_status", "unknown")
+            config_source = resolution.get("config_source", "unknown")
             try:
                 # Use the repository from the resolver to save logs
                 log_entry = {
@@ -152,6 +154,8 @@ class MetricsComputationService:
                     "classification": resolution["classification"],
                     "similarity": resolution["similarity"],
                     "decision": decision,
+                    "calibration_status": calibration_status,
+                    "config_source": config_source,
                     "board_id": metadata.get("board_id"),
                     "environment_name": metadata.get("environment_name")
                 }
@@ -162,6 +166,8 @@ class MetricsComputationService:
             # Inject context into metadata for downstream awareness
             metadata["scene_context"] = context
             metadata["speaker_classification"] = resolution["classification"]
+            metadata["speaker_similarity"] = resolution["similarity"]
+            metadata["calibration_status"] = calibration_status
 
             if decision == "discard":
                 print(f"🛡️ Gatekeeper: Discarding audio for user {user_id} (Context: {context}, Class: {resolution['classification']})")
@@ -311,6 +317,11 @@ class MetricsComputationService:
                 "environment_id": metadata.get("environment_id"),
                 "environment_name": metadata.get("environment_name"),
                 "system_mode": metadata.get("system_mode", "live"),
+                # Scene analysis metadata for Analysis Layer dynamic heuristics
+                "scene_context": metadata.get("scene_context"),
+                "speaker_classification": metadata.get("speaker_classification"),
+                "speaker_similarity": metadata.get("speaker_similarity"),
+                "calibration_status": metadata.get("calibration_status"),
             })
 
         # Prepare audio quality metrics record (for audio_quality_metrics collection)
