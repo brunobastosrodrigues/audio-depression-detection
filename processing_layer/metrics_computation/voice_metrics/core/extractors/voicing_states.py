@@ -7,6 +7,7 @@ RMS_THRESHOLD = 0.01
 def classify_voicing_states(audio_np, sample_rate, frame_length=0.04, hop_length=0.01):
     """
     Segments audio into 3 states: 1=voiced, 2=unvoiced, 3=silence
+    Optimized with vectorization for better performance
     """
     frame_len = int(frame_length * sample_rate)
     hop_len = int(hop_length * sample_rate)
@@ -16,31 +17,39 @@ def classify_voicing_states(audio_np, sample_rate, frame_length=0.04, hop_length
 
     pitch_present = np.any(pitches > 0, axis=0)
 
-    state_sequence = []
-    for i in range(len(rms)):
-        if pitch_present[i]:
-            state = 1  # Voiced
-        elif rms[i] > RMS_THRESHOLD:
-            state = 2  # Unvoiced
-        else:
-            state = 3  # Silence
-        state_sequence.append(state)
+    # Vectorized state assignment using np.where
+    # Priority: voiced (1) > unvoiced (2) > silence (3)
+    state_sequence = np.where(
+        pitch_present,
+        1,  # Voiced
+        np.where(rms > RMS_THRESHOLD, 2, 3)  # Unvoiced or Silence
+    )
 
-    return state_sequence
+    return state_sequence.tolist()
 
 
 def compute_transition_probability(state_sequence, from_state, to_state):
     """
     Computes all the transition probabilities based off the state_sequence
+    Optimized with vectorization for better performance
     """
-    transitions = zip(state_sequence[:-1], state_sequence[1:])
-    total_from = sum(1 for a, _ in transitions if a == from_state)
-    total_transition = sum(
-        1
-        for a, b in zip(state_sequence[:-1], state_sequence[1:])
-        if a == from_state and b == to_state
-    )
-    return total_transition / total_from if total_from > 0 else 0.0
+    # Convert to numpy array for vectorized operations
+    state_arr = np.array(state_sequence)
+    
+    # Find transitions from from_state
+    from_mask = state_arr[:-1] == from_state
+    total_from = np.sum(from_mask)
+    
+    if total_from == 0:
+        return 0.0
+    
+    # Find transitions to to_state
+    to_mask = state_arr[1:] == to_state
+    
+    # Count transitions from from_state to to_state
+    total_transition = np.sum(from_mask & to_mask)
+    
+    return total_transition / total_from
 
 
 def get_t13_voiced_to_silence(audio_np, sample_rate):
