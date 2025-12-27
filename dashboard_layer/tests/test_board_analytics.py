@@ -127,6 +127,10 @@ class TestBoardAnalytics(unittest.TestCase):
         
     def test_data_deletion(self):
         """Test data deletion functionality."""
+        # Constants for time window
+        DELETION_WINDOW_START_OFFSET = 0.5  # seconds before timestamp
+        DELETION_WINDOW_END_OFFSET = 5.5    # seconds after timestamp
+        
         # Generate test scenario with recent data
         result = self.generator.generate_test_scenario("data_deletion", duration_hours=1)
         
@@ -146,8 +150,8 @@ class TestBoardAnalytics(unittest.TestCase):
         
         # Simulate deletion - delete metrics in a time window around test_timestamp
         ts_dt = datetime.utcfromtimestamp(test_timestamp)
-        window_start = ts_dt - timedelta(seconds=0.5)
-        window_end = ts_dt + timedelta(seconds=5.5)
+        window_start = ts_dt - timedelta(seconds=DELETION_WINDOW_START_OFFSET)
+        window_end = ts_dt + timedelta(seconds=DELETION_WINDOW_END_OFFSET)
         
         delete_result = self.db["raw_metrics"].delete_many({
             "board_id": board_id,

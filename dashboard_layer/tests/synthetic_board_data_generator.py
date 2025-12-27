@@ -100,7 +100,8 @@ class BoardDataGenerator:
             Generated board ID
         """
         board_id = str(uuid.uuid4())
-        mac_address = f"{mac_prefix}:{random.randint(10, 99):02d}:{random.randint(10, 99):02d}:{random.randint(10, 99):02d}"
+        # Generate valid MAC address with 6 octets
+        mac_address = f"{mac_prefix}:{random.randint(10, 99):02X}:{random.randint(10, 99):02X}:{random.randint(10, 99):02X}:{random.randint(10, 99):02X}:{random.randint(10, 99):02X}"
         
         board_doc = {
             "board_id": board_id,

@@ -687,8 +687,10 @@ with tab_config:
                                 
                             except Exception as e:
                                 st.error(f"Error discarding data: {e}")
+                                # Log full traceback server-side for debugging
                                 import traceback
-                                st.code(traceback.format_exc())
+                                import logging
+                                logging.error(f"Data deletion error: {traceback.format_exc()}")
 
                     with col_keep:
                         if st.button("💾 Keep & Clear", type="primary"):
