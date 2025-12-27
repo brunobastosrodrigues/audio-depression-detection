@@ -15,7 +15,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from utils.database import get_database, render_mode_selector, get_current_mode
-from utils.user_selector import render_user_selector
+from utils.user_selector import render_user_selector, get_user_display_name
 
 st.set_page_config(page_title="Scene Forensics", page_icon="🔬", layout="wide")
 
@@ -27,14 +27,22 @@ if get_current_mode() != "live":
 st.title("🔬 Scene Forensics")
 st.markdown("Real-time verification of Live Mode speaker identification and context classification.")
 
+# --- SIDEBAR ---
+render_mode_selector()
+selected_user = render_user_selector()
+
+if not selected_user:
+    st.warning("Please select or register a user to view Scene Forensics.")
+    st.stop()
+
+# Display selected user info in header
+user_display_name = get_user_display_name(selected_user)
+st.info(f"Analyzing scene data for: **{user_display_name}** (`{selected_user}`)")
+
 # --- DATABASE CONNECTION ---
 db = get_database()
 scene_logs_collection = db["scene_logs"]
 voice_profiling_collection = db["voice_profiling"]
-
-# --- SIDEBAR ---
-render_mode_selector()
-selected_user = render_user_selector()
 
 # Time window selector
 st.sidebar.divider()
@@ -123,10 +131,10 @@ user_embeddings = list(voice_profiling_collection.find({"user_id": selected_user
 has_enrollment = len(user_embeddings) > 0
 
 if has_enrollment:
-    st.success(f"User '{selected_user}' has {len(user_embeddings)} voice embedding(s) enrolled.")
+    st.success(f"User **{user_display_name}** has {len(user_embeddings)} voice embedding(s) enrolled.")
 else:
     st.error(
-        f"**CALIBRATION WARNING**: User '{selected_user}' has NO voice enrollment! "
+        f"**CALIBRATION WARNING**: User **{user_display_name}** has NO voice enrollment! "
         "Speaker verification is disabled. All audio will be treated as 'solo_activity' (Fail-Open). "
         "Go to User Management to enroll a voice profile."
     )
