@@ -249,9 +249,17 @@ class ReSpeakerService:
         print(f"Board {config.name} ({config.mac_address}) connected from {addr}")
         print(f"  Publishing to topic: {topic}")
 
+        # Set heartbeat timeout (3x chunk duration to be safe)
+        conn.settimeout(15.0)
+
         try:
             while True:
-                data = conn.recv(4096)
+                try:
+                    data = conn.recv(4096)
+                except socket.timeout:
+                    print(f"Board {config.name} timed out (heartbeat missing for 15s)")
+                    break
+
                 if not data:
                     print(f"Board {config.name} disconnected (no data)")
                     break
