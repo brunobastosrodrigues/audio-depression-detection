@@ -186,21 +186,29 @@ tab1, tab2, tab3 = st.tabs(["📋 User Roster", "➕ Enroll New User", "🔍 Tes
 
 with tab1:
     st.header("User Roster")
-    
+
     if not users:
         st.info("No users registered yet. Use the 'Enroll New User' tab to add users.")
     else:
         st.markdown(f"**{len(users)} registered user(s)**")
-        
+
+        # Check voice enrollment status for each user
+        voice_profiling_collection = db["voice_profiling"]
+
         # Create a table-like display
         for user in users:
+            user_id = user.get('user_id', 'N/A')
+
+            # Check if user has voice enrollment
+            has_voice_enrollment = voice_profiling_collection.find_one({"user_id": user_id}) is not None
+
             with st.container():
-                col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 1])
-                
+                col1, col2, col3, col4, col5, col6 = st.columns([3, 2, 2, 2, 1, 1])
+
                 with col1:
                     st.markdown(f"**{user.get('name', 'Unknown')}**")
-                    st.caption(f"ID: {user.get('user_id', 'N/A')}")
-                
+                    st.caption(f"ID: {user_id}")
+
                 with col2:
                     role = user.get('role', 'N/A')
                     role_color = "#3b82f6" if role == "patient" else "#10b981"
@@ -210,7 +218,7 @@ with tab1:
                         f'{role.upper()}</span>',
                         unsafe_allow_html=True
                     )
-                
+
                 with col3:
                     created = user.get('created_at')
                     if created:
@@ -219,25 +227,179 @@ with tab1:
                         else:
                             date_str = created.strftime('%Y-%m-%d')
                         st.caption(f"📅 {date_str}")
-                
+
                 with col4:
-                    status = user.get('status', 'active')
-                    status_color = "#10b981" if status == "active" else "#6b7280"
-                    st.markdown(
-                        f'<span style="color: {status_color}; font-size: 0.85rem;">●</span> {status}',
-                        unsafe_allow_html=True
-                    )
-                
+                    # Voice enrollment status
+                    if has_voice_enrollment:
+                        st.markdown(
+                            '<span style="color: #10b981; font-size: 0.85rem;">✅ Voice Enrolled</span>',
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        st.markdown(
+                            '<span style="color: #f59e0b; font-size: 0.85rem;">⚠️ No Voice</span>',
+                            unsafe_allow_html=True
+                        )
+
                 with col5:
-                    if st.button("🗑️", key=f"del_{user['user_id']}", help="Delete user"):
-                        if delete_user(user['user_id']):
+                    # Calibrate voice button
+                    calibrate_key = f"cal_{user_id}"
+                    if st.button("🎙️", key=calibrate_key, help="Calibrate voice profile"):
+                        st.session_state["calibrating_user_id"] = user_id
+                        st.session_state["calibrating_user_name"] = user.get('name', 'Unknown')
+                        st.session_state["calibrating_user_role"] = user.get('role', 'patient')
+
+                with col6:
+                    if st.button("🗑️", key=f"del_{user_id}", help="Delete user"):
+                        if delete_user(user_id):
                             st.success(f"User '{user.get('name')}' deleted.")
                             time.sleep(0.5)
                             st.rerun()
                         else:
                             st.error("Failed to delete user.")
-                
+
                 st.divider()
+
+        # =====================================================================
+        # VOICE CALIBRATION MODAL
+        # =====================================================================
+        if "calibrating_user_id" in st.session_state:
+            cal_user_id = st.session_state["calibrating_user_id"]
+            cal_user_name = st.session_state.get("calibrating_user_name", "Unknown")
+            cal_user_role = st.session_state.get("calibrating_user_role", "patient")
+
+            st.divider()
+            st.subheader(f"🎙️ Voice Calibration: {cal_user_name}")
+            st.markdown("""
+            Record a new voice sample to update this user's voice profile.
+            This will improve speaker recognition accuracy.
+            """)
+
+            # Reading passage
+            cal_passage = """The rainbow is a division of white light into many beautiful colors.
+These take the shape of a long round arch, with its path high above."""
+
+            st.markdown(
+                f"""
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            color: white; padding: 1rem; border-radius: 8px;
+                            font-size: 1rem; line-height: 1.6; margin: 0.5rem 0;">
+                    <strong>📖 Read this:</strong> "{cal_passage}"
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            # Recording method for calibration
+            cal_method = st.radio(
+                "Recording source:",
+                ["Record from Board", "Upload Audio File"],
+                horizontal=True,
+                key="calibration_method"
+            )
+
+            cal_audio_ready = False
+
+            if cal_method == "Record from Board":
+                cal_active_boards = list(boards_collection.find({"is_active": True}))
+                if not cal_active_boards:
+                    st.warning("No active boards found.")
+                else:
+                    cal_board_opts = {}
+                    for b in cal_active_boards:
+                        env_name = env_lookup.get(b.get("environment_id"), "Unknown") if 'env_lookup' in dir() else "Unknown"
+                        cal_board_opts[b["board_id"]] = f"{b.get('name', 'Unknown')}"
+
+                    cal_selected_board = st.selectbox(
+                        "Select Board",
+                        options=list(cal_board_opts.keys()),
+                        format_func=lambda x: cal_board_opts[x],
+                        key="cal_board_select"
+                    )
+
+                    col_rec, col_preview = st.columns([1, 2])
+
+                    with col_rec:
+                        if st.button("🎙️ Record (15 sec)", type="primary", key="cal_record_btn"):
+                            if BOARD_RECORDER_AVAILABLE and BoardRecorder:
+                                recorder = BoardRecorder()
+                                with st.spinner("Recording... Please read now!"):
+                                    audio_data = recorder.start_recording(cal_selected_board, duration=15)
+
+                                if audio_data is not None and len(audio_data) > 0:
+                                    st.session_state["calibration_audio_data"] = audio_data
+                                    st.success("Recording captured!")
+                                    st.rerun()
+                                else:
+                                    st.error("No audio received.")
+                            else:
+                                st.error("Board recorder not available.")
+
+                    with col_preview:
+                        if "calibration_audio_data" in st.session_state:
+                            st.audio(st.session_state["calibration_audio_data"], sample_rate=16000)
+                            cal_audio_ready = True
+
+            else:  # Upload File
+                cal_uploaded = st.file_uploader(
+                    "Upload WAV file",
+                    type=["wav", "mp3"],
+                    key="cal_upload"
+                )
+                if cal_uploaded:
+                    st.audio(cal_uploaded)
+                    st.session_state["calibration_audio_file"] = cal_uploaded
+                    cal_audio_ready = True
+
+            # Action buttons
+            col_save, col_cancel = st.columns(2)
+
+            with col_save:
+                can_calibrate = cal_audio_ready or "calibration_audio_data" in st.session_state or "calibration_audio_file" in st.session_state
+
+                if st.button("✅ Save Voice Profile", type="primary", disabled=not can_calibrate, key="cal_save_btn"):
+                    with st.spinner("Updating voice profile..."):
+                        try:
+                            # Save audio to temporary file
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                                if "calibration_audio_data" in st.session_state:
+                                    import soundfile as sf
+                                    sf.write(tmp.name, st.session_state["calibration_audio_data"], 16000)
+                                elif "calibration_audio_file" in st.session_state:
+                                    tmp.write(st.session_state["calibration_audio_file"].getvalue())
+                                tmp_path = tmp.name
+
+                            # Re-enroll user via API (updates existing profile)
+                            success, result = enroll_user_local(cal_user_id, cal_user_name, cal_user_role, tmp_path)
+
+                            # Cleanup
+                            os.remove(tmp_path)
+
+                            if success:
+                                st.success(f"Voice profile updated for {cal_user_name}!")
+
+                                # Clear calibration state
+                                for key in ["calibrating_user_id", "calibrating_user_name", "calibrating_user_role",
+                                           "calibration_audio_data", "calibration_audio_file"]:
+                                    if key in st.session_state:
+                                        del st.session_state[key]
+
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.error(f"Failed to update: {result.get('error', 'Unknown error')}")
+
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+
+            with col_cancel:
+                if st.button("❌ Cancel", key="cal_cancel_btn"):
+                    # Clear calibration state
+                    for key in ["calibrating_user_id", "calibrating_user_name", "calibrating_user_role",
+                               "calibration_audio_data", "calibration_audio_file"]:
+                        if key in st.session_state:
+                            del st.session_state[key]
+                    st.rerun()
 
 # =============================================================================
 # TAB 2: ENROLL NEW USER

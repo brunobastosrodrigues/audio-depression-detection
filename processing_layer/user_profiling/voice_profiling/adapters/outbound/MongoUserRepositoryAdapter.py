@@ -4,6 +4,7 @@ import numpy as np
 from typing import Union, Dict, List
 from datetime import datetime
 import logging
+import os
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -11,10 +12,14 @@ logger = logging.getLogger(__name__)
 
 class MongoUserRepositoryAdapter(UserRepositoryPort):
     def __init__(self):
-        client = MongoClient("mongodb://mongodb:27017")
-        self.db = client["iotsensing"]
+        mongo_url = os.getenv("MONGO_URL", "mongodb://mongodb:27017")
+        # Use iotsensing_live by default for live mode consistency
+        db_name = os.getenv("VOICE_PROFILING_DB", "iotsensing_live")
+        client = MongoClient(mongo_url)
+        self.db = client[db_name]
         self.collection = self.db["voice_profiling"]
         self.users_collection = self.db["users"]
+        logger.info(f"MongoUserRepositoryAdapter initialized with database: {db_name}")
 
     def load_all_user_embeddings(self) -> dict:
         profiles = {}
@@ -45,32 +50,55 @@ class MongoUserRepositoryAdapter(UserRepositoryPort):
 
     def add_user(self, user_profile: Dict) -> bool:
         """
-        Add a new user with full profile to the users collection.
+        Add or update a user with full profile to the users collection.
+        Supports re-enrollment: if user exists, updates their profile.
         Expected fields: user_id, name, role, voice_embedding, status
         """
         try:
-            # Ensure created_at is set
-            if "created_at" not in user_profile:
-                user_profile["created_at"] = datetime.utcnow().isoformat()
-            
-            # Ensure status is set
-            if "status" not in user_profile:
-                user_profile["status"] = "active"
-            
-            # Insert into users collection
-            self.users_collection.insert_one(user_profile)
-            
+            user_id = user_profile.get("user_id")
+            if not user_id:
+                logger.error("user_id is required for enrollment")
+                return False
+
+            # Ensure created_at is set (only on first creation)
+            # Use update_one with upsert to support re-enrollment
+            update_doc = {
+                "$set": {
+                    "name": user_profile.get("name", user_id),
+                    "role": user_profile.get("role", "patient"),
+                    "status": user_profile.get("status", "active"),
+                    "updated_at": datetime.utcnow().isoformat(),
+                },
+                "$setOnInsert": {
+                    "user_id": user_id,
+                    "created_at": user_profile.get("created_at", datetime.utcnow().isoformat()),
+                }
+            }
+
+            # Include voice_embedding in $set if provided
+            if "voice_embedding" in user_profile:
+                update_doc["$set"]["voice_embedding"] = user_profile["voice_embedding"]
+
+            # Upsert into users collection (insert if new, update if exists)
+            self.users_collection.update_one(
+                {"user_id": user_id},
+                update_doc,
+                upsert=True
+            )
+            logger.info(f"User profile saved/updated for {user_id}")
+
             # Also maintain backward compatibility with voice_profiling collection
             if "voice_embedding" in user_profile:
                 self.save_user_embedding(
-                    user_profile["user_id"],
+                    user_id,
                     np.array(user_profile["voice_embedding"]),
-                    overwrite=True
+                    overwrite=True  # Always overwrite for re-enrollment
                 )
-            
+                logger.info(f"Voice embedding saved for {user_id}")
+
             return True
         except Exception as e:
-            logger.error(f"Error adding user: {e}")
+            logger.error(f"Error adding/updating user: {e}")
             return False
 
     def delete_user(self, user_id: Union[int, str]) -> bool:

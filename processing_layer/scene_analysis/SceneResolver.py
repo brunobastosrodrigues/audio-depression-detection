@@ -27,21 +27,59 @@ class SceneResolver:
         print("SceneResolver initialized.")
 
     def _get_user_embedding(self, user_id):
+        """
+        Get user embedding with lazy loading.
+
+        Strategy:
+        1. Check in-memory cache first
+        2. If not cached, do a DIRECT database lookup for this specific user
+        3. This ensures newly enrolled users are picked up immediately
+        """
         if user_id in self.user_embeddings_cache:
             return self.user_embeddings_cache[user_id]
-        
-        # Fetch from Repo
+
+        # LAZY LOADING: Direct database lookup for this specific user
+        # This fixes the "stale read" bug where new enrollments were ignored
         try:
-            profiles = self.repository.load_all_user_embeddings()
-            if user_id in profiles and profiles[user_id]:
-                # Take the most recent embedding (last in list)
-                emb = profiles[user_id][-1]
+            emb = self.repository.get_user_embedding(str(user_id))
+            if emb is not None:
                 self.user_embeddings_cache[user_id] = emb
+                logger.info(f"Cached new embedding for user {user_id}")
                 return emb
         except Exception as e:
-            logging.error(f"Error fetching user embedding: {e}")
-            
+            logger.error(f"Error fetching user embedding: {e}")
+
         return None
+
+    def invalidate_cache(self, user_id: str = None):
+        """
+        Invalidate the embedding cache.
+
+        Args:
+            user_id: If provided, only invalidate this user's cache.
+                     If None, invalidate entire cache.
+        """
+        if user_id:
+            if user_id in self.user_embeddings_cache:
+                del self.user_embeddings_cache[user_id]
+                logger.info(f"Cache invalidated for user {user_id}")
+        else:
+            self.user_embeddings_cache.clear()
+            logger.info("Full cache invalidated")
+
+    def refresh_user(self, user_id: str) -> bool:
+        """
+        Force refresh a user's embedding from database.
+
+        Args:
+            user_id: User ID to refresh
+
+        Returns:
+            True if embedding was found and cached, False otherwise
+        """
+        self.invalidate_cache(user_id)
+        emb = self._get_user_embedding(user_id)
+        return emb is not None
 
     def _detect_mechanical_activity(self, audio_np, sr=16000):
         """
