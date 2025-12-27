@@ -10,6 +10,46 @@ from scipy.stats import ttest_ind
 import os
 import contextlib
 import io
+import pickle
+
+
+class MyprosodyModels:
+    """Singleton cache for myprosody ML models"""
+
+    _instance = None
+    _models = {}
+
+    def __new__(cls, model_path=None):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            if model_path:
+                cls._load_models(model_path)
+        return cls._instance
+
+    @classmethod
+    def _load_models(cls, path):
+        """Load all models once at initialization"""
+        model_names = [
+            "CART_model.sav",
+            "KNN_model.sav",
+            "LDA_model.sav",
+            "LR_model.sav",
+            "NB_model.sav",
+            "SVN_model.sav",
+        ]
+
+        for name in model_names:
+            filename = os.path.join(path, "dataset", "essen", name)
+            try:
+                with open(filename, "rb") as f:
+                    cls._models[name] = pickle.load(f)
+                    print(f"Loaded model: {name}")
+            except Exception as e:
+                print(f"Failed to load model {name}: {e}")
+
+    def get_model(self, name):
+        """Retrieve cached model"""
+        return self._models.get(name)
 
 
 def run_praat_file(m, p):
@@ -749,34 +789,37 @@ def mysplev(m, p):
             )
             exit()
 
-        filename = p + "/" + "dataset" + "/" + "essen" + "/" + "CART_model.sav"
-        model = pickle.load(open(filename, "rb"))
-        predictions = model.predict(x)
-        print("58% accuracy    ", predictions)
+        # Initialize model cache (singleton)
+        model_cache = MyprosodyModels(p)
 
-        filename = p + "/" + "dataset" + "/" + "essen" + "/" + "KNN_model.sav"
-        model = pickle.load(open(filename, "rb"))
-        predictions = model.predict(x)
-        print("65% accuracy    ", predictions)
+        model = model_cache.get_model("CART_model.sav")
+        if model:
+            predictions = model.predict(x)
+            print("58% accuracy    ", predictions)
 
-        filename = p + "/" + "dataset" + "/" + "essen" + "/" + "LDA_model.sav"
-        model = pickle.load(open(filename, "rb"))
-        predictions = model.predict(x)
-        print("70% accuracy    ", predictions)
+        model = model_cache.get_model("KNN_model.sav")
+        if model:
+            predictions = model.predict(x)
+            print("65% accuracy    ", predictions)
 
-        filename = p + "/" + "dataset" + "/" + "essen" + "/" + "LR_model.sav"
-        model = pickle.load(open(filename, "rb"))
-        predictions = model.predict(x)
-        print("67% accuracy    ", predictions)
+        model = model_cache.get_model("LDA_model.sav")
+        if model:
+            predictions = model.predict(x)
+            print("70% accuracy    ", predictions)
 
-        filename = p + "/" + "dataset" + "/" + "essen" + "/" + "NB_model.sav"
-        model = pickle.load(open(filename, "rb"))
-        predictions = model.predict(x)
-        print("64% accuracy    ", predictions)
+        model = model_cache.get_model("LR_model.sav")
+        if model:
+            predictions = model.predict(x)
+            print("67% accuracy    ", predictions)
 
-        filename = p + "/" + "dataset" + "/" + "essen" + "/" + "SVN_model.sav"
-        model = pickle.load(open(filename, "rb"))
-        predictions = model.predict(x)
-        print("63% accuracy    ", predictions)
+        model = model_cache.get_model("NB_model.sav")
+        if model:
+            predictions = model.predict(x)
+            print("64% accuracy    ", predictions)
+
+        model = model_cache.get_model("SVN_model.sav")
+        if model:
+            predictions = model.predict(x)
+            print("63% accuracy    ", predictions)
     except:
         print("Try again the sound of the audio was not clear")

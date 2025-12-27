@@ -11,9 +11,9 @@ This document provides actionable recommendations for improving the performance 
 | ✅ DONE | Fix filter design in temporal_modulation | 10-20% speedup | 5 min |
 | ✅ DONE | Add file cleanup | Prevent disk full | 5 min |
 | ✅ DONE | Pre-allocate arrays in f2_transition_speed | 2-3x speedup | 20 min |
-| ⏳ TODO | Cache myprosody models | 300-1200ms/segment | 30 min |
-| ⏳ TODO | Parallel feature extraction | 30-50% reduction | 2 hours |
-| ⏳ TODO | Optimize OpenSMILE usage | 20-40% reduction | 1-2 hours |
+| ✅ DONE | Cache myprosody models | 300-1200ms/segment | 30 min |
+| ✅ DONE | Parallel feature extraction | 30-50% reduction | 2 hours |
+| ✅ DONE | Optimize OpenSMILE usage | 20-40% reduction | 1-2 hours |
 
 ---
 

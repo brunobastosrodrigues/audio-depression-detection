@@ -1,10 +1,18 @@
 import numpy as np
 
 
-def get_snr(features_HLD):
-    signal_energy = features_HLD["pcm_RMSenergy_sma_amean"].iloc[0]
-    noise_floor = features_HLD["pcm_RMSenergy_sma_quartile1"].iloc[0]
-    if noise_floor == 0:
-        return None
+def get_snr(audio_signal, rms_series):
+    """
+    Estimate SNR using manual RMS energy series.
+    """
+    if rms_series is None or len(rms_series) == 0:
+        return 0.0
+        
+    signal_energy = np.mean(rms_series)
+    noise_floor = np.percentile(rms_series, 25) # Use 25th percentile as noise floor proxy
+    
+    if noise_floor <= 0:
+        return 0.0
+        
     snr_estimate_db = 10 * np.log10(signal_energy / noise_floor)
-    return snr_estimate_db
+    return float(snr_estimate_db)

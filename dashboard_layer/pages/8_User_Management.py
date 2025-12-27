@@ -29,6 +29,13 @@ except ImportError:
         BOARD_RECORDER_AVAILABLE = False
         BoardRecorder = None
 
+# Resemblyzer for local recognition tests
+try:
+    from resemblyzer import VoiceEncoder, preprocess_wav
+    RESEMBLYZER_AVAILABLE = True
+except ImportError:
+    RESEMBLYZER_AVAILABLE = False
+
 st.set_page_config(page_title="User Management", page_icon="👥", layout="wide")
 
 # Mode Check - Only available in Live mode
@@ -53,6 +60,17 @@ environments_collection = db["environments"]
 
 # API endpoints
 VOICE_PROFILING_API = os.getenv("VOICE_PROFILING_API", "http://voice_profiling:8000")
+
+
+@st.cache_resource
+def get_encoder():
+    if RESEMBLYZER_AVAILABLE:
+        return VoiceEncoder()
+    return None
+
+
+encoder = get_encoder()
+
 
 # =============================================================================
 # HELPER FUNCTIONS
@@ -160,7 +178,7 @@ st.divider()
 # TABS
 # =============================================================================
 
-tab1, tab2 = st.tabs(["📋 User Roster", "➕ Enroll New User"])
+tab1, tab2, tab3 = st.tabs(["📋 User Roster", "➕ Enroll New User", "🔍 Test Recognition"])
 
 # =============================================================================
 # TAB 1: USER ROSTER
@@ -417,6 +435,115 @@ a boiling pot of gold at one end. People look, but no one ever finds it."""
     
     if not can_enroll:
         st.caption("💡 Enter user information and record/upload audio to enable registration.")
+
+# =============================================================================
+# TAB 3: TEST RECOGNITION
+# =============================================================================
+
+with tab3:
+    st.header("Test Recognition")
+    st.markdown("Upload or record audio to test if the system can identify a registered user.")
+
+    if not RESEMBLYZER_AVAILABLE:
+        st.error("❌ Voice recognition library (resemblyzer) not available.")
+        st.info("Please ensure the dashboard container has resemblyzer installed.")
+    elif not users:
+        st.warning("⚠️ No users registered. Register users first to test recognition.")
+    else:
+        test_method = st.radio("Test audio source:", ["Upload File", "Record from Board"], horizontal=True, key="test_method_radio")
+
+        test_audio = None
+
+        if test_method == "Upload File":
+            test_file = st.file_uploader("Upload test audio", type=["wav", "mp3"], key="test_file_upload")
+            if test_file:
+                st.audio(test_file)
+                test_audio = test_file
+
+        else:
+            active_boards = list(boards_collection.find({"is_active": True}))
+            if active_boards:
+                board_opts = {b["board_id"]: b.get("name", "Unknown") for b in active_boards}
+                test_board = st.selectbox("Board", list(board_opts.keys()), format_func=lambda x: board_opts[x], key="test_board_select")
+
+                if st.button("🎙️ Record Test Sample (10s)", key="rec_test_btn"):
+                    recorder = BoardRecorder()
+                    with st.spinner("Recording..."):
+                        audio = recorder.start_recording(test_board, duration=10)
+                    if audio is not None:
+                        st.session_state["test_audio_data"] = audio
+                        st.rerun()
+
+                if "test_audio_data" in st.session_state:
+                    st.audio(st.session_state["test_audio_data"], sample_rate=16000)
+                    test_audio = st.session_state["test_audio_data"]
+            else:
+                st.warning("No active boards available.")
+
+        if test_audio is not None:
+            if st.button("🔍 Run Recognition Test", type="primary"):
+                with st.spinner("Analyzing voice..."):
+                    try:
+                        # Save to temp
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                            if isinstance(test_audio, np.ndarray):
+                                import soundfile as sf
+                                sf.write(tmp.name, test_audio, 16000)
+                            else:
+                                tmp.write(test_audio.getvalue())
+                            tmp_path = tmp.name
+
+                        # Generate embedding
+                        wav = preprocess_wav(tmp_path)
+                        query_embed = encoder.embed_utterance(wav)
+
+                        # Compare against all users
+                        results = []
+                        for user in users:
+                            # Users in 'users' collection should have voice_embedding if enrolled properly
+                            if "voice_embedding" in user:
+                                ref_embed = np.array(user["voice_embedding"])
+                                sim = np.dot(ref_embed, query_embed) / (
+                                    np.linalg.norm(ref_embed) * np.linalg.norm(query_embed)
+                                )
+                                results.append({
+                                    "name": user.get("name", "Unknown"),
+                                    "similarity": sim,
+                                    "user_id": user["user_id"],
+                                    "role": user.get("role", "unknown")
+                                })
+
+                        os.remove(tmp_path)
+
+                        if results:
+                            # Sort by similarity
+                            results.sort(key=lambda x: x["similarity"], reverse=True)
+                            best = results[0]
+
+                            st.subheader("Recognition Results")
+
+                            if best["similarity"] >= 0.75:
+                                st.success(f"✅ Identified: **{best['name']}** (Similarity: {best['similarity']:.1%})")
+                            elif best["similarity"] >= 0.6:
+                                st.warning(f"⚠️ Possible match: **{best['name']}** (Similarity: {best['similarity']:.1%})")
+                            else:
+                                st.error("❌ No match found. Speaker not recognized.")
+
+                            # Show all scores
+                            st.markdown("##### All Similarity Scores")
+                            for r in results:
+                                icon = "🟢" if r["similarity"] >= 0.75 else "🟡" if r["similarity"] >= 0.6 else "🔴"
+                                st.markdown(f"{icon} **{r['name']}** ({r['role']}): `{r['similarity']:.1%}`")
+                        else:
+                            st.warning("No users with voice profiles found.")
+
+                            # Clear test audio
+                            if "test_audio_data" in st.session_state:
+                                del st.session_state["test_audio_data"]
+
+                    except Exception as e:
+                        st.error(f"Recognition error: {e}")
+
 
 # =============================================================================
 # FOOTER

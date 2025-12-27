@@ -10,6 +10,7 @@ Usage:
 """
 
 import os
+import time
 import streamlit as st
 from pymongo import MongoClient
 
@@ -92,7 +93,23 @@ def render_mode_selector():
     """
     # Initialize session state if not set
     if "system_mode" not in st.session_state:
-        st.session_state.system_mode = "demo"
+        # Check query params for mode persistence
+        try:
+            qp_mode = st.query_params.get("mode")
+            if qp_mode in DB_MAP:
+                st.session_state.system_mode = qp_mode
+            else:
+                st.session_state.system_mode = "demo"
+        except Exception:
+            # Fallback for older streamlit versions or errors
+            st.session_state.system_mode = "demo"
+
+    # Sync URL with current state
+    try:
+        if st.query_params.get("mode") != st.session_state.system_mode:
+            st.query_params["mode"] = st.session_state.system_mode
+    except Exception:
+        pass
 
     current_mode = st.session_state.system_mode
     config = MODE_CONFIG.get(current_mode, MODE_CONFIG["live"])
@@ -131,6 +148,13 @@ def render_mode_selector():
 
     current_index = mode_options.index(current_mode) if current_mode in mode_options else 0
 
+    # Check for active streaming
+    streamer = st.session_state.get("streamer")
+    is_streaming = streamer is not None and getattr(streamer, "running", False)
+
+    if is_streaming:
+        st.sidebar.warning("🔊 Audio Streaming Active")
+
     selected_label = st.sidebar.selectbox(
         "Select Mode",
         options=mode_labels,
@@ -145,8 +169,14 @@ def render_mode_selector():
 
     # Handle mode change
     if selected_mode != current_mode:
-        st.session_state.system_mode = selected_mode
-        st.rerun()
+        if is_streaming:
+            st.sidebar.error("⚠️ Stop streaming before changing mode!")
+            # Force reset of the widget on next rerun by modifying session state manually if needed
+            # or just let the user see the error.
+            # We do NOT update system_mode, effectively blocking the change.
+        else:
+            st.session_state.system_mode = selected_mode
+            st.rerun()
 
     # Dynamic CSS to hide sidebar pages based on mode
     css_to_inject = ""
@@ -155,8 +185,6 @@ def render_mode_selector():
         css_to_inject = """
             <style>
                 div[data-testid="stSidebarNav"] a[href*="Boards"],
-                div[data-testid="stSidebarNav"] a[href*="User_Recognition"],
-                div[data-testid="stSidebarNav"] a[href*="Voice_Calibration"],
                 div[data-testid="stSidebarNav"] a[href*="User_Management"],
                 div[data-testid="stSidebarNav"] a[href*="Data_Tools"] {
                     display: none !important;
@@ -175,9 +203,7 @@ def render_mode_selector():
         css_to_inject = """
             <style>
                 div[data-testid="stSidebarNav"] a[href*="Boards"],
-                div[data-testid="stSidebarNav"] a[href*="User_Recognition"],
-                div[data-testid="stSidebarNav"] a[href*="User_Management"],
-                div[data-testid="stSidebarNav"] a[href*="Voice_Calibration"] {
+                div[data-testid="stSidebarNav"] a[href*="User_Management"] {
                     display: none !important;
                 }
             </style>

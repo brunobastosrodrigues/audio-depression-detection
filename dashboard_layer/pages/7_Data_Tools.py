@@ -8,6 +8,8 @@ import os
 import sys
 import threading
 import time
+import contextlib
+import io
 from datetime import datetime
 import pandas as pd
 import plotly.express as px
@@ -55,12 +57,14 @@ class StoppableVoiceFromFile:
         if VoiceFromFile is None:
             raise ImportError("VoiceFromFile class is not available.")
 
-        self.device = VoiceFromFile(
-            filepath=filepath,
-            topic=topic,
-            mqtthostname=mqtthostname,
-            mqttport=mqttport,
-        )
+        # Suppress output from torch.hub.load or other backend logs
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.device = VoiceFromFile(
+                filepath=filepath,
+                topic=topic,
+                mqtthostname=mqtthostname,
+                mqttport=mqttport,
+            )
         self.running = False
         self.thread = None
         self.error = None
@@ -197,15 +201,18 @@ with tab_audio:
             # Status Display
             if st.session_state.streamer:
                 if st.session_state.streamer.running:
-                    st.info(f"🔊 Streaming: {os.path.basename(filepath)}")
+                    st.success(f"🔊 Streaming Active: {os.path.basename(filepath)}")
+                    st.caption("ℹ️ Streaming runs in the background. You can navigate to other pages.")
                     time.sleep(1)
                     st.rerun()
                 elif st.session_state.streamer.completed:
                     st.success("✅ Playback completed.")
                     st.session_state.streamer = None
+                    st.rerun()
                 elif st.session_state.streamer.error:
                     st.error(f"Error: {st.session_state.streamer.error}")
                     st.session_state.streamer = None
+                    st.rerun()
 
 # ============================================================================
 # BASELINE VIEWER TAB

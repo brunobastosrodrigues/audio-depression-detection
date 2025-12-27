@@ -190,13 +190,6 @@ if current_mode == "live":
         "visible": True
     })
     cards.append({
-        "icon": "🎤", 
-        "title": "Voice Calibration", 
-        "desc": "Enroll voice for speaker verification", 
-        "color": "#EAECEE",
-        "visible": True
-    })
-    cards.append({
         "icon": "👥", 
         "title": "User Management", 
         "desc": "Manage authorized users for voice recognition", 
