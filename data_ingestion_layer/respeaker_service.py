@@ -338,6 +338,8 @@ class ReSpeakerService:
                         self.mqtt_client.publish(topic, json.dumps(payload.to_dict()))
                         print(f"Published {len(audio_np)} samples to {topic}")
 
+        except socket.timeout:
+            print(f"Board {config.name} connection timed out (no data received within timeout window)")
         except ConnectionResetError:
             print(f"Board {config.name} connection reset")
         except Exception as e:
@@ -379,8 +381,10 @@ class ReSpeakerService:
             # Send acknowledgement
             conn.sendall(b"READY\n")
 
-            # Remove timeout for normal operation
-            conn.settimeout(None)
+            # Set timeout for zombie connection detection
+            # Since we expect audio chunks every 5 seconds, we set timeout to 15 seconds
+            # to allow for network delays while still detecting dead connections
+            conn.settimeout(15.0)
 
             # Look up or register board
             with self.lock:
