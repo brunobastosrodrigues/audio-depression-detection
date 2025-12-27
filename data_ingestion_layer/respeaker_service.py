@@ -113,6 +113,14 @@ class ReSpeakerService:
         self.boards_collection = self.db["boards"]
         self.environments_collection = self.db["environments"]
 
+        # Reset all boards to inactive on startup to clear zombie states
+        # This prevents boards from remaining "online" if the service was restarted ungracefully
+        print("Resetting all boards to inactive state...")
+        self.boards_collection.update_many(
+            {},
+            {"$set": {"is_active": False}}
+        )
+
         # MQTT connection
         self.mqtt_client = mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION2)
         self.mqtt_client.connect(mqtt_host, mqtt_port, 60)
@@ -201,6 +209,7 @@ class ReSpeakerService:
 
     def update_board_status(self, board_id: str, is_active: bool):
         """Update board active status and last_seen in MongoDB."""
+        print(f"Updating board {board_id} status to is_active={is_active}")
         self.boards_collection.update_one(
             {"board_id": board_id},
             {"$set": {"is_active": is_active, "last_seen": datetime.utcnow()}},
@@ -243,7 +252,6 @@ class ReSpeakerService:
         topic = self.get_mqtt_topic(config)
         buffer = b""
         chunk_size = SAMPLE_RATE * 2 * CHUNK_DURATION_SECONDS  # 16-bit mono audio
-        vad_iterator = self.VADIterator(self.vad_model)
         speech_buffer = []
 
         print(f"Board {config.name} ({config.mac_address}) connected from {addr}")
@@ -270,26 +278,11 @@ class ReSpeakerService:
                     audio_int16 = np.frombuffer(frame_bytes, dtype=np.int16)
                     audio_float32 = int2float(audio_int16)
 
-                    # Use VADIterator for stateful processing
-                    # It returns a tensor with confidence if using legacy VADIterator or similar
-                    # But often it returns speech dicts.
-                    # Let's check typical usage or stick to VoiceSensor-like model call but verify correctness.
-                    # VoiceSensor used: confidence = self.vad_model(torch.from_numpy(audio_float32), self.sample_rate).item()
-                    # But VADIterator handles the reset state better.
-
-                    # Assuming standard Silero VADIterator:
-                    # speech_prob = vad_iterator(audio_tensor, return_seconds=False)
-                    # We need to wrap it in try-except in case of API mismatch or just use the iterator which we instantiated.
-                    
-                    # However, since VoiceSensor used direct model call, and we want to be "correct",
-                    # let's try to use vad_iterator if possible.
-                    # But we mocked torch hub, so we don't know the real API.
-                    # Let's trust the reviewer that vad_iterator is better.
-                    
-                    # Note: vad_iterator expects a tensor
-                    confidence = vad_iterator(torch.from_numpy(audio_float32), return_seconds=False)
-                    if torch.is_tensor(confidence):
-                         confidence = confidence.item()
+                    # Use direct model call instead of VADIterator to avoid state shape errors
+                    # This matches the implementation in VoiceFromFile.py
+                    confidence = self.vad_model(
+                        torch.from_numpy(audio_float32), 16000
+                    ).item()
 
                     if confidence > 0.5:
                         speech_buffer.append(frame_bytes)

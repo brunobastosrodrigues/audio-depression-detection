@@ -207,6 +207,8 @@ def derive_indicator_scores(
         # In Learning Mode, we do not signal MDD.
         if in_learning_mode:
             mdd_signal = False
+            # Also suppress individual binary indicators to avoid "7/9 active" scares during calibration
+            binary_scores = {k: 0 for k in binary_scores}
 
         all_scores.append(
             IndicatorScoreRecord(

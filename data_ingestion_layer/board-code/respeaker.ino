@@ -16,16 +16,11 @@ const int port       = 8010;
 #define I2S_SD          44  // Mic Input
 
 // VAD SETTINGS (Edge Intelligence)
-// Threshold: Adjust this if it cuts off too much (Lower = More Sensitive)
 #define VAD_THRESHOLD   150 
-// Hangover: Keeps recording for 500ms AFTER you stop speaking
-// This preserves the "breathiness" or "trailing off" at the end of sentences.
 #define HANGOVER_MS     500 
 
 // DIGITAL GAIN
-// 12 is the standard boost for ReSpeaker. 
-// If audio is too quiet, try 11. If distorted, try 13.
-#define BIT_SHIFT       12 
+#define BIT_SHIFT       16 
 
 // Internal Globals
 RingbufHandle_t audio_ringbuf;
@@ -46,9 +41,7 @@ void i2s_reader_task(void *param) {
   bool is_streaming = false;
 
   while (true) {
-    // 1. READ RAW DATA
-    // We request 32-bit data. Because we configured "ONLY_LEFT" in setup,
-    // this data comes directly from the XMOS Noise Suppression engine.
+    // 1. READ RAW DATA (32-bit)
     i2s_read(I2S_NUM_0, raw_buffer, sizeof(raw_buffer), &bytes_read, portMAX_DELAY);
     
     int samples_acquired = bytes_read / 4;
@@ -62,14 +55,14 @@ void i2s_reader_task(void *param) {
       // Digital Gain Boost
       sample = sample >> BIT_SHIFT;
 
-      // Soft Limiter (Prevents harsh digital clipping distortion)
+      // Soft Limiter
       if (sample > 32767) sample = 32767;
       else if (sample < -32768) sample = -32768;
 
       int16_t final_sample = (int16_t)sample;
       clean_buffer[idx++] = final_sample;
       
-      // Calculate Energy (Loudness) for VAD
+      // Calculate Energy for VAD
       energy_sum += abs(final_sample);
     }
 
@@ -78,11 +71,11 @@ void i2s_reader_task(void *param) {
 
     // Detect Voice
     if (average_energy > VAD_THRESHOLD) {
-      last_speech_time = millis(); // Reset "silence" timer
+      last_speech_time = millis(); 
       is_streaming = true;
     }
 
-    // Check Hangover (Are we still in the "tail" of the speech?)
+    // Check Hangover
     if (millis() - last_speech_time < HANGOVER_MS) {
         is_streaming = true;
     } else {
@@ -90,12 +83,10 @@ void i2s_reader_task(void *param) {
     }
 
     // 4. SMART SEND
-    // Only send data if we are actively streaming. 
-    // This utilizes the hardware to filter silence, saving bandwidth.
+    // Only send to ringbuffer if streaming is active
     if (is_streaming && idx > 0) {
       xRingbufferSend(audio_ringbuf, clean_buffer, idx * sizeof(int16_t), pdMS_TO_TICKS(10));
     }
-    // Note: If silence, we drop the data here. The loop continues instantly.
   }
 }
 
@@ -116,16 +107,12 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
   Serial.println("\nWiFi Connected!");
 
-  // 3. I2S CONFIGURATION (CRITICAL FOR QUALITY)
+  // 3. I2S CONFIGURATION
   i2s_config_t i2s_config = {
-    .mode = (i2s_mode_t)(I2S_MODE_SLAVE | I2S_MODE_RX), // Slave Mode = Perfect Sync with XMOS Clock
+    .mode = (i2s_mode_t)(I2S_MODE_SLAVE | I2S_MODE_RX), 
     .sample_rate = SAMPLE_RATE,
-    .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,       // Native ReSpeaker depth
-    
-    // THIS LINE IS THE KEY TO QUALITY:
-    // "ONLY_LEFT" selects Channel 0, which carries the XMOS Processed Audio (Noise Cancelled).
-    .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT, 
-    
+    .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,      
+    .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT, // Critical for Noise Suppression channel
     .communication_format = I2S_COMM_FORMAT_STAND_I2S,
     .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
     .dma_buf_count = 16,
@@ -165,33 +152,40 @@ void loop() {
     if (client.connect(host, port)) {
       Serial.println("Connected!");
 
-      // REQUIRED: Handshake with MAC Address
+      // --- START: NEW HANDSHAKE LOGIC ---
+      // 1. Send MAC Address
       String mac = WiFi.macAddress();
       Serial.print("Sending Handshake: ");
       Serial.println(mac);
       client.print(mac);
-      
-      // Wait for Server Acknowledgment
-      unsigned long start_wait = millis();
-      bool server_ready = false;
-      while (millis() - start_wait < 5000) {
+
+      // 2. Wait for "READY" from Server
+      // This prevents the board from sending audio before the server has registered the User ID
+      unsigned long startWait = millis();
+      bool serverReady = false;
+      Serial.println("Waiting for server READY...");
+
+      while (millis() - startWait < 5000) { // 5-second timeout
         if (client.available()) {
           String response = client.readStringUntil('\n');
-          if (response.indexOf("READY") >= 0) {
-            server_ready = true;
+          response.trim();
+          if (response == "READY") {
+            Serial.println("Server acknowledged. Starting Stream...");
+            serverReady = true;
             break;
           }
         }
         delay(10);
       }
 
-      if (server_ready) {
-        Serial.println("Server Ready! Streaming Audio...");
-      } else {
-        Serial.println("Server handshake failed or timed out.");
+      if (!serverReady) {
+        Serial.println("Handshake failed (Timeout or invalid response). Retrying...");
         client.stop();
         return;
       }
+      // --- END: NEW HANDSHAKE LOGIC ---
+      
+      Serial.println("Streaming Audio...");
     } else {
       delay(1000); 
       return;
