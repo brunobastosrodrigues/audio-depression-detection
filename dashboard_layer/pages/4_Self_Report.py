@@ -14,6 +14,7 @@ import os
 from utils.refresh_procedure import refresh_procedure
 from utils.theme import COLORS, INDICATOR_CLINICAL_NAMES, apply_custom_css
 from utils.database import get_database, render_mode_selector
+from utils.user_selector import render_user_selector
 
 st.set_page_config(page_title="Self-Report", page_icon="📋", layout="wide")
 
@@ -28,16 +29,6 @@ collection_phq9 = db["phq9_submissions"]
 collection_indicators = db["indicator_scores"]
 
 
-def load_users():
-    users = set()
-    for col_name in ["raw_metrics", "indicator_scores"]:
-        try:
-            users.update(db[col_name].distinct("user_id"))
-        except Exception:
-            pass
-    return sorted(list(users))
-
-
 # --- SIDEBAR ---
 render_mode_selector()
 
@@ -46,17 +37,11 @@ st.sidebar.title("Actions")
 if st.sidebar.button("🔄 Refresh Analysis"):
     refresh_procedure()
 
-st.sidebar.subheader("Select User")
-users = load_users()
-
-if not users:
-    st.warning("No data available.")
-    st.stop()
-
-selected_user = st.sidebar.selectbox("User", users, key="user_id")
+# Render user selector
+selected_user = render_user_selector()
 
 if not selected_user:
-    st.warning("Please select a user.")
+    st.warning("No data available.")
     st.stop()
 
 # --- TAB NAVIGATION ---

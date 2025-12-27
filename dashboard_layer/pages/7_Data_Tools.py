@@ -15,6 +15,7 @@ import pandas as pd
 import plotly.express as px
 
 from utils.database import get_database, render_mode_selector, get_current_mode
+from utils.user_selector import USER_ID_KEY
 
 st.set_page_config(page_title="Data Tools", page_icon="🔧", layout="wide")
 
@@ -106,13 +107,19 @@ class StoppableVoiceFromFile:
 
 
 @st.cache_data
-def load_users():
+def load_users_data_tools():
+    """
+    Load users for Data Tools page (specific to dataset mode).
+    Kept separate from user_selector to maintain caching.
+    """
+    db = get_database()
     users = set()
     for col_name in ["raw_metrics", "baseline", "indicator_scores"]:
         try:
             users.update(db[col_name].distinct("user_id"))
-        except Exception:
-            pass
+        except Exception as e:
+            # Log the error but continue - some collections may not exist yet
+            print(f"Warning: Could not load users from {col_name}: {e}", file=sys.stderr)
     users_list = sorted(list(users))
     if not users_list:
         return ["test-user1"]
@@ -125,15 +132,25 @@ render_mode_selector()
 st.sidebar.title("Actions")
 
 st.sidebar.subheader("Select User")
-users = load_users()
-# Ensure a user is selected
-if "user_id" not in st.session_state:
-     st.session_state.user_id = users[0] if users else "test-user1"
 
-selected_user = st.sidebar.selectbox("User", users, key="user_id_select")
-# Sync sidebar selection with session state
-if selected_user != st.session_state.get("user_id"):
-    st.session_state.user_id = selected_user
+# Note: This page uses its own user loading function instead of render_user_selector()
+# because it needs @st.cache_data for performance and provides a default test user
+# when no users exist in the database (common in dataset mode during initial setup).
+users = load_users_data_tools()
+
+# Ensure a user is selected
+if USER_ID_KEY not in st.session_state:
+     st.session_state[USER_ID_KEY] = users[0] if users else "test-user1"
+
+# Determine the index for the selectbox (same logic as render_user_selector)
+current_user = st.session_state[USER_ID_KEY]
+if current_user in users:
+    default_index = users.index(current_user)
+else:
+    default_index = 0
+    st.session_state[USER_ID_KEY] = users[0] if users else "test-user1"
+
+selected_user = st.sidebar.selectbox("User", users, index=default_index, key=USER_ID_KEY)
 
 # --- TABS ---
 tab_audio, tab_baseline, tab_export = st.tabs(["🎵 Audio Loader", "📊 Baseline Viewer", "📥 Data Export"])

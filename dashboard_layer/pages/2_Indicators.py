@@ -27,6 +27,7 @@ from utils.theme import (
 from utils.MetricExplainerAdapter import MetricExplainerAdapter
 from utils.DSM5Descriptions import DSM5Descriptions
 from utils.database import get_database, render_mode_selector
+from utils.user_selector import render_user_selector
 
 st.set_page_config(page_title="Indicators", page_icon="📊", layout="wide")
 
@@ -40,16 +41,6 @@ collection_indicators = db["indicator_scores"]
 collection_metrics = db["analyzed_metrics"]
 
 
-def load_users():
-    users = set()
-    for col_name in ["indicator_scores", "analyzed_metrics"]:
-        try:
-            users.update(db[col_name].distinct("user_id"))
-        except Exception:
-            pass
-    return sorted(list(users))
-
-
 # --- SIDEBAR ---
 render_mode_selector()
 
@@ -58,14 +49,12 @@ st.sidebar.title("Actions")
 if st.sidebar.button("🔄 Refresh Analysis"):
     refresh_procedure()
 
-st.sidebar.subheader("Select User")
-users = load_users()
+# Render user selector
+selected_user = render_user_selector()
 
-if not users:
+if not selected_user:
     st.warning("No data available.")
     st.stop()
-
-selected_user = st.sidebar.selectbox("User", users, key="user_id")
 
 # --- VIEW MODE SELECTION ---
 view_mode = st.selectbox(
