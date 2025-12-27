@@ -21,8 +21,11 @@ def load_users():
     for col_name in ["raw_metrics", "indicator_scores", "analyzed_metrics"]:
         try:
             users.update(db[col_name].distinct("user_id"))
-        except Exception:
-            pass
+        except Exception as e:
+            # Log the error but continue - some collections may not exist yet
+            # This is expected during initial setup or when collections are empty
+            import sys
+            print(f"Warning: Could not load users from {col_name}: {e}", file=sys.stderr)
     return sorted(list(users))
 
 
