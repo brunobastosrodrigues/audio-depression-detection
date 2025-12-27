@@ -62,30 +62,39 @@ def myprosody_extractors_handler(
         f"/app/core/myprosody/myprosody/dataset/audioFiles/{temp_wav_name}.wav"
     )
 
-    sf.write(temp_wav_path, audio_np, sample_rate, subtype="PCM_16")
-
-    results_df = mysp.mysptotal(temp_wav_name, MYPROSODY_DIR_PATH)
-    if results_df is None or results_df.empty:
-        return {}
-
-    results = results_df.iloc[:, 0].tolist()
-
-    if len(results) < len(MYPROSODY_RESULT_KEYS):
-        results += [None] * (len(MYPROSODY_RESULT_KEYS) - len(results))
-
-    result_dict = dict(zip(MYPROSODY_RESULT_KEYS, results))
-    result_dict["pause_count"] = result_dict.get("number_of_pauses")
-
+    # Write temporary file and ensure cleanup
     try:
-        pause_duration = float(result_dict["original_duration"]) - float(
-            result_dict["speaking_duration"]
-        )
-    except (KeyError, TypeError, ValueError):
-        pause_duration = None
+        sf.write(temp_wav_path, audio_np, sample_rate, subtype="PCM_16")
 
-    result_dict["pause_duration"] = pause_duration
+        results_df = mysp.mysptotal(temp_wav_name, MYPROSODY_DIR_PATH)
+        if results_df is None or results_df.empty:
+            return {}
 
-    return {
-        metric.value: result_dict.get(metric.value, None)
-        for metric in myprosody_metrics
-    }
+        results = results_df.iloc[:, 0].tolist()
+
+        if len(results) < len(MYPROSODY_RESULT_KEYS):
+            results += [None] * (len(MYPROSODY_RESULT_KEYS) - len(results))
+
+        result_dict = dict(zip(MYPROSODY_RESULT_KEYS, results))
+        result_dict["pause_count"] = result_dict.get("number_of_pauses")
+
+        try:
+            pause_duration = float(result_dict["original_duration"]) - float(
+                result_dict["speaking_duration"]
+            )
+        except (KeyError, TypeError, ValueError):
+            pause_duration = None
+
+        result_dict["pause_duration"] = pause_duration
+
+        return {
+            metric.value: result_dict.get(metric.value, None)
+            for metric in myprosody_metrics
+        }
+    finally:
+        # Clean up temporary file to prevent disk space accumulation
+        if os.path.exists(temp_wav_path):
+            try:
+                os.remove(temp_wav_path)
+            except OSError:
+                pass  # File already removed or permissions issue

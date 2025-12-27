@@ -12,17 +12,16 @@ def get_temporal_modulation(audio_np, sample_rate):
     )
     log_S = librosa.power_to_db(S)
 
+    # Design filter once outside the loop (performance optimization)
+    nyq = 0.5 * (sample_rate / 256)  # temporal rate from hop_length
+    low, high = 2 / nyq, 8 / nyq
+    b, a = scipy.signal.butter(4, [low, high], btype="band")
+
     modulation_energies = []
 
     for band in log_S:
-        band = band - np.mean(band)
-
-        nyq = 0.5 * (sample_rate / 256)  # temporal rate from hop_length
-        low, high = 2 / nyq, 8 / nyq
-        b, a = scipy.signal.butter(4, [low, high], btype="band")
-
-        filtered = scipy.signal.filtfilt(b, a, band)
-
+        band_centered = band - np.mean(band)
+        filtered = scipy.signal.filtfilt(b, a, band_centered)
         energy = np.mean(filtered**2)
         modulation_energies.append(energy)
 
