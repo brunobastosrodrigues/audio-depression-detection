@@ -10,6 +10,7 @@ import os
 from utils.refresh_procedure import refresh_procedure
 from utils.setup_db import setup_indexes
 from utils.database import get_database, render_mode_selector, render_mode_badge, get_current_mode
+from utils.user_selector import render_user_selector
 
 # Initialize database indexes
 try:
@@ -27,16 +28,6 @@ st.set_page_config(
 db = get_database()
 
 
-def load_users():
-    users = set()
-    for col_name in ["raw_metrics", "indicator_scores", "analyzed_metrics"]:
-        try:
-            users.update(db[col_name].distinct("user_id"))
-        except Exception:
-            pass
-    return sorted(list(users))
-
-
 # --- SIDEBAR ---
 # Mode selector at top of sidebar
 render_mode_selector()
@@ -46,14 +37,8 @@ st.sidebar.title("Actions")
 if st.sidebar.button("🔄 Refresh Analysis"):
     refresh_procedure()
 
-st.sidebar.subheader("Select User")
-users = load_users()
-
-if users:
-    selected_user = st.sidebar.selectbox("User", users, key="user_id")
-else:
-    st.sidebar.warning("No users found")
-    selected_user = None
+# Render user selector
+selected_user = render_user_selector()
 
 # --- MAIN CONTENT ---
 st.title("IHearYou")

@@ -18,6 +18,7 @@ from plotly.subplots import make_subplots
 import numpy as np
 
 from utils.database import get_database, render_mode_selector, get_current_mode
+from utils.user_selector import render_user_selector
 
 st.set_page_config(page_title="Boards", page_icon="📡", layout="wide")
 
@@ -39,18 +40,6 @@ audio_quality_metrics_collection = db["audio_quality_metrics"]
 ANALYSIS_LAYER_URL = "http://analysis_layer:8083"
 
 
-def load_users():
-    users = set()
-    for col_name in ["raw_metrics", "boards"]:
-        try:
-            users.update(db[col_name].distinct("user_id"))
-        except Exception:
-            pass
-    if not users:
-        users.add(1)  # Default user
-    return sorted(list(users))
-
-
 # --- SIDEBAR ---
 render_mode_selector()
 
@@ -59,9 +48,8 @@ st.sidebar.title("Actions")
 if st.sidebar.button("🔄 Refresh Data"):
     st.rerun()
 
-st.sidebar.subheader("Select User")
-users = load_users()
-selected_user = st.sidebar.selectbox("User", users, key="user_id")
+# Render user selector
+selected_user = render_user_selector()
 
 st.divider()
 
