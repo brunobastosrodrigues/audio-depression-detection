@@ -9,6 +9,9 @@ import sys
 import streamlit as st
 from utils.database import get_database
 
+# Session state key for user selection - used across all dashboard pages
+USER_ID_KEY = "user_id"
+
 
 def load_users():
     """
@@ -53,19 +56,19 @@ def render_user_selector(sidebar=True, label="Select User"):
         return None
     
     # Initialize session state for user_id if not set
-    if "user_id" not in st.session_state:
-        st.session_state.user_id = users[0]
+    if USER_ID_KEY not in st.session_state:
+        st.session_state[USER_ID_KEY] = users[0]
     
     # Determine the index for the selectbox
     # If the current session state value is in the users list, use its index
     # Otherwise, default to the first user
-    current_user = st.session_state.user_id
+    current_user = st.session_state[USER_ID_KEY]
     if current_user in users:
         default_index = users.index(current_user)
     else:
         # Current user not in list (e.g., after mode change), default to first
         default_index = 0
-        st.session_state.user_id = users[0]
+        st.session_state[USER_ID_KEY] = users[0]
     
     # Render the selectbox
     if sidebar:
@@ -74,14 +77,14 @@ def render_user_selector(sidebar=True, label="Select User"):
             "User", 
             users, 
             index=default_index,
-            key="user_id"
+            key=USER_ID_KEY
         )
     else:
         selected_user = st.selectbox(
             label, 
             users, 
             index=default_index,
-            key="user_id"
+            key=USER_ID_KEY
         )
     
     return selected_user
