@@ -13,3 +13,4 @@ scipy
 torchaudio==2.5.1
 av
 resemblyzer
+requests

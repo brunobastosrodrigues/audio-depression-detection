@@ -4,3 +4,4 @@ numpy
 soundfile
 resemblyzer
 pymongo
+python-multipart
