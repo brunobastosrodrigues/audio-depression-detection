@@ -216,8 +216,14 @@ with tab_analytics:
             
             # Prepare data for heatmap
             df_heatmap = pd.DataFrame(quality_metrics)
-            df_heatmap["board_name"] = df_heatmap["board_id"].map(board_name_map)
+            # Map board IDs to names, use ID if name not found
+            df_heatmap["board_name"] = df_heatmap["board_id"].apply(
+                lambda x: board_name_map.get(x, f"Board {x[:8]}")
+            )
             df_heatmap["rms_log"] = df_heatmap["rms"].apply(lambda x: np.log10(x + 1e-10) if x > 0 else -10)
+            
+            # Filter out any None values in board_name
+            df_heatmap = df_heatmap[df_heatmap["board_name"].notna()]
             
             # Resample to 5-minute bins for better visualization
             df_heatmap["time_bin"] = df_heatmap["timestamp"].dt.floor("5min")
