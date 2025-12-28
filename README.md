@@ -341,8 +341,20 @@ Defines which acoustic features map to which DSM-5 indicators, with weights and 
 
 This project is part of academic research. Please contact the authors for licensing inquiries.
 
+## Dataset Attributions
+
+### TESS (Toronto Emotional Speech Set)
+
+This project uses the TESS dataset for research validation. TESS is licensed under [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/).
+
+> Dupuis, K., & Pichora-Fuller, M. K. (2010). *Toronto Emotional Speech Set (TESS)*.
+> University of Toronto, Psychology Department.
+> https://doi.org/10.5683/SP2/E8H2MF
+
+The dataset contains recordings of 200 target words spoken by two actresses portraying seven emotions (anger, disgust, fear, happiness, pleasant surprise, sadness, and neutral). In this project, sad emotion is used as a proxy for depressed speech patterns, and happy emotion represents non-depressed controls.
+
 ## Acknowledgments
 
 - Jonas Lanzlinger - Original prototype development (University of St. Gallen)
-- TESS Dataset - Toronto Emotional Speech Set
+- Kate Dupuis & M. Kathleen Pichora-Fuller - TESS Dataset (University of Toronto)
 - Resemblyzer - Speaker embedding library
