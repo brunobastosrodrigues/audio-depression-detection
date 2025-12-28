@@ -9,8 +9,9 @@ import os
 
 from utils.refresh_procedure import refresh_procedure
 from utils.setup_db import setup_indexes
-from utils.database import get_database, render_mode_selector, render_mode_badge, get_current_mode
+from utils.database import get_database, render_mode_selector, render_mode_badge, get_current_mode, MODE_CONFIG
 from utils.user_selector import render_user_selector, get_user_display_name, load_users_with_status
+from utils.dataset_users import get_dataset_users, get_dataset_user_info, DATASET_USERS
 
 # Initialize database indexes
 try:
@@ -46,6 +47,30 @@ st.markdown("### Linking Acoustic Speech Features with Major Depressive Disorder
 
 # Get current mode
 current_mode = get_current_mode()
+
+# Mode-specific overview section
+mode_config = MODE_CONFIG.get(current_mode, MODE_CONFIG["demo"])
+
+# Show mode description
+st.markdown(
+    f"""
+    <div style="
+        padding: 1rem 1.5rem;
+        background: {mode_config['color']}10;
+        border-left: 4px solid {mode_config['color']};
+        border-radius: 0 8px 8px 0;
+        margin-bottom: 1.5rem;
+    ">
+        <div style="font-weight: 600; color: {mode_config['color']}; margin-bottom: 0.25rem;">
+            {mode_config['icon']} {mode_config['label']} Mode Active
+        </div>
+        <div style="color: #555; font-size: 0.9rem;">
+            {mode_config['description']}
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 # In Live mode, show multi-user overview
 if current_mode == "live":
@@ -127,6 +152,50 @@ if current_mode == "live":
         st.markdown("<br>", unsafe_allow_html=True)
     else:
         st.info("No users registered. Go to User Management to add users.")
+
+# In Dataset mode, show available datasets
+elif current_mode == "dataset":
+    st.markdown("### Available Datasets")
+    st.markdown("Each dataset represents a cohort of audio samples that can be analyzed as a virtual 'user'.")
+
+    cols = st.columns(len(DATASET_USERS))
+    for i, du in enumerate(DATASET_USERS):
+        with cols[i]:
+            cohort_icon = "🔴" if du.cohort_type == "depressed" else "🟢"
+            st.markdown(
+                f"""
+                <div style="padding: 1rem; background: {du.color}15; border-radius: 8px; border-left: 4px solid {du.color};">
+                    <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">{cohort_icon}</div>
+                    <div style="font-weight: 600; color: #2C3E50; margin-bottom: 0.25rem;">{du.name}</div>
+                    <div style="font-size: 0.8rem; color: #7F8C8D; margin-bottom: 0.5rem;">{du.source_dataset} Dataset</div>
+                    <div style="font-size: 0.75rem; color: #999;">{du.description[:80]}...</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    with st.expander("About Dataset Mode"):
+        st.markdown(
+            """
+            **Dataset Mode** allows you to analyze pre-loaded research datasets using the same
+            visualization and analysis tools as live monitoring.
+
+            **Current Datasets:**
+            - **TESS (Toronto Emotional Speech Set):** Acted emotional speech samples.
+              Sad emotion is used as a proxy for depressed speech patterns,
+              while happy emotion represents non-depressed controls.
+
+            **Limitations:**
+            - Acted emotions differ from clinical depression manifestations
+            - PHQ-9 self-report is not applicable (hidden in this mode)
+            - Results should be interpreted as research validation, not clinical diagnosis
+
+            **Future Datasets:**
+            - DAIC-WOZ (pending access) - Clinical interviews with PHQ-8 scores
+            """
+        )
 
 # Show selected user details (for all modes)
 if selected_user:
@@ -222,54 +291,61 @@ st.divider()
 # Navigation hints
 st.markdown("### Quick Navigation")
 
-# Define all available cards
+# Define all available cards with page paths
 cards = [
     {
-        "icon": "🏠", 
-        "title": "Overview", 
-        "desc": "Simple wellness summary with patient-friendly indicators", 
+        "icon": "🏠",
+        "title": "Overview",
+        "desc": "Simple wellness summary with patient-friendly indicators",
         "color": "#EBF5FB",
+        "page": "pages/1_Overview.py",
         "visible": True
     },
     {
-        "icon": "📊", 
-        "title": "Indicators", 
-        "desc": "Detailed DSM-5 analysis with clinical drill-down", 
+        "icon": "📊",
+        "title": "Indicators",
+        "desc": "Detailed DSM-5 analysis with clinical drill-down",
         "color": "#FEF9E7",
+        "page": "pages/2_Indicators.py",
         "visible": True
     },
     {
-        "icon": "📈", 
-        "title": "Trends", 
-        "desc": "Track symptom progression over time", 
+        "icon": "📈",
+        "title": "Trends",
+        "desc": "Track symptom progression over time",
         "color": "#E8F8F5",
-        "visible": True
-    },
-    {
-        "icon": "📋", 
-        "title": "Self-Report", 
-        "desc": "PHQ-9 questionnaire and history", 
-        "color": "#FDEDEC",
+        "page": "pages/3_Trends.py",
         "visible": True
     },
 ]
 
-# Add mode-specific cards
-current_mode = get_current_mode()
+# Self-Report only for non-dataset modes
+if current_mode != "dataset":
+    cards.append({
+        "icon": "📋",
+        "title": "Self-Report",
+        "desc": "PHQ-9 questionnaire and history",
+        "color": "#FDEDEC",
+        "page": "pages/4_Self_Report.py",
+        "visible": True
+    })
 
+# Add mode-specific cards
 if current_mode == "live":
     cards.append({
-        "icon": "📡", 
-        "title": "Boards", 
-        "desc": "Configure ReSpeaker IoT boards", 
+        "icon": "📡",
+        "title": "Boards",
+        "desc": "Configure ReSpeaker IoT boards",
         "color": "#F4ECF7",
+        "page": "pages/5_Boards.py",
         "visible": True
     })
     cards.append({
-        "icon": "👥", 
-        "title": "User Management", 
-        "desc": "Manage authorized users for voice recognition", 
+        "icon": "👥",
+        "title": "User Management",
+        "desc": "Manage authorized users for voice recognition",
         "color": "#FEF5E7",
+        "page": "pages/6_User_Management.py",
         "visible": True
     })
 
@@ -277,29 +353,47 @@ if current_mode == "dataset":
     cards.append({
         "icon": "💾",
         "title": "Data Tools",
-        "desc": "Audio loader, baseline viewer, export",
+        "desc": "Research validation, hypothesis testing, data export",
         "color": "#E8DAEF",
+        "page": "pages/7_Data_Tools.py",
         "visible": True
     })
 
-# Render cards in rows of 3
+# Render clickable cards in rows of 3
 cols_per_row = 3
 for i in range(0, len(cards), cols_per_row):
     row_cards = cards[i:i + cols_per_row]
     cols = st.columns(cols_per_row)
-    
+
     for j, card in enumerate(row_cards):
         with cols[j]:
+            # Create a container with hover effect styling
             st.markdown(
                 f"""
-                <div style="padding: 1.5rem; background: {card['color']}; border-radius: 8px; height: 100%;">
-                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">{card['icon']}</div>
-                    <div style="font-weight: 600; margin-bottom: 0.5rem;">{card['title']}</div>
-                    <div style="color: #7F8C8D; font-size: 0.9rem;">{card['desc']}</div>
-                </div>
+                <style>
+                    .nav-card-{i+j} {{
+                        padding: 1.5rem;
+                        background: {card['color']};
+                        border-radius: 8px;
+                        height: 100%;
+                        transition: transform 0.2s, box-shadow 0.2s;
+                        cursor: pointer;
+                    }}
+                    .nav-card-{i+j}:hover {{
+                        transform: translateY(-2px);
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    }}
+                </style>
                 """,
                 unsafe_allow_html=True,
             )
+            # Use page_link for navigation
+            with st.container():
+                st.page_link(
+                    card["page"],
+                    label=f"{card['icon']} **{card['title']}**\n\n{card['desc']}",
+                    use_container_width=True,
+                )
     st.markdown("<br>", unsafe_allow_html=True)
 
 st.divider()

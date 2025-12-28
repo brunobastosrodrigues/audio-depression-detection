@@ -181,7 +181,7 @@ def render_mode_selector():
     # Dynamic CSS to hide sidebar pages based on mode
     # Live Mode: Full access to monitoring and management tools
     # Demo Mode: Hide live-only features (Boards, User Management, Scene Forensics)
-    # Dataset Mode: Hide live-only features, show Data Tools
+    # Dataset Mode: Hide live-only features, show Data Tools, hide Self Report
     css_to_inject = ""
 
     # Common pages to hide in non-live modes
@@ -189,6 +189,7 @@ def render_mode_selector():
         "Boards",
         "User_Management",
         "Scene_Forensics",
+        "Live_Status",
     ]
 
     # Pages always hidden from navigation
@@ -215,7 +216,8 @@ def render_mode_selector():
             </style>
         """
     elif current_mode == "dataset":
-        hidden_pages = live_only_pages + always_hidden
+        # Dataset mode: Hide live-only pages AND Self Report (PHQ-9 doesn't apply to acted speech)
+        hidden_pages = live_only_pages + ["Self_Report"] + always_hidden
         selectors = ", ".join([f'div[data-testid="stSidebarNav"] a[href*="{p}"]' for p in hidden_pages])
         css_to_inject = f"""
             <style>

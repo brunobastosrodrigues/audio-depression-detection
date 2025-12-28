@@ -8,12 +8,15 @@ Status Indicators:
 - ✅ Live: User is calibrated and actively monitored
 - ⚠️ Uncalibrated: User exists but has no voice profile
 - ⏸️ Inactive: User is registered but not active
+
+In dataset mode, uses pre-defined dataset users (cohorts) instead of database users.
 """
 
 import sys
 import streamlit as st
 from typing import Dict, List, Optional, Tuple
 from utils.database import get_database, get_current_mode
+from utils.dataset_users import get_dataset_users, get_dataset_user_info
 
 # Cache TTL in seconds
 CACHE_TTL = 60
@@ -87,8 +90,13 @@ def _load_users_with_status_cached(mode: str) -> List[Dict]:
         except Exception as e:
             print(f"Warning: Could not load registered users: {e}", file=sys.stderr)
 
+    elif mode == "dataset":
+        # In dataset mode, use pre-defined dataset users (cohorts)
+        # Each dataset cohort is treated as a virtual "user"
+        users = get_dataset_users()
+
     else:
-        # In demo/dataset mode, load from data collections
+        # In demo mode, load from data collections
         user_ids = set()
         for col_name in ["raw_metrics", "indicator_scores", "analyzed_metrics"]:
             try:
@@ -96,12 +104,12 @@ def _load_users_with_status_cached(mode: str) -> List[Dict]:
             except Exception as e:
                 print(f"Warning: Could not load users from {col_name}: {e}", file=sys.stderr)
 
-        # Demo/dataset users don't need calibration
+        # Demo users don't need calibration
         for uid in sorted(user_ids):
             users.append({
                 "user_id": uid,
                 "name": str(uid),
-                "status": "live",  # Always "live" in demo/dataset mode
+                "status": "live",  # Always "live" in demo mode
                 "has_calibration": True,  # Not applicable
                 "embedding_count": 0,
             })
@@ -171,11 +179,21 @@ def render_user_selector(sidebar: bool = True, label: str = "Select User") -> Op
         status = user.get("status", "inactive")
         status_cfg = USER_STATUS.get(status, USER_STATUS["inactive"])
 
-        # Format: "Bruno (✅ Live)" or "Test User (⚠️ Uncalibrated)"
+        # Format depends on mode
         if mode == "live":
+            # Live mode: "Bruno (✅ Live)" or "Test User (⚠️ Uncalibrated)"
             display_label = f"{name} ({status_cfg['icon']} {status_cfg['label']})"
+        elif mode == "dataset":
+            # Dataset mode: Show cohort type indicator
+            cohort = user.get("cohort_type", "")
+            if cohort == "depressed":
+                display_label = f"🔴 {name}"
+            elif cohort == "nondepressed":
+                display_label = f"🟢 {name}"
+            else:
+                display_label = name
         else:
-            # Simpler format for demo/dataset modes
+            # Demo mode: Simple format
             display_label = name
 
         user_ids.append(uid)
