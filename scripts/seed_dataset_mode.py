@@ -49,31 +49,51 @@ def load_json_data(filepath: str) -> list:
 
 def transform_metrics_to_raw(records: list, user_id: str) -> list:
     """
-    Transform long-format metric records to the format expected by raw_metrics collection.
+    Transform metric records to the format expected by raw_metrics collection.
 
-    The JSON files have one record per metric per timestamp.
-    We need to group by timestamp and create a single document with all metrics.
+    The data stays in LONG FORMAT (metric_name, metric_value) as expected by
+    the temporal_context_modeling_layer.
+
+    IMPORTANT: Timestamps are shifted to recent dates to avoid TTL expiration.
+    The TTL index expires documents after 30 days.
     """
-    from collections import defaultdict
+    from datetime import timedelta
 
-    # Group by timestamp
-    by_timestamp = defaultdict(dict)
+    if not records:
+        return []
+
+    # Find all unique timestamps and calculate time shift
+    timestamps = sorted(set(r.get("timestamp") for r in records if r.get("timestamp")))
+
+    if timestamps:
+        # Parse the most recent timestamp
+        most_recent_str = timestamps[-1]
+        most_recent = datetime.fromisoformat(most_recent_str.replace("Z", "+00:00"))
+        # Shift so most recent is yesterday (avoid edge cases with "today")
+        time_shift = datetime.now(timezone.utc) - timedelta(days=1) - most_recent
+    else:
+        time_shift = timedelta(0)
+
+    # Create raw_metrics documents in LONG FORMAT with shifted timestamps
+    raw_docs = []
     for rec in records:
-        ts = rec.get("timestamp")
+        ts_str = rec.get("timestamp")
         metric_name = rec.get("metric_name")
         metric_value = rec.get("metric_value")
-        if ts and metric_name:
-            by_timestamp[ts][metric_name] = metric_value
 
-    # Create raw_metrics documents
-    raw_docs = []
-    for ts, metrics in by_timestamp.items():
+        if not ts_str or not metric_name:
+            continue
+
+        original_ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+        shifted_ts = original_ts + time_shift
+
         doc = {
             "user_id": user_id,
-            "timestamp": datetime.fromisoformat(ts.replace("Z", "+00:00")) if isinstance(ts, str) else ts,
+            "timestamp": shifted_ts,
+            "metric_name": metric_name,
+            "metric_value": float(metric_value) if metric_value is not None else 0.0,
             "system_mode": "dataset",
             "origin": "dataset_seed",
-            **metrics,  # Flatten all metrics into the document
         }
         raw_docs.append(doc)
 
