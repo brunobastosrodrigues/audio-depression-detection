@@ -345,7 +345,7 @@ if current_mode == "live":
         "title": "User Management",
         "desc": "Manage authorized users for voice recognition",
         "color": "#FEF5E7",
-        "page": "pages/6_User_Management.py",
+        "page": "pages/8_User_Management.py",
         "visible": True
     })
 
