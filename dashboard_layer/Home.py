@@ -351,9 +351,17 @@ if current_mode == "live":
 
 if current_mode == "dataset":
     cards.append({
+        "icon": "🔬",
+        "title": "Research Validation",
+        "desc": "Scientific validation of system accuracy",
+        "color": "#D6EAF8",
+        "page": "pages/11_Research_Validation.py",
+        "visible": True
+    })
+    cards.append({
         "icon": "💾",
         "title": "Data Tools",
-        "desc": "Research validation, hypothesis testing, data export",
+        "desc": "Upload datasets, view baselines, export data",
         "color": "#E8DAEF",
         "page": "pages/7_Data_Tools.py",
         "visible": True
