@@ -3,6 +3,7 @@ import librosa
 from resemblyzer import VoiceEncoder
 from collections import deque
 import logging
+import threading
 from typing import Optional, Dict, List
 
 from .SceneConfig import SceneConfig
@@ -22,50 +23,63 @@ class SceneResolver:
         print(f"SceneResolver config loaded: {self.config.config_source}")
 
         # Context buffer: Dictionary mapping user_id -> deque of last N classifications
+        # Thread-safe access via lock (for multi-board concurrent processing)
         self.context_buffers = {}
+        self._context_lock = threading.Lock()
 
-        print("SceneResolver initialized.")
+        # Embedding cache lock (for concurrent lazy-loading)
+        self._cache_lock = threading.Lock()
+
+        print("SceneResolver initialized (thread-safe mode).")
 
     def _get_user_embedding(self, user_id):
         """
-        Get user embedding with lazy loading.
+        Get user embedding with lazy loading (thread-safe).
 
         Strategy:
-        1. Check in-memory cache first
+        1. Check in-memory cache first (under lock)
         2. If not cached, do a DIRECT database lookup for this specific user
         3. This ensures newly enrolled users are picked up immediately
         """
+        # Fast path: check cache without lock first (dict access is atomic in CPython)
         if user_id in self.user_embeddings_cache:
             return self.user_embeddings_cache[user_id]
 
-        # LAZY LOADING: Direct database lookup for this specific user
-        # This fixes the "stale read" bug where new enrollments were ignored
-        try:
-            emb = self.repository.get_user_embedding(str(user_id))
-            if emb is not None:
-                self.user_embeddings_cache[user_id] = emb
-                logger.info(f"Cached new embedding for user {user_id}")
-                return emb
-        except Exception as e:
-            logger.error(f"Error fetching user embedding: {e}")
+        # Slow path: acquire lock for cache update
+        with self._cache_lock:
+            # Double-check after acquiring lock
+            if user_id in self.user_embeddings_cache:
+                return self.user_embeddings_cache[user_id]
+
+            # LAZY LOADING: Direct database lookup for this specific user
+            # This fixes the "stale read" bug where new enrollments were ignored
+            try:
+                emb = self.repository.get_user_embedding(str(user_id))
+                if emb is not None:
+                    self.user_embeddings_cache[user_id] = emb
+                    logger.info(f"Cached new embedding for user {user_id}")
+                    return emb
+            except Exception as e:
+                logger.error(f"Error fetching user embedding: {e}")
 
         return None
 
     def invalidate_cache(self, user_id: str = None):
         """
-        Invalidate the embedding cache.
+        Invalidate the embedding cache (thread-safe).
 
         Args:
             user_id: If provided, only invalidate this user's cache.
                      If None, invalidate entire cache.
         """
-        if user_id:
-            if user_id in self.user_embeddings_cache:
-                del self.user_embeddings_cache[user_id]
-                logger.info(f"Cache invalidated for user {user_id}")
-        else:
-            self.user_embeddings_cache.clear()
-            logger.info("Full cache invalidated")
+        with self._cache_lock:
+            if user_id:
+                if user_id in self.user_embeddings_cache:
+                    del self.user_embeddings_cache[user_id]
+                    logger.info(f"Cache invalidated for user {user_id}")
+            else:
+                self.user_embeddings_cache.clear()
+                logger.info("Full cache invalidated")
 
     def refresh_user(self, user_id: str) -> bool:
         """
@@ -177,14 +191,16 @@ class SceneResolver:
         else:
             classification = "uncertain"
 
-        # 5. Update Context
-        if user_id not in self.context_buffers:
-            self.context_buffers[user_id] = deque(maxlen=self.config.buffer_size)
-        
-        self.context_buffers[user_id].append(classification)
-        
-        # 6. Determine Context
-        buffer = self.context_buffers[user_id]
+        # 5. Update Context (thread-safe for multi-board concurrent access)
+        with self._context_lock:
+            if user_id not in self.context_buffers:
+                self.context_buffers[user_id] = deque(maxlen=self.config.buffer_size)
+
+            self.context_buffers[user_id].append(classification)
+
+            # 6. Determine Context (inside lock to ensure consistent read)
+            buffer = list(self.context_buffers[user_id])  # Snapshot for consistent iteration
+
         total = len(buffer)
         target_count = sum(1 for c in buffer if c == "target_user")
         noise_count = sum(1 for c in buffer if c in ["background_noise", "mechanical_activity"])

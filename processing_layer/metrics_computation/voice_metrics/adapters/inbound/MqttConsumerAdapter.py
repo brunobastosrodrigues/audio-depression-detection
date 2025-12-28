@@ -2,17 +2,30 @@ from ports.ConsumerPort import ConsumerPort
 import queue
 import threading
 import time
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class MqttConsumerAdapter(ConsumerPort):
+    # Queue monitoring thresholds
+    QUEUE_WARNING_THRESHOLD = 5
+    QUEUE_CRITICAL_THRESHOLD = 10
+
     def __init__(self, mqtt_client):
         self.client = mqtt_client
         self.topic_handlers = {}
-        
-        # Threaded processing
+
+        # Threaded processing with monitoring
         self.message_queue = queue.Queue()
         self.is_running = True
         self.worker_thread = threading.Thread(target=self._worker, daemon=True)
         self.worker_thread.start()
+
+        # Queue monitoring stats
+        self._max_queue_depth = 0
+        self._total_messages_processed = 0
+        self._queue_warnings = 0
 
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
@@ -58,21 +71,66 @@ class MqttConsumerAdapter(ConsumerPort):
         self.message_queue.put((msg.topic, msg.payload))
 
     def _worker(self):
-        """Background thread to process messages from the queue."""
-        print("Worker thread started.")
+        """Background thread to process messages from the queue with monitoring."""
+        print("Worker thread started (with queue monitoring).")
         while self.is_running:
             try:
+                # Monitor queue depth before processing
+                queue_depth = self.message_queue.qsize()
+                self._max_queue_depth = max(self._max_queue_depth, queue_depth)
+
+                # Log warnings for queue backlog
+                if queue_depth >= self.QUEUE_CRITICAL_THRESHOLD:
+                    logger.error(
+                        f"🚨 CRITICAL: MQTT queue backlog: {queue_depth} messages. "
+                        f"Processing may be falling behind. Consider scaling."
+                    )
+                    self._queue_warnings += 1
+                elif queue_depth >= self.QUEUE_WARNING_THRESHOLD:
+                    logger.warning(
+                        f"⚠️ WARNING: MQTT queue depth elevated: {queue_depth} messages. "
+                        f"Monitor for sustained backlog."
+                    )
+                    self._queue_warnings += 1
+
                 # Get message with timeout to allow checking is_running
                 try:
                     topic, payload = self.message_queue.get(timeout=1.0)
                 except queue.Empty:
                     continue
 
+                # Process message and track stats
+                start_time = time.time()
                 self._process_message(topic, payload)
+                processing_time = time.time() - start_time
+
                 self.message_queue.task_done()
-                
+                self._total_messages_processed += 1
+
+                # Log slow processing (> 2 seconds)
+                if processing_time > 2.0:
+                    logger.warning(
+                        f"⏱️ Slow message processing: {processing_time:.2f}s for topic {topic}"
+                    )
+
+                # Periodic stats (every 100 messages)
+                if self._total_messages_processed % 100 == 0:
+                    logger.info(
+                        f"📊 MQTT Stats: {self._total_messages_processed} processed, "
+                        f"max queue depth: {self._max_queue_depth}, warnings: {self._queue_warnings}"
+                    )
+
             except Exception as e:
-                print(f"Error in worker thread: {e}")
+                logger.error(f"Error in worker thread: {e}")
+
+    def get_queue_stats(self) -> dict:
+        """Return current queue statistics for monitoring."""
+        return {
+            "current_depth": self.message_queue.qsize(),
+            "max_depth": self._max_queue_depth,
+            "total_processed": self._total_messages_processed,
+            "warnings": self._queue_warnings,
+        }
 
     def _process_message(self, topic, payload):
         """Actual message processing logic."""
