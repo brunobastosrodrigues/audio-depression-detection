@@ -359,53 +359,8 @@
    },
 
    "9_recurrent_thoughts_of_death_or_being_suicidal": {
-      "_rationale": "Requires careful clinical validation. Uses spectral markers and voicing patterns as potential indicators.",
-      "metrics": {
-         "silence_ratio": {
-            "weight": 1.0,
-            "correlation": "linear",
-            "direction": "positive",
-            "clipping_threshold": 3.0,
-            "_note": "Withdrawal from communication"
-         },
-         "f0_cv": {
-            "weight": 1.0,
-            "correlation": "linear",
-            "direction": "negative",
-            "clipping_threshold": 3.0,
-            "_note": "Extreme monotonicity"
-         },
-         "psd-4": {
-            "weight": 1.0,
-            "correlation": "linear",
-            "direction": "both",
-            "clipping_threshold": 3.0
-         },
-         "psd-5": {
-            "weight": 1.0,
-            "correlation": "linear",
-            "direction": "both",
-            "clipping_threshold": 3.0
-         },
-         "psd-7": {
-            "weight": 1.0,
-            "correlation": "linear",
-            "direction": "both",
-            "clipping_threshold": 3.0
-         },
-         "t13": {
-            "weight": 1.0,
-            "correlation": "linear",
-            "direction": "positive",
-            "clipping_threshold": 3.0
-         },
-         "voiced16_20": {
-            "weight": 1.0,
-            "correlation": "linear",
-            "direction": "negative",
-            "clipping_threshold": 3.0
-         }
-      },
+      "_rationale": "Not acoustically measurable - requires verbal content analysis or clinical self-report (PHQ-9 item 9).",
+      "metrics": {},
       "smoothing_factor": 0.8667,
       "severity_threshold": 0.5
    }

@@ -304,39 +304,9 @@
       "severity_threshold": 0.5
    },
    "9_recurrent_thoughts_of_death_or_being_suicidal": {
-      "metrics": {
-         "psd-4": {
-            "weight": 1.0,
-            "correlation": "linear",
-            "direction": "both",
-            "clipping_threshold": 3.0
-         },
-         "psd-5": {
-            "weight": 1.0,
-            "correlation": "linear",
-            "direction": "both",
-            "clipping_threshold": 3.0
-         },
-         "psd-7": {
-            "weight": 1.0,
-            "correlation": "linear",
-            "direction": "both",
-            "clipping_threshold": 3.0
-         },
-         "t13": {
-            "weight": 1.0,
-            "correlation": "linear",
-            "direction": "positive",
-            "clipping_threshold": 3.0
-         },
-         "voiced16_20": {
-            "weight": 1.0,
-            "correlation": "linear",
-            "direction": "negative",
-            "clipping_threshold": 3.0
-         }
-      },
+      "metrics": {},
       "smoothing_factor": 0.8667,
-      "severity_threshold": 0.5
+      "severity_threshold": 0.5,
+      "_comment": "Not acoustically measurable - requires content analysis or self-report"
    }
 }
