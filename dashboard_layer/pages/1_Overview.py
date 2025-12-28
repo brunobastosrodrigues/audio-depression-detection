@@ -26,14 +26,14 @@ apply_custom_css()
 
 st.title("Your Wellness Overview")
 
+# --- SIDEBAR ---
+# Mode selector MUST be called first to initialize session state
+render_mode_selector()
+
 # --- DATABASE CONNECTION ---
 db = get_database()
 collection_indicators = db["indicator_scores"]
 collection_phq9 = db["phq9_submissions"]
-
-
-# --- SIDEBAR ---
-render_mode_selector()
 
 st.sidebar.title("Actions")
 

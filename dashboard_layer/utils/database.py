@@ -191,11 +191,11 @@ def render_mode_selector():
         "Scene_Forensics",
     ]
 
-    # Legacy page always hidden
-    legacy_hidden = ["Indicators_Legacy"]
+    # Pages always hidden from navigation
+    always_hidden = []
 
     if current_mode == "demo":
-        hidden_pages = live_only_pages + ["Data_Tools"] + legacy_hidden
+        hidden_pages = live_only_pages + ["Data_Tools"] + always_hidden
         selectors = ", ".join([f'div[data-testid="stSidebarNav"] a[href*="{p}"]' for p in hidden_pages])
         css_to_inject = f"""
             <style>
@@ -205,7 +205,7 @@ def render_mode_selector():
             </style>
         """
     elif current_mode == "live":
-        hidden_pages = ["Data_Tools"] + legacy_hidden
+        hidden_pages = ["Data_Tools"] + always_hidden
         selectors = ", ".join([f'div[data-testid="stSidebarNav"] a[href*="{p}"]' for p in hidden_pages])
         css_to_inject = f"""
             <style>
@@ -215,7 +215,7 @@ def render_mode_selector():
             </style>
         """
     elif current_mode == "dataset":
-        hidden_pages = live_only_pages + legacy_hidden
+        hidden_pages = live_only_pages + always_hidden
         selectors = ", ".join([f'div[data-testid="stSidebarNav"] a[href*="{p}"]' for p in hidden_pages])
         css_to_inject = f"""
             <style>

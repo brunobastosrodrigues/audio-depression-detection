@@ -31,13 +31,13 @@ apply_custom_css()
 st.title("Longitudinal Trends")
 st.markdown("Track how your patterns change over time and identify emerging trends.")
 
+# --- SIDEBAR ---
+# Mode selector MUST be called first to initialize session state
+render_mode_selector()
+
 # --- DATABASE CONNECTION ---
 db = get_database()
 collection_indicators = db["indicator_scores"]
-
-
-# --- SIDEBAR ---
-render_mode_selector()
 
 st.sidebar.title("Actions")
 

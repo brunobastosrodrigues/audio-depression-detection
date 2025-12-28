@@ -35,14 +35,14 @@ apply_custom_css()
 
 st.title("DSM-5 Indicators")
 
+# --- SIDEBAR ---
+# Mode selector MUST be called first to initialize session state
+render_mode_selector()
+
 # --- DATABASE CONNECTION ---
 db = get_database()
 collection_indicators = db["indicator_scores"]
 collection_metrics = db["analyzed_metrics"]
-
-
-# --- SIDEBAR ---
-render_mode_selector()
 
 st.sidebar.title("Actions")
 
@@ -346,6 +346,132 @@ elif view_mode == "Clinical Analysis":
                 """,
                 unsafe_allow_html=True,
             )
+
+            # --- XAI EXPLANATION SECTION ---
+            explanations = latest_doc.get("explanations", {})
+            ind_explanation = explanations.get(selected_indicator, {})
+
+            if ind_explanation:
+                confidence = ind_explanation.get("confidence", 0.0)
+                data_quality = ind_explanation.get("data_quality", "unknown")
+                explanation_text = ind_explanation.get("text", "")
+                top_contributors = ind_explanation.get("top_contributors", [])
+
+                # Data quality badge colors
+                quality_colors = {
+                    "full": {"bg": "#22c55e20", "border": "#22c55e", "text": "#22c55e", "icon": "✓"},
+                    "partial": {"bg": "#f59e0b20", "border": "#f59e0b", "text": "#f59e0b", "icon": "⚠"},
+                    "insufficient": {"bg": "#ef444420", "border": "#ef4444", "text": "#ef4444", "icon": "✗"},
+                }
+                qc = quality_colors.get(data_quality, quality_colors["partial"])
+
+                # Confidence bar color
+                if confidence >= 0.8:
+                    conf_color = COLORS["success"]
+                elif confidence >= 0.5:
+                    conf_color = COLORS["warning"]
+                else:
+                    conf_color = COLORS["danger"]
+
+                st.markdown("#### AI Explanation")
+
+                # Confidence and quality badges
+                st.markdown(
+                    f"""
+                    <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 0.75rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="color: {COLORS['text_secondary']}; font-size: 0.85rem;">Confidence:</span>
+                            <div style="
+                                width: 100px;
+                                height: 8px;
+                                background: {COLORS['border']};
+                                border-radius: 4px;
+                                overflow: hidden;
+                            ">
+                                <div style="
+                                    width: {confidence * 100}%;
+                                    height: 100%;
+                                    background: {conf_color};
+                                    border-radius: 4px;
+                                "></div>
+                            </div>
+                            <span style="font-weight: 600; color: {conf_color};">{confidence:.0%}</span>
+                        </div>
+                        <div style="
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 0.25rem;
+                            padding: 0.25rem 0.5rem;
+                            background: {qc['bg']};
+                            border: 1px solid {qc['border']};
+                            border-radius: 4px;
+                            font-size: 0.75rem;
+                            color: {qc['text']};
+                        ">
+                            {qc['icon']} {data_quality.title()} Data
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+                # Explanation text box
+                if explanation_text:
+                    # Dim the box if confidence is low
+                    opacity = "1.0" if confidence >= 0.5 else "0.7"
+                    st.markdown(
+                        f"""
+                        <div style="
+                            background: {COLORS['background']};
+                            border-left: 3px solid {conf_color};
+                            padding: 0.75rem 1rem;
+                            border-radius: 0 8px 8px 0;
+                            margin-bottom: 1rem;
+                            opacity: {opacity};
+                        ">
+                            <div style="font-size: 0.9rem; color: {COLORS['text_primary']};">
+                                {explanation_text}
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+                # Top contributors chips
+                if top_contributors:
+                    chips_html = ""
+                    for contrib in top_contributors[:3]:
+                        z = contrib.get("z_score", 0)
+                        chip_color = COLORS["danger"] if z > 0 else COLORS["success"]
+                        sign = "+" if z > 0 else ""
+                        chips_html += f"""
+                            <span style="
+                                display: inline-flex;
+                                align-items: center;
+                                gap: 0.25rem;
+                                padding: 0.25rem 0.5rem;
+                                background: {chip_color}15;
+                                border: 1px solid {chip_color}40;
+                                border-radius: 12px;
+                                font-size: 0.8rem;
+                                margin-right: 0.5rem;
+                                margin-bottom: 0.5rem;
+                            ">
+                                <span style="font-weight: 500;">{contrib.get('friendly_name', contrib.get('metric', ''))}</span>
+                                <span style="color: {chip_color}; font-weight: 600;">{sign}{z:.1f}σ</span>
+                            </span>
+                        """
+                    st.markdown(
+                        f"""
+                        <div style="margin-bottom: 1rem;">
+                            <span style="font-size: 0.85rem; color: {COLORS['text_secondary']}; margin-right: 0.5rem;">Top factors:</span>
+                            {chips_html}
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+                st.divider()
 
             # Waterfall chart - Feature contributions
             st.markdown("#### Feature Contributions")

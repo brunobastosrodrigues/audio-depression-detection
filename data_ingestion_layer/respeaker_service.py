@@ -57,7 +57,7 @@ class BoardConfig:
     def __init__(
         self,
         board_id: str,
-        user_id: int,
+        user_id: str,  # UUID string or "unassigned"
         mac_address: str,
         name: str,
         environment_id: str,
@@ -174,14 +174,14 @@ class ReSpeakerService:
         env_name = config.environment_name.lower().replace(" ", "_") or "unknown"
         return f"voice/{config.user_id}/{config.board_id}/{env_name}"
 
-    def register_unknown_board(self, mac_address: str, default_user_id: int = 1) -> BoardConfig:
+    def register_unknown_board(self, mac_address: str, default_user_id: str = "unassigned") -> BoardConfig:
         """Auto-register a board that's not in the database."""
         board_id = str(uuid.uuid4())
         now = datetime.utcnow()
 
         board_doc = {
             "board_id": board_id,
-            "user_id": default_user_id,
+            "user_id": default_user_id,  # String UUID or "unassigned"
             "mac_address": mac_address,
             "name": f"Auto-registered ({mac_address[-8:]})",
             "environment_id": "default",

@@ -15,6 +15,9 @@ import streamlit as st
 from typing import Dict, List, Optional, Tuple
 from utils.database import get_database, get_current_mode
 
+# Cache TTL in seconds
+CACHE_TTL = 60
+
 # Session state key for user selection
 USER_ID_KEY = "user_id"
 
@@ -48,16 +51,15 @@ def get_user_calibration_status(user_id: str, db=None) -> Tuple[bool, int]:
         return False, 0
 
 
-def load_users_with_status() -> List[Dict]:
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def _load_users_with_status_cached(mode: str) -> List[Dict]:
     """
-    Load all users with their calibration status.
-
-    Returns:
-        List of user dicts with added 'status' and 'has_calibration' fields
+    Internal cached function to load users with status.
+    Separated to allow proper caching with mode as cache key.
     """
-    db = get_database()
-    mode = get_current_mode()
+    from utils.database import get_database  # Import here to avoid circular import
 
+    db = get_database(mode)
     users = []
 
     if mode == "live":
@@ -68,10 +70,17 @@ def load_users_with_status() -> List[Dict]:
                 {"_id": 0, "user_id": 1, "name": 1, "role": 1}
             ))
 
+            # Batch fetch enrolled user IDs (fixes N+1 pattern)
+            voice_collection = db["voice_profiling"]
+            enrolled_users = {
+                doc["user_id"]: 1
+                for doc in voice_collection.find({}, {"user_id": 1})
+            }
+
             for user in registered_users:
-                has_cal, count = get_user_calibration_status(user["user_id"], db)
+                has_cal = user["user_id"] in enrolled_users
                 user["has_calibration"] = has_cal
-                user["embedding_count"] = count
+                user["embedding_count"] = enrolled_users.get(user["user_id"], 0)
                 user["status"] = "live" if has_cal else "uncalibrated"
                 users.append(user)
 
@@ -98,6 +107,17 @@ def load_users_with_status() -> List[Dict]:
             })
 
     return users
+
+
+def load_users_with_status() -> List[Dict]:
+    """
+    Load all users with their calibration status.
+
+    Returns:
+        List of user dicts with added 'status' and 'has_calibration' fields
+    """
+    mode = get_current_mode()
+    return _load_users_with_status_cached(mode)
 
 
 def load_users() -> List[Dict]:
@@ -207,21 +227,14 @@ def render_user_selector(sidebar: bool = True, label: str = "Select User") -> Op
     return selected_user_id
 
 
-def get_user_display_name(user_id: str) -> str:
-    """
-    Get the display name for a user ID.
-
-    Args:
-        user_id: The user's ID
-
-    Returns:
-        str: The user's name if found, otherwise the user_id itself
-    """
-    db = get_database()
-    mode = get_current_mode()
+@st.cache_data(ttl=CACHE_TTL, show_spinner=False)
+def _get_user_display_name_cached(user_id: str, mode: str) -> str:
+    """Internal cached function for user display name lookup."""
+    from utils.database import get_database
 
     if mode == "live":
         try:
+            db = get_database(mode)
             user = db["users"].find_one(
                 {"user_id": user_id},
                 {"_id": 0, "name": 1}
@@ -232,6 +245,20 @@ def get_user_display_name(user_id: str) -> str:
             pass
 
     return str(user_id)
+
+
+def get_user_display_name(user_id: str) -> str:
+    """
+    Get the display name for a user ID.
+
+    Args:
+        user_id: The user's ID
+
+    Returns:
+        str: The user's name if found, otherwise the user_id itself
+    """
+    mode = get_current_mode()
+    return _get_user_display_name_cached(user_id, mode)
 
 
 def get_selected_user_info() -> Optional[Dict]:
@@ -257,3 +284,12 @@ def is_selected_user_calibrated() -> bool:
         bool: True if calibrated, False otherwise
     """
     return st.session_state.get("selected_user_calibrated", True)
+
+
+def clear_user_cache():
+    """
+    Clear all user-related caches.
+    Call this after user enrollment, deletion, or voice profile updates.
+    """
+    _load_users_with_status_cached.clear()
+    _get_user_display_name_cached.clear()

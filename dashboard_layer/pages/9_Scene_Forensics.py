@@ -434,6 +434,9 @@ with col_h1:
         latest_log = recent_logs[0]
         latest_time = latest_log.get("timestamp")
         if latest_time:
+            # Handle naive datetime from MongoDB by assuming UTC
+            if latest_time.tzinfo is None:
+                latest_time = latest_time.replace(tzinfo=timezone.utc)
             age = (datetime.now(timezone.utc) - latest_time).total_seconds()
             if age < 30:
                 st.success(f"Pipeline Active (last log {age:.0f}s ago)")

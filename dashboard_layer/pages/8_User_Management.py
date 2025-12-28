@@ -10,10 +10,21 @@ import tempfile
 import os
 import uuid
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 
 from utils.database import get_database, render_mode_selector, get_current_mode
+from utils.user_selector import (
+    render_user_selector,
+    get_user_display_name,
+    is_selected_user_calibrated,
+    get_selected_user_info,
+    clear_user_cache,
+)
+from utils.alerts import show_toast
 
 # Import BoardRecorder
 try:
@@ -178,7 +189,7 @@ st.divider()
 # TABS
 # =============================================================================
 
-tab1, tab2, tab3 = st.tabs(["📋 User Roster", "➕ Enroll New User", "🔍 Test Recognition"])
+tab1, tab2, tab3, tab4 = st.tabs(["📋 User Roster", "➕ Enroll New User", "🔍 Test Recognition", "📡 Live Monitor"])
 
 # =============================================================================
 # TAB 1: USER ROSTER
@@ -192,15 +203,19 @@ with tab1:
     else:
         st.markdown(f"**{len(users)} registered user(s)**")
 
-        # Check voice enrollment status for each user
+        # Batch fetch all enrolled user IDs (fixes N+1 query)
         voice_profiling_collection = db["voice_profiling"]
+        enrolled_user_ids = set(
+            doc["user_id"]
+            for doc in voice_profiling_collection.find({}, {"user_id": 1})
+        )
 
         # Create a table-like display
         for user in users:
             user_id = user.get('user_id', 'N/A')
 
-            # Check if user has voice enrollment
-            has_voice_enrollment = voice_profiling_collection.find_one({"user_id": user_id}) is not None
+            # Check if user has voice enrollment (O(1) set lookup)
+            has_voice_enrollment = user_id in enrolled_user_ids
 
             with st.container():
                 col1, col2, col3, col4, col5, col6 = st.columns([3, 2, 2, 2, 1, 1])
@@ -252,6 +267,7 @@ with tab1:
                 with col6:
                     if st.button("🗑️", key=f"del_{user_id}", help="Delete user"):
                         if delete_user(user_id):
+                            clear_user_cache()  # Invalidate cache after deletion
                             st.success(f"User '{user.get('name')}' deleted.")
                             time.sleep(0.5)
                             st.rerun()
@@ -376,6 +392,7 @@ These take the shape of a long round arch, with its path high above."""
                             os.remove(tmp_path)
 
                             if success:
+                                clear_user_cache()  # Invalidate cache after profile update
                                 st.success(f"Voice profile updated for {cal_user_name}!")
 
                                 # Clear calibration state
@@ -579,14 +596,15 @@ a boiling pot of gold at one end. People look, but no one ever finds it."""
                 os.remove(tmp_path)
                 
                 if success:
+                    clear_user_cache()  # Invalidate cache after enrollment
                     st.success(f"🎉 User '{user_name}' enrolled successfully!")
                     st.balloons()
-                    
+
                     # Clear session state
                     for key in ["enrollment_audio_data", "enrollment_audio_file", "enrollment_method"]:
                         if key in st.session_state:
                             del st.session_state[key]
-                    
+
                     time.sleep(1.5)
                     st.rerun()
                 else:
@@ -705,6 +723,288 @@ with tab3:
 
                     except Exception as e:
                         st.error(f"Recognition error: {e}")
+
+
+# =============================================================================
+# TAB 4: LIVE MONITOR
+# =============================================================================
+
+with tab4:
+    st.header("Live Monitor")
+    st.markdown("""
+    Real-time audio pipeline monitoring and speaker verification status.
+    Monitor gatekeeper decisions, context classification, and data quality.
+    """)
+
+    # User selector for monitoring
+    st.markdown("#### Select User to Monitor")
+    selected_user = render_user_selector()
+
+    if not selected_user:
+        st.warning("No users available. Register a user first using the 'Enroll New User' tab.")
+    else:
+        user_display_name = get_user_display_name(selected_user)
+
+        # Calibration check
+        if not is_selected_user_calibrated():
+            st.warning(
+                f"⚠️ Voice profile missing for {user_display_name}. "
+                "Data is being discarded by the gatekeeper. "
+                "Use the 'User Roster' tab to calibrate this user's voice."
+            )
+
+        # Time window selector
+        time_window = st.selectbox(
+            "Time Window",
+            options=[1, 5, 15, 30, 60],
+            index=1,
+            format_func=lambda x: f"Last {x} min",
+            key="live_monitor_time_window"
+        )
+
+        col_refresh, _ = st.columns([1, 3])
+        with col_refresh:
+            if st.button("🔄 Refresh", key="live_monitor_refresh"):
+                st.rerun()
+
+        st.divider()
+
+        # --- DATA LOADING ---
+        cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=time_window)
+
+        # Load scene logs
+        scene_logs_collection = db["scene_logs"]
+        scene_logs = list(scene_logs_collection.find({
+            "user_id": selected_user,
+            "timestamp": {"$gte": cutoff_time}
+        }).sort("timestamp", -1).limit(500))
+
+        # Load indicator scores
+        indicator_collection = db["indicator_scores"]
+        indicator_docs = list(
+            indicator_collection.find({"user_id": selected_user}).sort("timestamp", -1).limit(50)
+        )
+
+        # =============================================================================
+        # LIVE STATUS PANEL
+        # =============================================================================
+        st.subheader("🔴 Pipeline Status")
+
+        col_status1, col_status2, col_status3, col_status4 = st.columns(4)
+
+        with col_status1:
+            if scene_logs:
+                latest_log = scene_logs[0]
+                log_ts = latest_log.get("timestamp", datetime.now(timezone.utc))
+                # Handle naive datetime from MongoDB by assuming UTC
+                if log_ts.tzinfo is None:
+                    log_ts = log_ts.replace(tzinfo=timezone.utc)
+                age = (datetime.now(timezone.utc) - log_ts).total_seconds()
+                if age < 30:
+                    st.success("Pipeline Active")
+                    st.caption(f"Last update: {age:.0f}s ago")
+                elif age < 120:
+                    st.warning("Pipeline Slow")
+                    st.caption(f"Last update: {age:.0f}s ago")
+                else:
+                    st.error("Pipeline Stale")
+                    st.caption(f"Last update: {age:.0f}s ago")
+            else:
+                st.info("No scene data")
+                st.caption("Waiting for audio...")
+
+        with col_status2:
+            if scene_logs:
+                df_scene = pd.DataFrame(scene_logs)
+                processed = len(df_scene[df_scene["decision"] == "process"])
+                total = len(df_scene)
+                rate = (processed / total * 100) if total > 0 else 0
+                st.metric("Data Quality", f"{rate:.0f}%", delta=f"{processed}/{total} chunks")
+            else:
+                st.metric("Data Quality", "N/A")
+
+        with col_status3:
+            if scene_logs:
+                df_scene = pd.DataFrame(scene_logs)
+                if "context" in df_scene.columns:
+                    dominant = df_scene["context"].mode().iloc[0] if len(df_scene["context"].mode()) > 0 else "unknown"
+                    context_icons = {
+                        "solo_activity": "🎤 Solo",
+                        "social_interaction": "👥 Social",
+                        "background_noise_tv": "📺 Background",
+                        "unknown": "❓ Unknown",
+                    }
+                    st.metric("Room Context", context_icons.get(dominant, dominant))
+                else:
+                    st.metric("Room Context", "N/A")
+            else:
+                st.metric("Room Context", "N/A")
+
+        with col_status4:
+            if indicator_docs:
+                latest_scores = indicator_docs[0].get("indicator_scores", {})
+                active_count = sum(1 for v in latest_scores.values() if v is not None and v >= 0.5)
+                st.metric("Active Indicators", f"{active_count}/9")
+            else:
+                st.metric("Active Indicators", "N/A")
+
+        st.divider()
+
+        # =============================================================================
+        # SUB-TABS: SCENE ANALYSIS | RAW DATA
+        # =============================================================================
+        subtab_scene, subtab_data = st.tabs([
+            "🔬 Scene Analysis",
+            "📋 Raw Data",
+        ])
+
+        # --- SCENE ANALYSIS SUB-TAB ---
+        with subtab_scene:
+            if not scene_logs:
+                st.info("No scene logs found. Ensure audio is being processed and a board is connected.")
+            else:
+                df_scene = pd.DataFrame(scene_logs)
+                df_scene["timestamp"] = pd.to_datetime(df_scene["timestamp"])
+
+                # Metrics row
+                col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+
+                processed = len(df_scene[df_scene["decision"] == "process"])
+                discarded = len(df_scene[df_scene["decision"] == "discard"])
+                total = len(df_scene)
+
+                with col_s1:
+                    st.metric("Processed", processed, delta=f"{(processed/total*100):.0f}%" if total > 0 else "0%")
+                with col_s2:
+                    st.metric("Discarded", discarded)
+                with col_s3:
+                    if "similarity" in df_scene.columns:
+                        avg_sim = df_scene[df_scene["similarity"] > 0]["similarity"].mean()
+                        st.metric("Avg Similarity", f"{avg_sim:.2f}" if pd.notna(avg_sim) else "N/A")
+                    else:
+                        st.metric("Avg Similarity", "N/A")
+                with col_s4:
+                    error_count = len(df_scene[df_scene.get("classification", "") == "error"]) if "classification" in df_scene.columns else 0
+                    st.metric("Errors", error_count)
+
+                st.markdown("---")
+
+                # Decision timeline
+                st.markdown("##### Gatekeeper Decisions")
+
+                df_sorted = df_scene.sort_values("timestamp")
+
+                fig = px.scatter(
+                    df_sorted,
+                    x="timestamp",
+                    y="classification",
+                    color="decision",
+                    color_discrete_map={
+                        "process": "#22c55e",
+                        "discard": "#9ca3af",
+                    },
+                    hover_data=["similarity", "context"],
+                    opacity=[1.0 if d == "process" else 0.4 for d in df_sorted["decision"]],
+                )
+                fig.update_layout(height=300, showlegend=True)
+                st.plotly_chart(fig, use_container_width=True)
+
+                # Context distribution
+                st.markdown("##### Context Classification")
+
+                if "context" in df_scene.columns:
+                    context_counts = df_scene["context"].value_counts()
+
+                    col_ctx1, col_ctx2 = st.columns([1, 2])
+
+                    with col_ctx1:
+                        for ctx, count in context_counts.items():
+                            pct = (count / len(df_scene)) * 100
+                            ctx_style = {
+                                "solo_activity": ("🎤", "#22c55e"),
+                                "social_interaction": ("👥", "#8b5cf6"),
+                                "background_noise_tv": ("📺", "#9ca3af"),
+                                "unknown": ("❓", "#6b7280"),
+                            }.get(ctx, ("❓", "#6b7280"))
+
+                            st.markdown(
+                                f"""
+                                <div style="
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 0.5rem;
+                                    padding: 0.5rem;
+                                    background: {ctx_style[1]}15;
+                                    border-radius: 8px;
+                                    margin-bottom: 0.5rem;
+                                ">
+                                    <span style="font-size: 1.2rem;">{ctx_style[0]}</span>
+                                    <span style="flex: 1; font-weight: 500;">{ctx.replace('_', ' ').title()}</span>
+                                    <span style="font-weight: 600;">{pct:.0f}%</span>
+                                </div>
+                                """,
+                                unsafe_allow_html=True,
+                            )
+
+                    with col_ctx2:
+                        fig_ctx = px.pie(
+                            values=context_counts.values,
+                            names=context_counts.index,
+                            color=context_counts.index,
+                            color_discrete_map={
+                                "solo_activity": "#22c55e",
+                                "social_interaction": "#8b5cf6",
+                                "background_noise_tv": "#9ca3af",
+                                "unknown": "#6b7280",
+                            },
+                        )
+                        fig_ctx.update_traces(textposition='inside', textinfo='percent+label')
+                        fig_ctx.update_layout(height=220, showlegend=False)
+                        st.plotly_chart(fig_ctx, use_container_width=True)
+
+        # --- RAW DATA SUB-TAB ---
+        with subtab_data:
+            st.markdown("##### Recent Data")
+
+            data_source = st.selectbox(
+                "Data Source",
+                ["Scene Logs", "Raw Metrics", "Indicator Scores"],
+                key="live_monitor_data_source"
+            )
+
+            if data_source == "Scene Logs":
+                if scene_logs:
+                    df_display = pd.DataFrame(scene_logs)
+                    cols_to_show = ["timestamp", "classification", "context", "decision", "similarity"]
+                    available = [c for c in cols_to_show if c in df_display.columns]
+                    st.dataframe(df_display[available].head(100), use_container_width=True)
+                else:
+                    st.info("No scene logs available.")
+
+            elif data_source == "Raw Metrics":
+                raw_collection = db["raw_metrics"]
+                raw_docs = list(raw_collection.find({"user_id": selected_user}).sort("timestamp", -1).limit(100))
+                if raw_docs:
+                    df_raw = pd.DataFrame(raw_docs)
+                    if "timestamp" in df_raw.columns and "metric_name" in df_raw.columns:
+                        df_pivot = df_raw.pivot_table(
+                            index="timestamp",
+                            columns="metric_name",
+                            values="metric_value",
+                            aggfunc="first"
+                        ).reset_index()
+                        st.dataframe(df_pivot.head(50), use_container_width=True)
+                    else:
+                        st.dataframe(df_raw.head(50), use_container_width=True)
+                else:
+                    st.info("No raw metrics available.")
+
+            elif data_source == "Indicator Scores":
+                if indicator_docs:
+                    df_ind = pd.DataFrame(indicator_docs)
+                    st.dataframe(df_ind[["timestamp", "indicator_scores"]].head(50), use_container_width=True)
+                else:
+                    st.info("No indicator scores available.")
 
 
 # =============================================================================

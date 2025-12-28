@@ -10,7 +10,7 @@ import os
 from utils.refresh_procedure import refresh_procedure
 from utils.setup_db import setup_indexes
 from utils.database import get_database, render_mode_selector, render_mode_badge, get_current_mode
-from utils.user_selector import render_user_selector
+from utils.user_selector import render_user_selector, get_user_display_name, load_users_with_status
 
 # Initialize database indexes
 try:
@@ -24,13 +24,13 @@ st.set_page_config(
     layout="wide",
 )
 
-# --- DATABASE CONNECTION ---
-db = get_database()
-
-
 # --- SIDEBAR ---
-# Mode selector at top of sidebar
+# Mode selector MUST be called first to initialize session state with default mode
 render_mode_selector()
+
+# --- DATABASE CONNECTION ---
+# Now get database AFTER mode is initialized (defaults to "demo")
+db = get_database()
 
 st.sidebar.title("Actions")
 
@@ -44,8 +44,95 @@ selected_user = render_user_selector()
 st.title("IHearYou")
 st.markdown("### Linking Acoustic Speech Features with Major Depressive Disorder Symptoms")
 
-# Quick status card if user is selected
+# Get current mode
+current_mode = get_current_mode()
+
+# In Live mode, show multi-user overview
+if current_mode == "live":
+    all_users = load_users_with_status()
+
+    if all_users:
+        # Calculate status for each user
+        user_statuses = {"normal": 0, "monitoring": 0, "attention": 0, "no_data": 0}
+
+        for user in all_users:
+            uid = user["user_id"]
+            latest_doc = db["indicator_scores"].find_one(
+                {"user_id": uid}, sort=[("timestamp", -1)]
+            )
+            if latest_doc:
+                scores = latest_doc.get("indicator_scores", {})
+                active = sum(1 for v in scores.values() if v is not None and v >= 0.5)
+                has_core = any(
+                    k.startswith("1_") or k.startswith("2_")
+                    for k, v in scores.items() if v is not None and v >= 0.5
+                )
+                if active >= 5 and has_core:
+                    user_statuses["attention"] += 1
+                elif active >= 3:
+                    user_statuses["monitoring"] += 1
+                else:
+                    user_statuses["normal"] += 1
+            else:
+                user_statuses["no_data"] += 1
+
+        # Display multi-user overview
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            st.markdown(
+                f"""
+                <div style="padding: 1rem; background: #3b82f615; border-radius: 8px; border-left: 4px solid #3b82f6;">
+                    <div style="color: #7F8C8D; font-size: 0.9rem;">Tracked Users</div>
+                    <div style="font-size: 1.5rem; font-weight: 600; color: #3b82f6;">{len(all_users)}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        with col2:
+            attention_color = "#E74C3C" if user_statuses["attention"] > 0 else "#27AE60"
+            st.markdown(
+                f"""
+                <div style="padding: 1rem; background: {attention_color}15; border-radius: 8px; border-left: 4px solid {attention_color};">
+                    <div style="color: #7F8C8D; font-size: 0.9rem;">Needs Attention</div>
+                    <div style="font-size: 1.5rem; font-weight: 600; color: {attention_color};">{user_statuses["attention"]}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        with col3:
+            st.markdown(
+                f"""
+                <div style="padding: 1rem; background: #F39C1215; border-radius: 8px; border-left: 4px solid #F39C12;">
+                    <div style="color: #7F8C8D; font-size: 0.9rem;">Monitoring</div>
+                    <div style="font-size: 1.5rem; font-weight: 600; color: #F39C12;">{user_statuses["monitoring"]}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        with col4:
+            st.markdown(
+                f"""
+                <div style="padding: 1rem; background: #27AE6015; border-radius: 8px; border-left: 4px solid #27AE60;">
+                    <div style="color: #7F8C8D; font-size: 0.9rem;">Normal</div>
+                    <div style="font-size: 1.5rem; font-weight: 600; color: #27AE60;">{user_statuses["normal"]}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+    else:
+        st.info("No users registered. Go to User Management to add users.")
+
+# Show selected user details (for all modes)
 if selected_user:
+    # Get user display name
+    user_display_name = get_user_display_name(selected_user)
+
     # Get latest indicator data
     latest_doc = db["indicator_scores"].find_one(
         {"user_id": selected_user}, sort=[("timestamp", -1)]
@@ -72,6 +159,10 @@ if selected_user:
         else:
             status = "Normal"
             status_color = "#27AE60"
+
+        # Section header for selected user
+        if current_mode == "live":
+            st.markdown(f"### Selected User: {user_display_name}")
 
         # Display status card
         col1, col2, col3, col4 = st.columns(4)
@@ -103,7 +194,7 @@ if selected_user:
                 f"""
                 <div style="padding: 1rem; background: #F8F9FA; border-radius: 8px;">
                     <div style="color: #7F8C8D; font-size: 0.9rem;">User</div>
-                    <div style="font-size: 1.5rem; font-weight: 600; color: #2C3E50;">{selected_user}</div>
+                    <div style="font-size: 1.5rem; font-weight: 600; color: #2C3E50;">{user_display_name}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
