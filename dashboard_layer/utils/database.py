@@ -196,7 +196,7 @@ def render_mode_selector():
     always_hidden = []
 
     if current_mode == "demo":
-        hidden_pages = live_only_pages + ["Data_Tools"] + always_hidden
+        hidden_pages = live_only_pages + ["Data_Tools", "Research_Validation"] + always_hidden
         selectors = ", ".join([f'div[data-testid="stSidebarNav"] a[href*="{p}"]' for p in hidden_pages])
         css_to_inject = f"""
             <style>
@@ -206,7 +206,7 @@ def render_mode_selector():
             </style>
         """
     elif current_mode == "live":
-        hidden_pages = ["Data_Tools"] + always_hidden
+        hidden_pages = ["Data_Tools", "Research_Validation"] + always_hidden
         selectors = ", ".join([f'div[data-testid="stSidebarNav"] a[href*="{p}"]' for p in hidden_pages])
         css_to_inject = f"""
             <style>
