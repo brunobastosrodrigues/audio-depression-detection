@@ -36,6 +36,15 @@ The dashboard supports three operating modes, each with its own isolated MongoDB
 | **Dataset** | `iotsensing_dataset` | Research validation mode. Pre-loaded with TESS dataset cohorts (Depressed/Non-Depressed) for hypothesis testing and statistical analysis. |
 | **Demo** | `iotsensing_demo` | Golden demo data for presentations and showcases. Pre-seeded with realistic patterns for two simulated users. |
 
+### Demo Mode
+![Demo Mode](docs/assets/ihearyou-demopage.png)
+
+### Dataset Mode
+![Dataset Mode](docs/assets/ihearyou-datasetpage.png)
+
+### Live Mode
+![Live Mode](docs/assets/ihearyou-livepage.png)
+
 ## Data Pipeline Overview
 
 The high-level data pipeline is illustrated below. Each step in the pipeline reflects a corresponding stage in the analysis of user data.
