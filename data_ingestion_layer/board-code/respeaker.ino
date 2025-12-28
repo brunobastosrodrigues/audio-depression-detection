@@ -4,9 +4,15 @@
 #include <freertos/ringbuf.h>
 
 // ================= USER CONFIGURATION =================
-const char* ssid     = "bbr";
-const char* password = "Nopassword1";
-const char* host     = "192.168.1.34"; // <--- YOUR PC IP ADDRESS
+// IMPORTANT: Copy credentials.example.h to credentials.h and fill in your values
+// DO NOT commit credentials.h to version control!
+#include "credentials.h"
+
+// If you prefer inline config (NOT RECOMMENDED for git repos), uncomment:
+// const char* ssid     = "YOUR_WIFI_SSID";
+// const char* password = "YOUR_WIFI_PASSWORD";
+// const char* host     = "YOUR_SERVER_IP";  // IP of machine running respeaker_service
+
 const int port       = 8010;
 
 // ================= HIGH-FIDELITY AUDIO SETTINGS =================

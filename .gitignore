@@ -30,3 +30,6 @@ ex_files
 # AI assistant local guidance
 CLAUDE.md
 GEMINI.md
+
+# Board credentials (WiFi passwords, server IPs)
+**/credentials.h
