@@ -24,6 +24,10 @@ from core.extractors.dynamic_metrics_utils import (
     compute_entropy,
 )
 
+# Librosa F0 extraction parameters
+LIBROSA_FMIN = 30
+LIBROSA_FMAX = 2000
+
 
 def semitone_to_hz(semitones):
     """Convert eGeMAPS semitones (relative to 27.5 Hz) to Hz."""
@@ -48,7 +52,7 @@ def _extract_f0_contour(features_LLD, audio_signal, sr):
 
     # librosa F0 extraction
     y = np.array(audio_signal, dtype=np.float32)
-    f0_librosa, _, _ = librosa.pyin(y, fmin=30, fmax=2000, sr=sr)
+    f0_librosa, _, _ = librosa.pyin(y, fmin=LIBROSA_FMIN, fmax=LIBROSA_FMAX, sr=sr)
 
     if f0_librosa is not None:
         f0_librosa = f0_librosa[~np.isnan(f0_librosa)]
