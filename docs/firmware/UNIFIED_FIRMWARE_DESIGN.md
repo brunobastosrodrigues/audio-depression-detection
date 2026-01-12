@@ -1967,4 +1967,346 @@ Approved for implementation. Begin Phase 1 immediately. Report progress at weekl
 
 ---
 
+# ADDENDUM: RESEARCH QUESTIONS REQUIRING PI CLARIFICATION
+
+**Submitted by:** Engineering Team
+**Date:** 2026-01-11
+**Purpose:** Request for research direction on backend processing challenges
+
+---
+
+## Context
+
+The firmware design document addresses audio capture from multiple boards. However, once audio arrives at the backend, several **fundamental research questions** remain unresolved. These questions directly impact:
+- System validity in real-world deployments
+- Clinical reliability of depression indicators
+- Scientific defensibility of our claims
+
+We respectfully request the PI to clarify these open questions and assign research tasks to elucidate areas that require further investigation.
+
+---
+
+## Category 1: Multi-Occupant Household Differentiation
+
+### Q1.1: Speaker Verification Accuracy in Naturalistic Settings
+
+**Current Implementation:** D-vector embeddings with cosine similarity thresholds (HIGH: 0.70, LOW: 0.55)
+
+**Open Questions:**
+- What is the expected false acceptance rate (FAR) and false rejection rate (FRR) in home environments?
+- How do we handle voice changes due to illness, emotional state, or fatigue (all relevant to depression)?
+- Should thresholds be user-specific or universal?
+- How many enrollment samples are sufficient for reliable speaker verification?
+
+**Research Task Needed:**
+> Conduct speaker verification accuracy study in multi-occupant households with varying acoustic conditions.
+
+---
+
+### Q1.2: Distinguishing Target User from Household Members
+
+**Current Implementation:** Binary decision (target user vs. other)
+
+**Open Questions:**
+- What happens when target user speaks simultaneously with others (crosstalk)?
+- Should we track multiple target users per household (e.g., couple where both have depression)?
+- How do we handle voice similarity between family members (e.g., parent/child)?
+- Should we maintain speaker profiles for all household members to improve differentiation?
+
+**Research Task Needed:**
+> Define household speaker modeling strategy and evaluate accuracy with 2-5 occupant scenarios.
+
+---
+
+### Q1.3: Background Noise Source Identification
+
+**Current Implementation:** Basic scene classification (solo_activity, social_interaction, background_noise_tv)
+
+**Open Questions:**
+- How do we distinguish TV/radio speech from live human speech?
+- What acoustic features reliably differentiate mechanical sounds (HVAC, appliances) from speech?
+- Should we use content-based detection (music recognition, TV program fingerprinting)?
+- How do we handle mixed scenes (user speaking while TV is on)?
+
+**Proposed Acoustic Discriminators:**
+| Source | ZCR | Spectral Centroid | Temporal Consistency | Spatial (DoA) |
+|--------|-----|-------------------|---------------------|---------------|
+| Live Speech | Variable | 1-4 kHz | Variable | Changes |
+| TV Speech | Variable | 1-4 kHz | Consistent patterns | Fixed |
+| Music | Low-Medium | Wide range | Highly structured | Fixed |
+| HVAC | High | Low (< 500 Hz) | Very consistent | Fixed |
+
+**Research Task Needed:**
+> Develop multi-class audio source classifier and validate on home environment recordings.
+
+---
+
+## Category 2: Contextual Understanding
+
+### Q2.1: Temporal Context Extraction
+
+**Current Implementation:** Morning/evening/general time windows with EMA smoothing
+
+**Open Questions:**
+- What time granularity is clinically meaningful (hourly, part-of-day, daily)?
+- How do we handle shift workers or irregular sleep patterns?
+- Should context windows be personalized based on user's routine?
+- How long should the "learning period" be before making clinical inferences?
+
+**Research Task Needed:**
+> Investigate optimal temporal aggregation strategies for depression biomarkers across diverse daily routines.
+
+---
+
+### Q2.2: Environmental Context
+
+**Open Questions:**
+- Does room acoustics (reverberant kitchen vs. carpeted bedroom) affect feature extraction?
+- Should we normalize features by environment/board location?
+- How do we incorporate multi-board spatial information (user moved from living room to bedroom)?
+- Can environmental context (kitchen=social, bedroom=isolation) inform indicator weights?
+
+**Proposed Context Taxonomy:**
+```
+Environmental Context:
+├── Physical Location
+│   ├── Private (bedroom, bathroom)
+│   ├── Social (living room, kitchen)
+│   └── Transition (hallway)
+├── Activity Type (inferred)
+│   ├── Solo activity
+│   ├── Social interaction
+│   ├── Media consumption
+│   └── Silence/absence
+├── Time of Day
+│   ├── Morning (wake to noon)
+│   ├── Afternoon (noon to 6pm)
+│   ├── Evening (6pm to sleep)
+│   └── Night (sleep hours)
+└── Day Type
+    ├── Weekday
+    └── Weekend
+```
+
+**Research Task Needed:**
+> Define context ontology and validate its predictive value for depression indicators.
+
+---
+
+### Q2.3: Social Context Interpretation
+
+**Open Questions:**
+- How do we interpret silence? (isolation vs. away from home vs. sleeping)
+- What does "social interaction" quality look like? (positive engagement vs. conflict)
+- Can we infer emotional valence of interactions without content analysis?
+- How do we handle phone/video calls (one-sided audio)?
+
+**Research Task Needed:**
+> Develop social context classification beyond binary presence/absence of others.
+
+---
+
+## Category 3: Context-Weighted Indicator Scoring
+
+### Q3.1: Should Context Influence Feature Weights?
+
+**Current Implementation:** Static weights per feature per indicator (from `config.json`)
+
+**Hypothesis:** The same acoustic feature may have different clinical significance depending on context.
+
+**Examples:**
+| Feature | Context | Interpretation | Weight Adjustment? |
+|---------|---------|----------------|-------------------|
+| Low RMS energy | Morning, solo | Possible fatigue | Higher weight |
+| Low RMS energy | Evening, social | Normal quiet conversation | Lower weight |
+| Monotonic F0 | Social interaction | Possible emotional blunting | Higher weight |
+| Monotonic F0 | Reading aloud | Normal reading prosody | Lower weight |
+| Long pauses | Morning | Cognitive slowing | Higher weight |
+| Long pauses | Late night | Normal tiredness | Lower weight |
+
+**Open Questions:**
+- Should we implement context-dependent weight modifiers?
+- How do we learn these modifiers (clinical data, literature, expert input)?
+- Does this add too much complexity vs. predictive value?
+
+**Research Task Needed:**
+> Conduct literature review and expert consultation on context-feature interactions in depression assessment.
+
+---
+
+### Q3.2: Confidence Scoring by Context Quality
+
+**Open Questions:**
+- Should indicators derived from noisy/ambiguous audio have lower confidence?
+- How do we propagate uncertainty through the analysis pipeline?
+- Should we withhold indicator scores when context quality is poor?
+
+**Proposed Confidence Factors:**
+```
+Indicator Confidence = Base Score × Context Quality Factors
+
+Context Quality Factors:
+├── Speaker Verification Confidence (0.5 - 1.0)
+├── Audio Quality Score (0.0 - 1.0)
+├── Scene Classification Confidence (0.5 - 1.0)
+├── Sample Duration Sufficiency (0.0 - 1.0)
+└── Temporal Coverage (0.0 - 1.0)
+
+Example:
+- High confidence: Verified speaker, clean audio, clear solo activity, 30+ min data
+- Low confidence: Uncertain speaker, noisy, mixed scene, < 5 min data
+```
+
+**Research Task Needed:**
+> Design uncertainty quantification framework for indicator scoring.
+
+---
+
+## Category 4: Validation and Clinical Defensibility
+
+### Q4.1: Ground Truth Definition
+
+**Open Questions:**
+- What is our ground truth for depression state? (PHQ-9, clinical diagnosis, both?)
+- How frequently should ground truth be collected? (daily, weekly, per episode?)
+- How do we handle discordance between self-report and clinical assessment?
+- Can we use DAIC-WOZ clinical interviews as validation reference?
+
+**Research Task Needed:**
+> Define validation protocol with clinician input and IRB considerations.
+
+---
+
+### Q4.2: Feature-to-Indicator Mapping Validation
+
+**Current Implementation:** Literature-derived mappings from acoustic features to DSM-5 indicators
+
+**Open Questions:**
+- Have these mappings been validated in naturalistic (non-clinical) settings?
+- Do mappings hold across demographics (age, gender, culture, language)?
+- How do we handle individual variability (person A's "low energy" ≠ person B's)?
+- Should mappings be personalized over time?
+
+**Research Task Needed:**
+> Validate feature-to-indicator mappings with DAIC-WOZ dataset and plan prospective validation study.
+
+---
+
+### Q4.3: Multi-Board Consistency
+
+**Open Questions:**
+- If the same person speaks near different boards, do we get consistent features?
+- How do we handle feature drift between boards over time?
+- Should we cross-calibrate boards using overlapping audio captures?
+
+**Research Task Needed:**
+> Conduct multi-board feature consistency study with controlled speech samples.
+
+---
+
+### Q4.4: Longitudinal Validity
+
+**Open Questions:**
+- How do we validate that changes in indicators reflect true clinical changes?
+- What is the expected sensitivity to detect clinically meaningful change?
+- How do we distinguish real changes from measurement noise?
+- What is the minimum observation period for reliable assessment?
+
+**Research Task Needed:**
+> Design longitudinal validation study with repeated clinical assessments.
+
+---
+
+## Category 5: Ethical and Privacy Considerations
+
+### Q5.1: Consent in Multi-Occupant Households
+
+**Open Questions:**
+- How do we handle audio from non-consenting household members?
+- Should we actively suppress/delete non-target speaker audio?
+- What disclosures are required for household members?
+
+**Research Task Needed:**
+> Consult with IRB/ethics board on multi-occupant consent requirements.
+
+---
+
+### Q5.2: Incidental Findings
+
+**Open Questions:**
+- What if the system detects indicators of suicidal ideation?
+- Should there be automatic alerts to clinicians or emergency contacts?
+- What is our liability and duty of care?
+
+**Research Task Needed:**
+> Develop incidental findings protocol with clinical and legal input.
+
+---
+
+## Summary: Research Tasks for Assignment
+
+| Task ID | Research Question | Suggested Owner | Priority |
+|---------|-------------------|-----------------|----------|
+| R1.1 | Speaker verification accuracy study | ML Researcher | HIGH |
+| R1.2 | Household speaker modeling strategy | ML Researcher | HIGH |
+| R1.3 | Multi-class audio source classifier | Audio Researcher | MEDIUM |
+| R2.1 | Temporal aggregation strategies | Data Scientist | MEDIUM |
+| R2.2 | Context ontology validation | Clinical Researcher | MEDIUM |
+| R2.3 | Social context classification | Audio Researcher | LOW |
+| R3.1 | Context-feature interaction review | Clinical Researcher | MEDIUM |
+| R3.2 | Uncertainty quantification framework | Data Scientist | MEDIUM |
+| R4.1 | Validation protocol with clinicians | PI + Clinical | HIGH |
+| R4.2 | Feature-to-indicator validation (DAIC-WOZ) | ML Researcher | HIGH |
+| R4.3 | Multi-board consistency study | Audio Researcher | MEDIUM |
+| R4.4 | Longitudinal validation design | PI + Clinical | HIGH |
+| R5.1 | Multi-occupant consent requirements | PI + IRB | HIGH |
+| R5.2 | Incidental findings protocol | PI + Clinical + Legal | HIGH |
+
+---
+
+## Request to Principal Investigator
+
+We request the PI to:
+
+1. **Clarify** which of these questions have existing answers from literature or prior work
+2. **Prioritize** research tasks based on project timeline and resources
+3. **Assign** researchers to each task with clear deliverables
+4. **Define** acceptance criteria for each research question
+5. **Identify** any additional questions we may have missed
+6. **Determine** which questions are blocking for firmware deployment vs. can be addressed in parallel
+
+**These questions do not block Phase 1 firmware development** (ReSpeaker Lite parity), but several are **critical for Phase 2 and production deployment**.
+
+---
+
+## PI Response Section
+
+*(To be completed by Principal Investigator)*
+
+**Date of Response:** _______________
+
+### Clarifications:
+
+_(PI to provide clarifications on existing answers)_
+
+### Priority Ranking:
+
+_(PI to rank research tasks by priority)_
+
+### Research Assignments:
+
+| Task ID | Assigned To | Deadline | Deliverable |
+|---------|-------------|----------|-------------|
+| | | | |
+
+### Additional Questions Identified:
+
+_(PI to add any missing research questions)_
+
+### Decisions Made:
+
+_(PI to document any immediate decisions)_
+
+---
+
 **END OF DOCUMENT**
