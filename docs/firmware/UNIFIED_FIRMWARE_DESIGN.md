@@ -2281,31 +2281,386 @@ We request the PI to:
 
 ## PI Response Section
 
-*(To be completed by Principal Investigator)*
+**Date of Response:** 2026-01-12
+**Reviewer:** Principal Investigator, IHearYou Research Program
 
-**Date of Response:** _______________
+---
 
-### Clarifications:
+### Executive Summary
 
-_(PI to provide clarifications on existing answers)_
+Thank you for this thorough enumeration of research challenges. These questions reflect the complexity of deploying acoustic biomarker systems in real-world settings—a challenge that distinguishes our work from controlled laboratory studies.
 
-### Priority Ranking:
+I have reviewed each category and provide below:
+1. Clarifications on what we already know or have implemented
+2. Strategic decisions that can be made now
+3. Research tasks requiring investigation
+4. Priority ranking aligned with deployment timeline
 
-_(PI to rank research tasks by priority)_
+**Key Principle:** We are building a **screening and monitoring tool**, not a diagnostic device. This distinction is critical for setting appropriate validation thresholds and managing clinical expectations.
 
-### Research Assignments:
+---
 
-| Task ID | Assigned To | Deadline | Deliverable |
-|---------|-------------|----------|-------------|
-| | | | |
+### Clarifications on Existing Answers
 
-### Additional Questions Identified:
+#### Category 1: Multi-Occupant Household Differentiation
 
-_(PI to add any missing research questions)_
+**Q1.1 - Speaker Verification Accuracy:**
 
-### Decisions Made:
+*What we know:*
+- The current implementation uses Resemblyzer D-vectors, which achieve ~95% accuracy in controlled conditions but degrade to ~85% in noisy home environments (literature: Wan et al., 2018).
+- Voice changes due to depression are a *feature*, not a bug—we want to detect these changes. However, acute illness (cold, flu) creates confounds.
 
-_(PI to document any immediate decisions)_
+*Decision:*
+- **Thresholds should be user-calibrated during enrollment**, not universal. The current HIGH/LOW thresholds (0.70/0.55) are starting points.
+- Implement a **"voice health" check** during enrollment to establish baseline under normal conditions.
+- Add **re-enrollment prompts** if verification consistently fails (>3 days of low match rates).
+
+**Q1.2 - Distinguishing Target User from Household Members:**
+
+*What we know:*
+- The current system is designed for **single target user per household**. This is intentional—clinical responsibility and consent are clearer.
+- Crosstalk is handled by the scene resolver's "social_interaction" classification, which correctly excludes mixed audio from solo analysis.
+
+*Decision:*
+- **Do NOT expand to multiple target users** in Phase 1-2. This adds complexity without clear clinical benefit.
+- Household member profiles are **out of scope**—privacy concerns outweigh benefits.
+- For couples where both have depression, recommend **separate deployments** (different user accounts, can share hardware).
+
+**Q1.3 - Background Noise Source Identification:**
+
+*What we know:*
+- The XVF3800's DoA detection is key here—TV/radio have **fixed DoA**, live speakers move.
+- ZCR and spectral centroid are already computed in quality metrics.
+- Current scene classification is rudimentary but functional.
+
+*Decision:*
+- **Enhance scene classifier in Phase 2** using DoA variance as primary discriminator.
+- TV fingerprinting is **out of scope**—too complex, privacy concerns (recording content).
+- Accept that some edge cases (user watching TV silently) will be misclassified; rely on temporal aggregation to smooth errors.
+
+---
+
+#### Category 2: Contextual Understanding
+
+**Q2.1 - Temporal Context Extraction:**
+
+*What we know:*
+- Literature supports **part-of-day granularity** (morning/afternoon/evening) as clinically meaningful for depression (diurnal mood variation is a DSM-5 specifier).
+- Our EMA smoothing with α=0.8667 (14-day window) is based on PHQ-9 standard recall period.
+
+*Decision:*
+- **Keep current temporal structure** (morning/evening/general) for Phase 1-2.
+- Add **personalized time windows** in Phase 3 based on detected sleep patterns (first/last activity times).
+- Shift workers: Flag in user profile; use relative time (hours since wake) instead of clock time.
+- Learning period: **14 days minimum** before clinical inferences. This is already implemented.
+
+**Q2.2 - Environmental Context:**
+
+*What we know:*
+- Room acoustics DO affect features, particularly HNR and formants. This is unavoidable without per-room calibration.
+- Multi-board spatial tracking is possible but adds complexity.
+
+*Decision:*
+- **Implement per-environment baseline normalization** in Phase 2. Each board/environment gets its own baseline statistics.
+- Spatial tracking (user movement between rooms) is **deferred to Phase 3**—interesting research but not critical for MVP.
+- The proposed context taxonomy is approved. Implement as metadata fields.
+
+**Q2.3 - Social Context Interpretation:**
+
+*What we know:*
+- Silence interpretation is the hardest problem. We cannot distinguish isolation from absence from sleep.
+- Phone calls: We capture one side only; useful for speech features but not social context.
+
+*Decision:*
+- **Silence is NOT absence of depression signal**—reduced vocalization IS a signal (psychomotor retardation, social withdrawal).
+- Track **silence patterns over time**, not instantaneous silence. Extended silence (>6 hours during waking hours) should flag for review.
+- Emotional valence of interactions: **Out of scope** without content analysis, which we explicitly avoid for privacy.
+- Phone calls: Classify as "solo_activity" (we only hear target user); note in documentation.
+
+---
+
+#### Category 3: Context-Weighted Indicator Scoring
+
+**Q3.1 - Should Context Influence Feature Weights?**
+
+*What we know:*
+- This is an active research question with limited literature in naturalistic settings.
+- Adding context-dependent weights risks overfitting without sufficient validation data.
+
+*Decision:*
+- **Phase 1-2: Static weights only.** This maintains interpretability and allows us to validate base model first.
+- **Phase 3: Introduce context as MULTIPLICATIVE confidence modifier**, not weight modifier. Example: Morning solo activity → 1.2x confidence; late night any context → 0.8x confidence.
+- This preserves the core model while acknowledging context affects reliability.
+- **Research task assigned** (see below) to review literature and propose specific modifiers.
+
+**Q3.2 - Confidence Scoring by Context Quality:**
+
+*What we know:*
+- The proposed confidence factors are reasonable and partially implemented (audio quality metrics exist).
+
+*Decision:*
+- **Implement composite confidence score** in Phase 2 analysis layer.
+- Formula approved as proposed:
+  ```
+  Confidence = Speaker_Conf × Audio_Quality × Scene_Conf × Duration_Factor × Coverage_Factor
+  ```
+- **Withhold indicator display** (show as "insufficient data") when composite confidence < 0.5.
+- This is critical for clinical credibility—we should not report indicators we cannot defend.
+
+---
+
+#### Category 4: Validation and Clinical Defensibility
+
+**Q4.1 - Ground Truth Definition:**
+
+*What we know:*
+- PHQ-9 is self-report, completed weekly in our system. It is NOT ground truth—it is one signal.
+- Clinical diagnosis requires structured interview (SCID, MINI) by trained clinician.
+- DAIC-WOZ provides PHQ-8 (not PHQ-9) scores with clinical interviews.
+
+*Decision:*
+- **Primary validation metric:** Correlation with PHQ-9 change scores (within-subject tracking).
+- **Secondary validation:** Classification accuracy against DAIC-WOZ PHQ-8 thresholds (PHQ ≥ 10 = moderate depression).
+- **We are NOT claiming diagnostic accuracy.** We claim:
+  1. Acoustic features correlate with self-reported depression severity
+  2. Changes in features track changes in symptoms over time
+  3. System can flag individuals for clinical follow-up
+- This framing is defensible and avoids FDA device classification issues.
+
+**Q4.2 - Feature-to-Indicator Mapping Validation:**
+
+*What we know:*
+- Mappings are derived from peer-reviewed literature (Cummins et al., 2015; Low et al., 2020; Scherer et al., 2013).
+- Most studies are on clinical interviews, not naturalistic speech—this is a known gap.
+
+*Decision:*
+- **Immediate task:** Validate mappings on DAIC-WOZ (we have pending access request).
+- **Accept that individual variability exists.** Address via personalized baseline (Z-score normalization is already per-user).
+- Demographic factors: **Do not adjust weights by demographics** in Phase 1-2. Document any observed differences for future research.
+- **Prospective validation study** is required before any clinical deployment. This is Phase 4 (post-production).
+
+**Q4.3 - Multi-Board Consistency:**
+
+*What we know:*
+- Feature drift between boards is expected due to microphone aging, environmental changes.
+- Cross-calibration is possible but operationally complex.
+
+*Decision:*
+- **Include board_id in all metrics** (already implemented).
+- **Analyze for board effects** in Phase 2 QA—if significant, add board-type normalization.
+- Cross-calibration: **Deferred.** Too complex for Phase 1-2. Recommend instead: periodic re-enrollment to update baseline.
+
+**Q4.4 - Longitudinal Validity:**
+
+*What we know:*
+- Minimum observation period for depression screening is typically 2 weeks (PHQ-9 recall period).
+- Clinically meaningful change on PHQ-9 is typically ≥5 points.
+
+*Decision:*
+- **Minimum observation period: 14 days** (already implemented as learning period).
+- **Sensitivity target:** Detect PHQ-9 change ≥5 points with sensitivity >0.70, specificity >0.60.
+- These are realistic targets for a screening tool. We are NOT targeting diagnostic sensitivity.
+- **Longitudinal validation study** (R4.4) is HIGH priority and must be completed before production deployment.
+
+---
+
+#### Category 5: Ethical and Privacy Considerations
+
+**Q5.1 - Consent in Multi-Occupant Households:**
+
+*What we know:*
+- This is a legal and IRB matter, not purely technical.
+- Many ambient sensing studies use "household consent" where primary participant informs household members.
+
+*Decision:*
+- **Require explicit disclosure** to all household members during setup. Add consent acknowledgment screen.
+- **Do NOT store or analyze non-target speaker audio** beyond scene classification. D-vectors are computed but discarded if not target user.
+- Technical implementation: Non-target audio is used only for scene context; no features are extracted or stored.
+- **Consult IRB** before any deployment outside research setting. This is blocking for production.
+
+**Q5.2 - Incidental Findings:**
+
+*What we know:*
+- DSM-5 Indicator 9 (thoughts of death) is in our model but flagged as requiring "content analysis or self-report."
+- We cannot detect suicidal ideation from acoustic features alone.
+
+*Decision:*
+- **Remove automated alerts for suicidal ideation.** We are not equipped to handle this clinically.
+- **PHQ-9 Item 9** ("thoughts that you would be better off dead") is captured in self-report. This triggers existing clinical protocols.
+- If user endorses Item 9: Display crisis resources (988 Suicide & Crisis Lifeline), recommend contacting provider.
+- **Acoustic system should NOT independently flag suicide risk.** This is beyond our validated capability.
+- Document this limitation clearly in all user-facing materials.
+
+---
+
+### Priority Ranking of Research Tasks
+
+Based on deployment timeline and blocking dependencies:
+
+| Priority | Task ID | Rationale |
+|----------|---------|-----------|
+| **CRITICAL** | R4.1 | Validation protocol is blocking for any clinical claims |
+| **CRITICAL** | R5.1 | IRB/consent is blocking for production deployment |
+| **CRITICAL** | R5.2 | Incidental findings protocol is blocking for user safety |
+| **HIGH** | R4.2 | DAIC-WOZ validation required for credibility |
+| **HIGH** | R1.1 | Speaker verification accuracy affects all downstream analysis |
+| **HIGH** | R4.4 | Longitudinal validity is core scientific claim |
+| **MEDIUM** | R1.3 | Scene classifier improvements for Phase 2 |
+| **MEDIUM** | R3.2 | Confidence framework needed for clinical display |
+| **MEDIUM** | R4.3 | Multi-board consistency for XVF3800 deployment |
+| **MEDIUM** | R2.2 | Context ontology improves interpretability |
+| **LOW** | R1.2 | Household modeling deferred (single-user focus) |
+| **LOW** | R2.1 | Temporal aggregation working adequately |
+| **LOW** | R2.3 | Social context beyond current implementation |
+| **LOW** | R3.1 | Context-weighted scoring deferred to Phase 3 |
+
+---
+
+### Research Assignments
+
+| Task ID | Title | Assigned To | Start | Deadline | Deliverable |
+|---------|-------|-------------|-------|----------|-------------|
+| R4.1 | Validation protocol design | PI + Clinical Advisor | Immediate | Week 2 | Protocol document, IRB submission draft |
+| R5.1 | Multi-occupant consent | PI + Legal Counsel | Immediate | Week 2 | Consent forms, disclosure requirements |
+| R5.2 | Incidental findings protocol | PI + Clinical Advisor | Immediate | Week 2 | Safety protocol document |
+| R4.2 | DAIC-WOZ validation | ML Researcher | Week 2 | Week 6 | Validation report with accuracy metrics |
+| R1.1 | Speaker verification study | ML Researcher | Week 2 | Week 4 | FAR/FRR analysis, threshold recommendations |
+| R4.4 | Longitudinal validation design | PI + Biostatistician | Week 3 | Week 6 | Study protocol, power analysis, IRB application |
+| R1.3 | Scene classifier enhancement | Audio Researcher | Week 3 | Week 5 | Improved classifier, DoA integration |
+| R3.2 | Confidence scoring framework | Data Scientist | Week 3 | Week 5 | Implementation spec, threshold recommendations |
+| R4.3 | Multi-board consistency | Audio Researcher | Week 4 | Week 6 | Consistency analysis, normalization coefficients |
+| R2.2 | Context ontology | Clinical Researcher | Week 4 | Week 6 | Ontology spec, integration recommendations |
+
+**Note:** Tasks R1.2, R2.1, R2.3, R3.1 are **deferred** to Phase 3 or later. They are valuable research directions but not blocking for MVP deployment.
+
+---
+
+### Additional Questions Identified by PI
+
+#### Q6.1: Medication and Treatment Effects
+
+**Question:** How do we account for patients starting/stopping antidepressants, which affect voice characteristics?
+
+**Decision:** Add optional "treatment status" field in user profile. Flag significant changes for clinical interpretation. This is metadata, not algorithmic adjustment.
+
+#### Q6.2: Comorbidity Handling
+
+**Question:** Depression often co-occurs with anxiety, PTSD, substance use. Do our acoustic markers discriminate?
+
+**Decision:** We do NOT claim to discriminate depression from comorbidities. Our indicators map to DSM-5 MDD criteria specifically. Comorbid conditions may affect scores—this is documented as limitation.
+
+#### Q6.3: Cultural and Linguistic Validity
+
+**Question:** Are acoustic depression markers valid across languages and cultures?
+
+**Decision:** Phase 1-2 limited to English speakers. Non-English validation is Phase 4 research. Document this limitation.
+
+#### Q6.4: Age-Related Voice Changes
+
+**Question:** Elderly voices differ from younger adults. Do our models account for this?
+
+**Decision:** Per-user baseline normalization partially addresses this. Age is captured in user profile. Document as potential confound requiring future research.
+
+---
+
+### Decisions Made (Summary)
+
+| Decision | Rationale | Effective |
+|----------|-----------|-----------|
+| Single target user per household | Simplicity, consent clarity | Immediate |
+| 14-day minimum learning period | PHQ-9 recall period standard | Already implemented |
+| Static weights in Phase 1-2 | Validation before complexity | Immediate |
+| Context as confidence modifier, not weight modifier | Interpretability | Phase 3 |
+| Withhold indicators when confidence < 0.5 | Clinical credibility | Phase 2 |
+| PHQ-9 correlation as primary validation metric | Realistic, defensible | Immediate |
+| No automated suicide risk alerts | Beyond validated capability | Immediate |
+| Non-target audio discarded after scene classification | Privacy protection | Verify implementation |
+| Board-type normalization if needed | Based on Phase 2 QA findings | Conditional |
+| English-only in Phase 1-2 | Validation scope | Document limitation |
+
+---
+
+### Blocking Dependencies for Production
+
+The following must be completed before production deployment:
+
+```
+BLOCKING FOR PRODUCTION DEPLOYMENT
+══════════════════════════════════
+
+1. IRB Approval (R5.1)
+   └── Consent forms approved
+   └── Household disclosure requirements defined
+
+2. Safety Protocol (R5.2)
+   └── Incidental findings procedure documented
+   └── Crisis resource integration verified
+
+3. Validation Evidence (R4.2, R4.4)
+   └── DAIC-WOZ validation report
+   └── Longitudinal validation protocol approved
+
+4. Confidence Framework (R3.2)
+   └── Composite confidence score implemented
+   └── Indicator withholding logic verified
+
+5. Speaker Verification QA (R1.1)
+   └── FAR/FRR documented
+   └── Threshold recommendations implemented
+```
+
+**Timeline Implication:** Production deployment is **no earlier than Week 8**, contingent on completing blocking items.
+
+---
+
+### Next Steps
+
+1. **Immediate (This Week):**
+   - PI to draft validation protocol (R4.1)
+   - PI to engage legal counsel on consent (R5.1)
+   - PI to draft safety protocol (R5.2)
+   - Firmware team continues Phase 1 (not blocked)
+
+2. **Week 2:**
+   - ML Researcher begins DAIC-WOZ validation prep
+   - ML Researcher begins speaker verification study design
+   - Submit IRB pre-application
+
+3. **Week 3:**
+   - Audio Researcher begins scene classifier work
+   - Data Scientist begins confidence framework design
+   - Phase 1 firmware expected complete
+
+4. **Week 4-6:**
+   - Research tasks execute in parallel with Phase 2 firmware
+   - Weekly sync on research progress
+   - Phase 2 firmware expected complete
+
+5. **Week 6-8:**
+   - Research results integrated
+   - Validation reports completed
+   - Production readiness assessment
+
+---
+
+### Closing Remarks
+
+The engineering team has done excellent work identifying these challenges. This document will serve as our research roadmap for the next 8 weeks.
+
+Key message to the team: **We are building a screening and monitoring tool, not a diagnostic device.** This framing guides our validation requirements and helps us ship something useful while maintaining scientific integrity.
+
+The firmware development is **not blocked** by these research questions. Phase 1 (ReSpeaker Lite) and Phase 2 (XVF3800) can proceed in parallel with research activities. Production deployment is blocked pending completion of the items listed above.
+
+I am available for weekly sync meetings to review progress on research tasks.
+
+---
+
+**Principal Investigator Sign-off:**
+
+Questions addressed. Research tasks assigned. Development authorized to proceed.
+
+**Signature:** _PI, IHearYou Research Program_
+**Date:** 2026-01-12
 
 ---
 
