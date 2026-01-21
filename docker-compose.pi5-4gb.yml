@@ -1,0 +1,89 @@
+# Docker Compose override for Raspberry Pi 5 (4GB) - CONSTRAINED
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.pi5-4gb.yml up -d
+#
+# Target: 3.5GB total (leaves 500MB for OS)
+# Trade-offs:
+#   - No speaker identification (Resemblyzer disabled)
+#   - Reduced MongoDB cache
+#   - Dashboard may be slower
+#   - Max 8 boards recommended
+
+version: "3.7"
+
+services:
+   mqtt:
+      deploy:
+         resources:
+            limits:
+               memory: 32M
+               cpus: '0.25'
+
+   mongodb:
+      deploy:
+         resources:
+            limits:
+               memory: 256M
+               cpus: '0.5'
+      command: mongod --wiredTigerCacheSizeGB 0.1
+
+   mongo-express:
+      deploy:
+         replicas: 0  # Disabled
+
+   voice_profiling:
+      deploy:
+         replicas: 0  # Disabled - no speaker enrollment on device
+
+   voice_metrics:
+      deploy:
+         resources:
+            limits:
+               memory: 1024M  # Reduced from 1.5GB
+               cpus: '2.0'
+      environment:
+         - SYSTEM_MODE=live
+         - OMP_NUM_THREADS=2
+         - DISABLE_SPEAKER_ID=true  # Skip Resemblyzer loading
+         - VAD_MODEL=energy  # Use energy VAD instead of Silero
+
+   respeaker_service:
+      deploy:
+         resources:
+            limits:
+               memory: 128M
+               cpus: '0.5'
+      environment:
+         - MAX_BOARDS=8
+         - DISABLE_SILERO=true  # Use energy VAD
+
+   quality_metrics_service:
+      deploy:
+         resources:
+            limits:
+               memory: 64M
+               cpus: '0.25'
+
+   temporal_context_modeling_layer:
+      deploy:
+         resources:
+            limits:
+               memory: 128M
+               cpus: '0.5'
+
+   analysis_layer:
+      deploy:
+         resources:
+            limits:
+               memory: 256M
+               cpus: '0.5'
+
+   dashboard_layer:
+      deploy:
+         resources:
+            limits:
+               memory: 256M
+               cpus: '0.5'
+
+# Total: ~2.1GB for containers
+# Buffer for spikes: ~1.4GB
+# Should run stable on 4GB Pi 5

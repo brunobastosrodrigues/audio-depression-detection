@@ -30,6 +30,16 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class DoaFusionConfig:
+    """Configuration for DoA + D-vector fusion (XVF3800)."""
+    enabled: bool = True
+    dvector_weight: float = 0.7
+    doa_weight: float = 0.3
+    min_doa_confidence: float = 0.3
+    location_std_dev_degrees: float = 30.0
+
+
+@dataclass
 class SceneConfig:
     """Configuration container for Scene Analysis thresholds."""
 
@@ -49,6 +59,14 @@ class SceneConfig:
     # Context Classification
     solo_activity_ratio: float = 0.5
     background_noise_ratio: float = 0.6
+
+    # Hardware capabilities
+    has_doa: bool = False
+    has_aec: bool = False
+
+    # DoA Fusion (V2)
+    doa_fusion: DoaFusionConfig = field(default_factory=DoaFusionConfig)
+    location_priors: dict = field(default_factory=dict)
 
     # Metadata
     hardware_profile: str = "default"
@@ -120,6 +138,21 @@ class SceneConfig:
                         "background_noise_ratio", config.background_noise_ratio
                     )
 
+                # Load DoA fusion config (V2)
+                if "doa_fusion" in json_config:
+                    df = json_config["doa_fusion"]
+                    config.doa_fusion = DoaFusionConfig(
+                        enabled=df.get("enabled", True),
+                        dvector_weight=df.get("dvector_weight", 0.7),
+                        doa_weight=df.get("doa_weight", 0.3),
+                        min_doa_confidence=df.get("min_doa_confidence", 0.3),
+                        location_std_dev_degrees=df.get("location_std_dev_degrees", 30.0),
+                    )
+
+                # Load location priors (V2)
+                if "location_priors" in json_config:
+                    config.location_priors = json_config["location_priors"]
+
                 config.config_source = "json"
 
                 # 2. Apply hardware profile if specified
@@ -141,9 +174,12 @@ class SceneConfig:
                         config.centroid_threshold_hz = profile.get(
                             "centroid_threshold_hz", config.centroid_threshold_hz
                         )
+                        # V2: Hardware capabilities
+                        config.has_doa = profile.get("has_doa", False)
+                        config.has_aec = profile.get("has_aec", False)
                         config.hardware_profile = hw_profile
                         config.config_source = f"json+profile:{hw_profile}"
-                        logger.info(f"Applied hardware profile: {hw_profile}")
+                        logger.info(f"Applied hardware profile: {hw_profile} (doa={config.has_doa}, aec={config.has_aec})")
                     else:
                         logger.warning(
                             f"Hardware profile '{hw_profile}' not found in config"
@@ -218,4 +254,14 @@ class SceneConfig:
             "background_noise_ratio": self.background_noise_ratio,
             "hardware_profile": self.hardware_profile,
             "config_source": self.config_source,
+            # V2 fields
+            "has_doa": self.has_doa,
+            "has_aec": self.has_aec,
+            "doa_fusion": {
+                "enabled": self.doa_fusion.enabled,
+                "dvector_weight": self.doa_fusion.dvector_weight,
+                "doa_weight": self.doa_fusion.doa_weight,
+                "min_doa_confidence": self.doa_fusion.min_doa_confidence,
+                "location_std_dev_degrees": self.doa_fusion.location_std_dev_degrees,
+            },
         }

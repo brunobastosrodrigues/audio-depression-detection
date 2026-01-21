@@ -49,6 +49,25 @@ static EventGroupHandle_t s_app_event_group;
 #define AUDIO_STREAMING_BIT     BIT2
 #define ERROR_BIT               BIT3
 
+// Shared DSP State (DoA, AEC)
+typedef struct {
+    int16_t azimuth;
+    uint8_t confidence;
+    bool aec_active;
+} shared_dsp_state_t;
+
+static shared_dsp_state_t s_dsp_state = {0};
+static SemaphoreHandle_t s_dsp_state_mutex = NULL;
+
+// Packet Header
+typedef struct __attribute__((packed)) {
+    char board_type[16];
+    int16_t doa_angle;
+    uint8_t doa_confidence;
+    uint8_t aec_active;     // 1 = active, 0 = inactive
+    uint32_t payload_len;   // Audio payload length in bytes
+} audio_packet_header_t;
+
 // =============================================================================
 // Task Handles
 // =============================================================================
@@ -166,6 +185,13 @@ void app_main(void)
     s_app_event_group = xEventGroupCreate();
     if (s_app_event_group == NULL) {
         ESP_LOGE(TAG, "Failed to create event group");
+        return;
+    }
+
+    // Create mutex for shared DSP state
+    s_dsp_state_mutex = xSemaphoreCreateMutex();
+    if (s_dsp_state_mutex == NULL) {
+        ESP_LOGE(TAG, "Failed to create DSP state mutex");
         return;
     }
 
@@ -510,10 +536,18 @@ static void tcp_sender_task(void *param)
     }
     ESP_LOGI(TAG, "WiFi connected!");
 
-    // Buffer for speech data
-    uint8_t *send_buffer = heap_caps_malloc(AUDIO_CHUNK_BYTES, MALLOC_CAP_SPIRAM);
-    if (send_buffer == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate send buffer");
+    // Buffer for speech data + metadata
+    // We allocate enough for the header + the audio chunk
+    size_t send_buffer_size = sizeof(audio_packet_header_t) + AUDIO_CHUNK_BYTES;
+    uint8_t *send_buffer = heap_caps_malloc(send_buffer_size, MALLOC_CAP_SPIRAM);
+    
+    // Scratch buffer for reading audio from ring buffer (just the audio part)
+    uint8_t *audio_read_buffer = heap_caps_malloc(AUDIO_CHUNK_BYTES, MALLOC_CAP_SPIRAM);
+
+    if (send_buffer == NULL || audio_read_buffer == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate send buffers");
+        if(send_buffer) free(send_buffer);
+        if(audio_read_buffer) free(audio_read_buffer);
         vTaskDelete(NULL);
         return;
     }
@@ -535,7 +569,7 @@ static void tcp_sender_task(void *param)
         // Read speech chunk from queue
         size_t bytes_read = 0;
         audio_quality_metrics_t metrics;
-        esp_err_t ret = audio_buffer_read_speech(send_buffer, AUDIO_CHUNK_BYTES,
+        esp_err_t ret = audio_buffer_read_speech(audio_read_buffer, AUDIO_CHUNK_BYTES,
                                                    &bytes_read, &metrics, pdMS_TO_TICKS(100));
 
         if (ret != ESP_OK || bytes_read == 0) {
@@ -543,8 +577,30 @@ static void tcp_sender_task(void *param)
             continue;
         }
 
-        // Send audio data
-        ret = tcp_client_send(send_buffer, bytes_read);
+        // Prepare metadata header
+        audio_packet_header_t header;
+        memset(&header, 0, sizeof(header));
+        strncpy(header.board_type, BOARD_NAME, sizeof(header.board_type) - 1);
+        header.payload_len = bytes_read;
+
+        // Retrieve latest DSP state safely
+        if (s_dsp_state_mutex != NULL) {
+            if (xSemaphoreTake(s_dsp_state_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                header.doa_angle = s_dsp_state.azimuth;
+                header.doa_confidence = s_dsp_state.confidence;
+                header.aec_active = s_dsp_state.aec_active ? 1 : 0;
+                xSemaphoreGive(s_dsp_state_mutex);
+            }
+        }
+
+        // Construct packet: [Header][Audio]
+        memcpy(send_buffer, &header, sizeof(header));
+        memcpy(send_buffer + sizeof(header), audio_read_buffer, bytes_read);
+
+        // Send combined data
+        size_t total_len = sizeof(header) + bytes_read;
+        ret = tcp_client_send(send_buffer, total_len);
+        
         if (ret != ESP_OK) {
             ESP_LOGW(TAG, "Failed to send audio: %s", esp_err_to_name(ret));
             tcp_client_disconnect();
@@ -554,12 +610,13 @@ static void tcp_sender_task(void *param)
         s_telemetry.audio_chunks_sent++;
 
 #if CONFIG_ENABLE_AUDIO_DEBUG
-        ESP_LOGD(TAG, "Sent %d bytes, RMS=%.1f, dBFS=%.1f",
-                 bytes_read, metrics.rms, metrics.db_fs);
+        ESP_LOGD(TAG, "Sent %d bytes (payload %d), DoA=%d, Conf=%d",
+                 total_len, bytes_read, header.doa_angle, header.doa_confidence);
 #endif
     }
 
     free(send_buffer);
+    free(audio_read_buffer);
     vTaskDelete(NULL);
 }
 
@@ -575,10 +632,26 @@ static void dsp_control_task(void *param)
     while (1) {
         // Periodically query DoA if enabled
 #if XVF3800_INCLUDE_DOA
-        doa_metadata_t doa;
-        if (xvf3800_get_doa(&doa.azimuth_degrees, &doa.confidence) == ESP_OK) {
-            // Store DoA for next audio chunk
-            // This will be included in the metadata sent to server
+        int16_t azimuth = 0;
+        uint8_t confidence = 0;
+        xvf3800_status_t status;
+        
+        // Get DoA
+        esp_err_t doa_ret = xvf3800_get_doa(&azimuth, &confidence);
+        
+        // Get Status (for AEC active)
+        esp_err_t status_ret = xvf3800_get_status(&status);
+
+        if (doa_ret == ESP_OK && status_ret == ESP_OK) {
+            // Update shared state safely
+            if (s_dsp_state_mutex != NULL) {
+                if (xSemaphoreTake(s_dsp_state_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                    s_dsp_state.azimuth = azimuth;
+                    s_dsp_state.confidence = confidence;
+                    s_dsp_state.aec_active = status.aec_active;
+                    xSemaphoreGive(s_dsp_state_mutex);
+                }
+            }
         }
 #endif
 

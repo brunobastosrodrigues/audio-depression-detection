@@ -1,0 +1,24 @@
+{
+  "timestamp": "2026-01-21T16:57:05.852772",
+  "config": {
+    "sample_rate": 16000,
+    "chunk_duration_s": 5.0,
+    "num_iterations": 10,
+    "warmup_iterations": 3,
+    "esp32_max_latency_ms": 100.0,
+    "esp32_max_memory_kb": 200.0
+  },
+  "test_audio_count": 1,
+  "edge_features": [],
+  "hub_features": [
+    {
+      "feature_name": "mfcc_13",
+      "category": "spectral",
+      "mean_latency_ms": 17.18,
+      "std_latency_ms": 5.02,
+      "min_latency_ms": 8.05,
+      "max_latency_ms": 21.76,
+      "p95_latency_ms": 21.19,
+      "memory_peak_kb": 2404.85,
+      "samples_tested": 10,
+      "edge_feasible": 

@@ -1,6 +1,6 @@
 {
     "_comment": "Scene Analysis Configuration - Thresholds for Live Mode Gatekeeper",
-    "_version": "1.0.0",
+    "_version": "2.0.0",
 
     "context_window": {
         "buffer_size": 12,
@@ -33,13 +33,71 @@
             "similarity_threshold_high": 0.68,
             "similarity_threshold_low": 0.52,
             "zcr_threshold": 0.14,
-            "centroid_threshold_hz": 2800
+            "centroid_threshold_hz": 2800,
+            "has_doa": false,
+            "has_aec": false
+        },
+        "respeaker_lite": {
+            "similarity_threshold_high": 0.70,
+            "similarity_threshold_low": 0.55,
+            "has_doa": false,
+            "has_aec": false
+        },
+        "xvf3800": {
+            "similarity_threshold_high": 0.65,
+            "similarity_threshold_low": 0.50,
+            "zcr_threshold": 0.10,
+            "centroid_threshold_hz": 2000,
+            "has_doa": true,
+            "has_aec": true,
+            "far_field_range_m": 5.0,
+            "_description": "XVF3800 has DSP processing (AEC, beamforming, dereverb) - lower thresholds due to cleaner audio"
         },
         "usb_microphone": {
             "similarity_threshold_high": 0.72,
             "similarity_threshold_low": 0.58,
             "zcr_threshold": 0.10,
-            "centroid_threshold_hz": 2200
+            "centroid_threshold_hz": 2200,
+            "has_doa": false,
+            "has_aec": false
+        }
+    },
+
+    "doa_fusion": {
+        "_description": "Direction of Arrival fusion settings for XVF3800 boards",
+        "enabled": true,
+        "dvector_weight": 0.7,
+        "doa_weight": 0.3,
+        "min_doa_confidence": 0.3,
+        "location_std_dev_degrees": 30.0,
+        "_notes": "fused_confidence = dvector_weight * similarity + doa_weight * location_score"
+    },
+
+    "location_priors": {
+        "_description": "Expected speaker locations by room and time of day",
+        "kitchen": {
+            "default_doa": 180,
+            "std_dev": 45,
+            "time_based": [
+                {"hours": [6, 9], "doa": 90, "std": 30, "_note": "Morning: near stove"},
+                {"hours": [12, 14], "doa": 180, "std": 30, "_note": "Lunch: at table"},
+                {"hours": [18, 21], "doa": 135, "std": 45, "_note": "Dinner prep"}
+            ]
+        },
+        "living_room": {
+            "default_doa": 0,
+            "std_dev": 60,
+            "_note": "TV typically at 0 degrees, couch behind"
+        },
+        "bedroom": {
+            "default_doa": 270,
+            "std_dev": 30,
+            "_note": "Bed typically at 270 degrees from device"
+        },
+        "office": {
+            "default_doa": 0,
+            "std_dev": 20,
+            "_note": "Desk position is consistent"
         }
     }
 }

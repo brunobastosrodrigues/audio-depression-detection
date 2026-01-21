@@ -1,0 +1,1960 @@
+[
+  {
+    "session_id": 300,
+    "baseline_features": {
+      "f0_mean_hz": 153.5949928212491,
+      "f0_std_hz": 49.54353406672961,
+      "f0_range_hz": 283.0,
+      "pause_ratio": 0.5703998396323882,
+      "voiced_ratio": 0.4296001603676119,
+      "energy_std": 1.1365967688072982
+    },
+    "extended_features": {
+      "naq_mean": 0.0656969585879709,
+      "naq_std": 0.06184660964494241,
+      "h1h2_mean": 1.1980622363513345,
+      "h1h2_std": 5.673618692046346
+    },
+    "metadata": {
+      "total_frames": 64851,
+      "voiced_frames": 27860,
+      "duration_sec": 648.51
+    }
+  },
+  {
+    "session_id": 301,
+    "baseline_features": {
+      "f0_mean_hz": 115.8322829780661,
+      "f0_std_hz": 31.796341792470788,
+      "f0_range_hz": 170.0,
+      "pause_ratio": 0.6071077449659542,
+      "voiced_ratio": 0.3928922550340458,
+      "energy_std": 0.8600988877051144
+    },
+    "extended_features": {
+      "naq_mean": 0.06589149353629005,
+      "naq_std": 0.05627405902018661,
+      "h1h2_mean": 0.08172966152151379,
+      "h1h2_std": 4.957445486367382
+    },
+    "metadata": {
+      "total_frames": 82389,
+      "voiced_frames": 32370,
+      "duration_sec": 823.89
+    }
+  },
+  {
+    "session_id": 302,
+    "baseline_features": {
+      "f0_mean_hz": 125.67554955866645,
+      "f0_std_hz": 37.32893072870656,
+      "f0_range_hz": 165.5,
+      "pause_ratio": 0.7655873166488751,
+      "voiced_ratio": 0.2344126833511248,
+      "energy_std": 0.57870544339384
+    },
+    "extended_features": {
+      "naq_mean": 0.03272397115146127,
+      "naq_std": 0.05013630745258279,
+      "h1h2_mean": 1.099535699404315,
+      "h1h2_std": 4.866817065712215
+    },
+    "metadata": {
+      "total_frames": 75879,
+      "voiced_frames": 17787,
+      "duration_sec": 758.79
+    }
+  },
+  {
+    "session_id": 303,
+    "baseline_features": {
+      "f0_mean_hz": 199.18730244468452,
+      "f0_std_hz": 43.504284467072786,
+      "f0_range_hz": 293.0,
+      "pause_ratio": 0.49267728283043566,
+      "voiced_ratio": 0.5073227171695643,
+      "energy_std": 0.8146423345711841
+    },
+    "extended_features": {
+      "naq_mean": 0.08436675626069787,
+      "naq_std": 0.06277576358434539,
+      "h1h2_mean": 3.9195842028793955,
+      "h1h2_std": 5.793912843049144
+    },
+    "metadata": {
+      "total_frames": 98529,
+      "voiced_frames": 49986,
+      "duration_sec": 985.2900000000001
+    }
+  },
+  {
+    "session_id": 304,
+    "baseline_features": {
+      "f0_mean_hz": 218.01708098450544,
+      "f0_std_hz": 48.12775231968089,
+      "f0_range_hz": 316.0,
+      "pause_ratio": 0.5904239212717638,
+      "voiced_ratio": 0.4095760787282362,
+      "energy_std": 0.7306191230676584
+    },
+    "extended_features": {
+      "naq_mean": 0.07482979050813483,
+      "naq_std": 0.06270539080365817,
+      "h1h2_mean": 3.1964385551140673,
+      "h1h2_std": 5.390206631766709
+    },
+    "metadata": {
+      "total_frames": 79260,
+      "voiced_frames": 32463,
+      "duration_sec": 792.6
+    }
+  },
+  {
+    "session_id": 305,
+    "baseline_features": {
+      "f0_mean_hz": 126.22418240442192,
+      "f0_std_hz": 39.94995539633806,
+      "f0_range_hz": 196.0,
+      "pause_ratio": 0.617781690140845,
+      "voiced_ratio": 0.38221830985915495,
+      "energy_std": 0.7478568535913012
+    },
+    "extended_features": {
+      "naq_mean": 0.051558869947899766,
+      "naq_std": 0.050356129457610144,
+      "h1h2_mean": 0.746986609526878,
+      "h1h2_std": 6.431971766702875
+    },
+    "metadata": {
+      "total_frames": 170400,
+      "voiced_frames": 65130,
+      "duration_sec": 1704.0
+    }
+  },
+  {
+    "session_id": 306,
+    "baseline_features": {
+      "f0_mean_hz": 182.720091791313,
+      "f0_std_hz": 49.6821637093242,
+      "f0_range_hz": 292.0,
+      "pause_ratio": 0.5784940973557553,
+      "voiced_ratio": 0.42150590264424476,
+      "energy_std": 1.2373064832397218
+    },
+    "extended_features": {
+      "naq_mean": 0.06601026948369586,
+      "naq_std": 0.06293399272904711,
+      "h1h2_mean": 1.4259631323833746,
+      "h1h2_std": 6.516864149534148
+    },
+    "metadata": {
+      "total_frames": 85809,
+      "voiced_frames": 36169,
+      "duration_sec": 858.09
+    }
+  },
+  {
+    "session_id": 307,
+    "baseline_features": {
+      "f0_mean_hz": 209.09417303019785,
+      "f0_std_hz": 46.44586238123976,
+      "f0_range_hz": 309.0,
+      "pause_ratio": 0.4418424430290848,
+      "voiced_ratio": 0.5581575569709152,
+      "energy_std": 0.8600225121775272
+    },
+    "extended_features": {
+      "naq_mean": 0.09127242474778773,
+      "naq_std": 0.06592307824595167,
+      "h1h2_mean": 3.00310343029478,
+      "h1h2_std": 6.765271276669688
+    },
+    "metadata": {
+      "total_frames": 123879,
+      "voiced_frames": 69144,
+      "duration_sec": 1238.79
+    }
+  },
+  {
+    "session_id": 308,
+    "baseline_features": {
+      "f0_mean_hz": 200.15993431155093,
+      "f0_std_hz": 45.72122309462538,
+      "f0_range_hz": 286.5,
+      "pause_ratio": 0.7297833102812357,
+      "voiced_ratio": 0.2702166897187644,
+      "energy_std": 0.495106621393046
+    },
+    "extended_features": {
+      "naq_mean": 0.05728294562032597,
+      "naq_std": 0.06582340065394014,
+      "h1h2_mean": 3.034598035856478,
+      "h1h2_std": 6.327995684951595
+    },
+    "metadata": {
+      "total_frames": 86760,
+      "voiced_frames": 23444,
+      "duration_sec": 867.6
+    }
+  },
+  {
+    "session_id": 309,
+    "baseline_features": {
+      "f0_mean_hz": 143.56585351886847,
+      "f0_std_hz": 38.40080749378046,
+      "f0_range_hz": 189.0,
+      "pause_ratio": 0.7525821396693161,
+      "voiced_ratio": 0.2474178603306839,
+      "energy_std": 1.5663457427248921
+    },
+    "extended_features": {
+      "naq_mean": 0.03568360527880575,
+      "naq_std": 0.03889202370064401,
+      "h1h2_mean": 0.3804618726554223,
+      "h1h2_std": 5.078156191274434
+    },
+    "metadata": {
+      "total_frames": 70581,
+      "voiced_frames": 17463,
+      "duration_sec": 705.8100000000001
+    }
+  },
+  {
+    "session_id": 310,
+    "baseline_features": {
+      "f0_mean_hz": 90.7516975641302,
+      "f0_std_hz": 23.661044361806468,
+      "f0_range_hz": 124.0,
+      "pause_ratio": 0.7803737764679426,
+      "voiced_ratio": 0.21962622353205744,
+      "energy_std": 1.3819276946435797
+    },
+    "extended_features": {
+      "naq_mean": 0.03269308973803406,
+      "naq_std": 0.03524109399209015,
+      "h1h2_mean": 0.5086423941883321,
+      "h1h2_std": 4.82060316693509
+    },
+    "metadata": {
+      "total_frames": 84489,
+      "voiced_frames": 18556,
+      "duration_sec": 844.89
+    }
+  },
+  {
+    "session_id": 311,
+    "baseline_features": {
+      "f0_mean_hz": 205.22226541620097,
+      "f0_std_hz": 45.13254414001477,
+      "f0_range_hz": 288.0,
+      "pause_ratio": 0.7380506867275112,
+      "voiced_ratio": 0.2619493132724889,
+      "energy_std": 0.9728385196668364
+    },
+    "extended_features": {
+      "naq_mean": 0.04849735949814184,
+      "naq_std": 0.053933533451069736,
+      "h1h2_mean": 3.951733360358269,
+      "h1h2_std": 6.126306246513056
+    },
+    "metadata": {
+      "total_frames": 78561,
+      "voiced_frames": 20579,
+      "duration_sec": 785.61
+    }
+  },
+  {
+    "session_id": 312,
+    "baseline_features": {
+      "f0_mean_hz": 118.68253279320987,
+      "f0_std_hz": 40.00839310417078,
+      "f0_range_hz": 176.0,
+      "pause_ratio": 0.7375156647552501,
+      "voiced_ratio": 0.26248433524474996,
+      "energy_std": 2.2568308355406006
+    },
+    "extended_features": {
+      "naq_mean": 0.03861934722103723,
+      "naq_std": 0.03693471132527342,
+      "h1h2_mean": 0.20813667732463706,
+      "h1h2_std": 4.704041038783338
+    },
+    "metadata": {
+      "total_frames": 78999,
+      "voiced_frames": 20736,
+      "duration_sec": 789.99
+    }
+  },
+  {
+    "session_id": 313,
+    "baseline_features": {
+      "f0_mean_hz": 115.34125072483161,
+      "f0_std_hz": 32.02223311516054,
+      "f0_range_hz": 159.0,
+      "pause_ratio": 0.7025908385402158,
+      "voiced_ratio": 0.2974091614597843,
+      "energy_std": 1.5235665091770396
+    },
+    "extended_features": {
+      "naq_mean": 0.06028717420037277,
+      "naq_std": 0.04832725340312462,
+      "h1h2_mean": 1.7917919292354967,
+      "h1h2_std": 4.838808521830394
+    },
+    "metadata": {
+      "total_frames": 75381,
+      "voiced_frames": 22419,
+      "duration_sec": 753.8100000000001
+    }
+  },
+  {
+    "session_id": 314,
+    "baseline_features": {
+      "f0_mean_hz": 167.0605416353686,
+      "f0_std_hz": 40.766024118618155,
+      "f0_range_hz": 240.0,
+      "pause_ratio": 0.517996263035734,
+      "voiced_ratio": 0.48200373696426607,
+      "energy_std": 1.4204745155555536
+    },
+    "extended_features": {
+      "naq_mean": 0.07080121926651955,
+      "naq_std": 0.05506922901239449,
+      "h1h2_mean": 2.978188799844973,
+      "h1h2_std": 5.439915420459856
+    },
+    "metadata": {
+      "total_frames": 154671,
+      "voiced_frames": 74552,
+      "duration_sec": 1546.71
+    }
+  },
+  {
+    "session_id": 315,
+    "baseline_features": {
+      "f0_mean_hz": 118.78423367828096,
+      "f0_std_hz": 27.19243794610058,
+      "f0_range_hz": 169.0,
+      "pause_ratio": 0.6760372773967336,
+      "voiced_ratio": 0.32396272260326636,
+      "energy_std": 2.0597420137838363
+    },
+    "extended_features": {
+      "naq_mean": 0.03219071576101836,
+      "naq_std": 0.03558177028789674,
+      "h1h2_mean": 1.516642485760196,
+      "h1h2_std": 6.023475437760701
+    },
+    "metadata": {
+      "total_frames": 97539,
+      "voiced_frames": 31599,
+      "duration_sec": 975.39
+    }
+  },
+  {
+    "session_id": 316,
+    "baseline_features": {
+      "f0_mean_hz": 107.47494369369369,
+      "f0_std_hz": 31.373623059956607,
+      "f0_range_hz": 139.0,
+      "pause_ratio": 0.8160665584976007,
+      "voiced_ratio": 0.1839334415023993,
+      "energy_std": 1.4271527991061101
+    },
+    "extended_features": {
+      "naq_mean": 0.03468022477050633,
+      "naq_std": 0.040485450160625186,
+      "h1h2_mean": 2.115424493946341,
+      "h1h2_std": 5.475903465331731
+    },
+    "metadata": {
+      "total_frames": 86901,
+      "voiced_frames": 15984,
+      "duration_sec": 869.01
+    }
+  },
+  {
+    "session_id": 317,
+    "baseline_features": {
+      "f0_mean_hz": 119.5047619047619,
+      "f0_std_hz": 37.47835920815111,
+      "f0_range_hz": 165.5,
+      "pause_ratio": 0.7547521431233694,
+      "voiced_ratio": 0.24524785687663064,
+      "energy_std": 1.2196723860616647
+    },
+    "extended_features": {
+      "naq_mean": 0.049706012333261274,
+      "naq_std": 0.046583016636152615,
+      "h1h2_mean": 1.847137162967282,
+      "h1h2_std": 5.311893440278129
+    },
+    "metadata": {
+      "total_frames": 80490,
+      "voiced_frames": 19740,
+      "duration_sec": 804.9
+    }
+  },
+  {
+    "session_id": 318,
+    "baseline_features": {
+      "f0_mean_hz": 107.41260811516806,
+      "f0_std_hz": 34.26250142615576,
+      "f0_range_hz": 150.0,
+      "pause_ratio": 0.707218001665562,
+      "voiced_ratio": 0.292781998334438,
+      "energy_std": 1.3206162974644866
+    },
+    "extended_features": {
+      "naq_mean": 0.031161389455824574,
+      "naq_std": 0.03522494442263739,
+      "h1h2_mean": 0.10446832303915768,
+      "h1h2_std": 5.002765591180923
+    },
+    "metadata": {
+      "total_frames": 58839,
+      "voiced_frames": 17227,
+      "duration_sec": 588.39
+    }
+  },
+  {
+    "session_id": 319,
+    "baseline_features": {
+      "f0_mean_hz": 122.62425273390036,
+      "f0_std_hz": 42.45940501250954,
+      "f0_range_hz": 190.0,
+      "pause_ratio": 0.6972973768224684,
+      "voiced_ratio": 0.3027026231775316,
+      "energy_std": 1.0036269896597445
+    },
+    "extended_features": {
+      "naq_mean": 0.05196643738796384,
+      "naq_std": 0.05474698669655519,
+      "h1h2_mean": 1.0291753312374394,
+      "h1h2_std": 5.77490486226233
+    },
+    "metadata": {
+      "total_frames": 67971,
+      "voiced_frames": 20575,
+      "duration_sec": 679.71
+    }
+  },
+  {
+    "session_id": 320,
+    "baseline_features": {
+      "f0_mean_hz": 205.92042146693453,
+      "f0_std_hz": 51.55212054130905,
+      "f0_range_hz": 285.5,
+      "pause_ratio": 0.709869274048698,
+      "voiced_ratio": 0.2901307259513019,
+      "energy_std": 1.2263775068026705
+    },
+    "extended_features": {
+      "naq_mean": 0.06151103823581452,
+      "naq_std": 0.05657025430500607,
+      "h1h2_mean": 2.7475946273291463,
+      "h1h2_std": 5.085664161252413
+    },
+    "metadata": {
+      "total_frames": 84069,
+      "voiced_frames": 24391,
+      "duration_sec": 840.69
+    }
+  },
+  {
+    "session_id": 321,
+    "baseline_features": {
+      "f0_mean_hz": 186.33159648376576,
+      "f0_std_hz": 42.8314122798338,
+      "f0_range_hz": 262.0,
+      "pause_ratio": 0.6567507391320218,
+      "voiced_ratio": 0.34324926086797825,
+      "energy_std": 0.9067675820129188
+    },
+    "extended_features": {
+      "naq_mean": 0.0653540828580818,
+      "naq_std": 0.05973771139059267,
+      "h1h2_mean": 3.0486081676815098,
+      "h1h2_std": 5.41156355978021
+    },
+    "metadata": {
+      "total_frames": 82191,
+      "voiced_frames": 28212,
+      "duration_sec": 821.91
+    }
+  },
+  {
+    "session_id": 322,
+    "baseline_features": {
+      "f0_mean_hz": 128.7925853409381,
+      "f0_std_hz": 34.39625807442873,
+      "f0_range_hz": 183.0,
+      "pause_ratio": 0.6634386728934476,
+      "voiced_ratio": 0.33656132710655245,
+      "energy_std": 1.1355329198847264
+    },
+    "extended_features": {
+      "naq_mean": 0.03926858242959144,
+      "naq_std": 0.045219653077609716,
+      "h1h2_mean": 2.1271384670168976,
+      "h1h2_std": 5.6483953821712065
+    },
+    "metadata": {
+      "total_frames": 104709,
+      "voiced_frames": 35241,
+      "duration_sec": 1047.09
+    }
+  },
+  {
+    "session_id": 323,
+    "baseline_features": {
+      "f0_mean_hz": 196.71163623954956,
+      "f0_std_hz": 53.00650532682487,
+      "f0_range_hz": 277.0,
+      "pause_ratio": 0.6498805256869773,
+      "voiced_ratio": 0.3501194743130227,
+      "energy_std": 0.9969355654785043
+    },
+    "extended_features": {
+      "naq_mean": 0.05437435533022095,
+      "naq_std": 0.05801411335579245,
+      "h1h2_mean": 2.9093071578425818,
+      "h1h2_std": 5.445402152613939
+    },
+    "metadata": {
+      "total_frames": 83700,
+      "voiced_frames": 29305,
+      "duration_sec": 837.0
+    }
+  },
+  {
+    "session_id": 324,
+    "baseline_features": {
+      "f0_mean_hz": 102.93111674370061,
+      "f0_std_hz": 29.001672614745836,
+      "f0_range_hz": 144.0,
+      "pause_ratio": 0.7210414673709604,
+      "voiced_ratio": 0.27895853262903963,
+      "energy_std": 1.4287729702765328
+    },
+    "extended_features": {
+      "naq_mean": 0.0688205295686534,
+      "naq_std": 0.05951208132752514,
+      "h1h2_mean": 2.197157387422937,
+      "h1h2_std": 4.686621680646244
+    },
+    "metadata": {
+      "total_frames": 72129,
+      "voiced_frames": 20121,
+      "duration_sec": 721.29
+    }
+  },
+  {
+    "session_id": 325,
+    "baseline_features": {
+      "f0_mean_hz": 190.0937412077653,
+      "f0_std_hz": 34.049068682580724,
+      "f0_range_hz": 271.0,
+      "pause_ratio": 0.5531822493457217,
+      "voiced_ratio": 0.44681775065427826,
+      "energy_std": 1.272417725264132
+    },
+    "extended_features": {
+      "naq_mean": 0.08490399783123713,
+      "naq_std": 0.061724942945856,
+      "h1h2_mean": 4.3468108254537094,
+      "h1h2_std": 5.563914287773987
+    },
+    "metadata": {
+      "total_frames": 87501,
+      "voiced_frames": 39097,
+      "duration_sec": 875.01
+    }
+  },
+  {
+    "session_id": 326,
+    "baseline_features": {
+      "f0_mean_hz": 134.95587370649108,
+      "f0_std_hz": 43.90719082335103,
+      "f0_range_hz": 202.0,
+      "pause_ratio": 0.7567540510004147,
+      "voiced_ratio": 0.24324594899958524,
+      "energy_std": 1.1478533715718975
+    },
+    "extended_features": {
+      "naq_mean": 0.061885607748537644,
+      "naq_std": 0.059120226523692386,
+      "h1h2_mean": 1.4464236710870269,
+      "h1h2_std": 4.769616895528179
+    },
+    "metadata": {
+      "total_frames": 69921,
+      "voiced_frames": 17008,
+      "duration_sec": 699.21
+    }
+  },
+  {
+    "session_id": 327,
+    "baseline_features": {
+      "f0_mean_hz": 205.5772331154684,
+      "f0_std_hz": 44.116865384694094,
+      "f0_range_hz": 292.0,
+      "pause_ratio": 0.5954699687128189,
+      "voiced_ratio": 0.40453003128718107,
+      "energy_std": 1.805760905745577
+    },
+    "extended_features": {
+      "naq_mean": 0.07523968530563757,
+      "naq_std": 0.06303121551202719,
+      "h1h2_mean": 3.1398967901818926,
+      "h1h2_std": 5.1320771826279055
+    },
+    "metadata": {
+      "total_frames": 68079,
+      "voiced_frames": 27540,
+      "duration_sec": 680.79
+    }
+  },
+  {
+    "session_id": 328,
+    "baseline_features": {
+      "f0_mean_hz": 139.08705096073518,
+      "f0_std_hz": 31.261927963520243,
+      "f0_range_hz": 203.0,
+      "pause_ratio": 0.6066972709606556,
+      "voiced_ratio": 0.3933027290393444,
+      "energy_std": 2.193033182602306
+    },
+    "extended_features": {
+      "naq_mean": 0.06682623920851005,
+      "naq_std": 0.04961526407856276,
+      "h1h2_mean": 1.5018126583641138,
+      "h1h2_std": 4.801294906022381
+    },
+    "metadata": {
+      "total_frames": 106521,
+      "voiced_frames": 41895,
+      "duration_sec": 1065.21
+    }
+  },
+  {
+    "session_id": 329,
+    "baseline_features": {
+      "f0_mean_hz": 117.26272039288303,
+      "f0_std_hz": 29.47097054794895,
+      "f0_range_hz": 165.0,
+      "pause_ratio": 0.6482747879766102,
+      "voiced_ratio": 0.3517252120233898,
+      "energy_std": 1.2168038929090692
+    },
+    "extended_features": {
+      "naq_mean": 0.07706694687980858,
+      "naq_std": 0.06561339219165035,
+      "h1h2_mean": 2.653974764798864,
+      "h1h2_std": 5.378457283649399
+    },
+    "metadata": {
+      "total_frames": 70629,
+      "voiced_frames": 24842,
+      "duration_sec": 706.29
+    }
+  },
+  {
+    "session_id": 330,
+    "baseline_features": {
+      "f0_mean_hz": 107.23388671875,
+      "f0_std_hz": 35.44462607654251,
+      "f0_range_hz": 152.0,
+      "pause_ratio": 0.8141825770242771,
+      "voiced_ratio": 0.18581742297572293,
+      "energy_std": 1.1630175431844056
+    },
+    "extended_features": {
+      "naq_mean": 0.035939287271936855,
+      "naq_std": 0.04010774533412291,
+      "h1h2_mean": 0.4274972044914518,
+      "h1h2_std": 4.312237609752666
+    },
+    "metadata": {
+      "total_frames": 77151,
+      "voiced_frames": 14336,
+      "duration_sec": 771.51
+    }
+  },
+  {
+    "session_id": 331,
+    "baseline_features": {
+      "f0_mean_hz": 124.33379450285925,
+      "f0_std_hz": 31.66894937018713,
+      "f0_range_hz": 168.0,
+      "pause_ratio": 0.6176605423704905,
+      "voiced_ratio": 0.3823394576295095,
+      "energy_std": 1.4464030441511297
+    },
+    "extended_features": {
+      "naq_mean": 0.05916331097700157,
+      "naq_std": 0.04808542228608686,
+      "h1h2_mean": 1.3436546271665786,
+      "h1h2_std": 5.010301652339718
+    },
+    "metadata": {
+      "total_frames": 85071,
+      "voiced_frames": 32526,
+      "duration_sec": 850.71
+    }
+  },
+  {
+    "session_id": 332,
+    "baseline_features": {
+      "f0_mean_hz": 163.64032904742155,
+      "f0_std_hz": 46.374253080995814,
+      "f0_range_hz": 232.0,
+      "pause_ratio": 0.6690119092562721,
+      "voiced_ratio": 0.3309880907437279,
+      "energy_std": 1.5137600902418211
+    },
+    "extended_features": {
+      "naq_mean": 0.055403863132535945,
+      "naq_std": 0.048886141606339584,
+      "h1h2_mean": 2.0192681505584766,
+      "h1h2_std": 4.9799785837136215
+    },
+    "metadata": {
+      "total_frames": 87411,
+      "voiced_frames": 28932,
+      "duration_sec": 874.11
+    }
+  },
+  {
+    "session_id": 333,
+    "baseline_features": {
+      "f0_mean_hz": 115.06456289027653,
+      "f0_std_hz": 33.99991929588666,
+      "f0_range_hz": 165.0,
+      "pause_ratio": 0.7224388734138038,
+      "voiced_ratio": 0.27756112658619625,
+      "energy_std": 1.370394832497267
+    },
+    "extended_features": {
+      "naq_mean": 0.043727645014728145,
+      "naq_std": 0.03954715893573828,
+      "h1h2_mean": 0.6217914628683936,
+      "h1h2_std": 4.51039944690678
+    },
+    "metadata": {
+      "total_frames": 96930,
+      "voiced_frames": 26904,
+      "duration_sec": 969.3000000000001
+    }
+  },
+  {
+    "session_id": 334,
+    "baseline_features": {
+      "f0_mean_hz": 140.41386955400876,
+      "f0_std_hz": 34.24499735329597,
+      "f0_range_hz": 193.0,
+      "pause_ratio": 0.6041877123702819,
+      "voiced_ratio": 0.39581228762971804,
+      "energy_std": 1.4067703083794851
+    },
+    "extended_features": {
+      "naq_mean": 0.08903907119337558,
+      "naq_std": 0.07582520368252112,
+      "h1h2_mean": 4.656020999492301,
+      "h1h2_std": 6.633049926758326
+    },
+    "metadata": {
+      "total_frames": 98001,
+      "voiced_frames": 38790,
+      "duration_sec": 980.01
+    }
+  },
+  {
+    "session_id": 335,
+    "baseline_features": {
+      "f0_mean_hz": 206.80973894060216,
+      "f0_std_hz": 44.65119495732534,
+      "f0_range_hz": 290.0,
+      "pause_ratio": 0.6026864233224913,
+      "voiced_ratio": 0.3973135766775087,
+      "energy_std": 1.855482511345661
+    },
+    "extended_features": {
+      "naq_mean": 0.061765753297842424,
+      "naq_std": 0.05423429148464639,
+      "h1h2_mean": 3.943529522486556,
+      "h1h2_std": 5.781742648850557
+    },
+    "metadata": {
+      "total_frames": 83010,
+      "voiced_frames": 32981,
+      "duration_sec": 830.1
+    }
+  },
+  {
+    "session_id": 336,
+    "baseline_features": {
+      "f0_mean_hz": 114.7173238078013,
+      "f0_std_hz": 34.73349971008273,
+      "f0_range_hz": 167.0,
+      "pause_ratio": 0.6487628243814122,
+      "voiced_ratio": 0.3512371756185878,
+      "energy_std": 1.610530988157119
+    },
+    "extended_features": {
+      "naq_mean": 0.07659600413528993,
+      "naq_std": 0.06349559713730986,
+      "h1h2_mean": 2.3060631713589346,
+      "h1h2_std": 5.481866979623042
+    },
+    "metadata": {
+      "total_frames": 94449,
+      "voiced_frames": 33174,
+      "duration_sec": 944.49
+    }
+  },
+  {
+    "session_id": 337,
+    "baseline_features": {
+      "f0_mean_hz": 170.08023209283712,
+      "f0_std_hz": 33.502291568127006,
+      "f0_range_hz": 250.0,
+      "pause_ratio": 0.505859907331698,
+      "voiced_ratio": 0.494140092668302,
+      "energy_std": 1.3179137115369859
+    },
+    "extended_features": {
+      "naq_mean": 0.07504003041079545,
+      "naq_std": 0.0572090600068035,
+      "h1h2_mean": 2.716354379697391,
+      "h1h2_std": 5.549704344232261
+    },
+    "metadata": {
+      "total_frames": 187119,
+      "voiced_frames": 92463,
+      "duration_sec": 1871.19
+    }
+  },
+  {
+    "session_id": 338,
+    "baseline_features": {
+      "f0_mean_hz": 181.25833595824147,
+      "f0_std_hz": 43.77013458207573,
+      "f0_range_hz": 260.0,
+      "pause_ratio": 0.6276244575143686,
+      "voiced_ratio": 0.3723755424856315,
+      "energy_std": 1.8409351270813055
+    },
+    "extended_features": {
+      "naq_mean": 0.042989951138534495,
+      "naq_std": 0.042082667885351574,
+      "h1h2_mean": 2.9389487720755043,
+      "h1h2_std": 4.91404191560446
+    },
+    "metadata": {
+      "total_frames": 59679,
+      "voiced_frames": 22223,
+      "duration_sec": 596.79
+    }
+  },
+  {
+    "session_id": 339,
+    "baseline_features": {
+      "f0_mean_hz": 78.23660090104086,
+      "f0_std_hz": 12.63647669402874,
+      "f0_range_hz": 110.0,
+      "pause_ratio": 0.7016073891225996,
+      "voiced_ratio": 0.2983926108774004,
+      "energy_std": 1.2151350114037038
+    },
+    "extended_features": {
+      "naq_mean": 0.060105667926578135,
+      "naq_std": 0.049585301218061054,
+      "h1h2_mean": 0.014909743361297452,
+      "h1h2_std": 4.779494474069183
+    },
+    "metadata": {
+      "total_frames": 86289,
+      "voiced_frames": 25748,
+      "duration_sec": 862.89
+    }
+  },
+  {
+    "session_id": 340,
+    "baseline_features": {
+      "f0_mean_hz": 98.98605324482735,
+      "f0_std_hz": 34.9185661699516,
+      "f0_range_hz": 148.0,
+      "pause_ratio": 0.7637116016752599,
+      "voiced_ratio": 0.2362883983247401,
+      "energy_std": 1.269368012182265
+    },
+    "extended_features": {
+      "naq_mean": 0.045665872142130116,
+      "naq_std": 0.04730985180551569,
+      "h1h2_mean": 0.9967816490157513,
+      "h1h2_std": 5.126539184189879
+    },
+    "metadata": {
+      "total_frames": 59931,
+      "voiced_frames": 14161,
+      "duration_sec": 599.3100000000001
+    }
+  },
+  {
+    "session_id": 341,
+    "baseline_features": {
+      "f0_mean_hz": 195.01062930305594,
+      "f0_std_hz": 43.65427019376984,
+      "f0_range_hz": 290.0,
+      "pause_ratio": 0.6182637664119146,
+      "voiced_ratio": 0.38173623358808545,
+      "energy_std": 1.2776987985530797
+    },
+    "extended_features": {
+      "naq_mean": 0.07238368023744164,
+      "naq_std": 0.06160605179852965,
+      "h1h2_mean": 3.478204470089313,
+      "h1h2_std": 5.052859911845795
+    },
+    "metadata": {
+      "total_frames": 86751,
+      "voiced_frames": 33116,
+      "duration_sec": 867.51
+    }
+  },
+  {
+    "session_id": 343,
+    "baseline_features": {
+      "f0_mean_hz": 113.08912723542791,
+      "f0_std_hz": 36.14649141111005,
+      "f0_range_hz": 155.0,
+      "pause_ratio": 0.7581904453790574,
+      "voiced_ratio": 0.24180955462094253,
+      "energy_std": 0.9370458285734836
+    },
+    "extended_features": {
+      "naq_mean": 0.06561433667290846,
+      "naq_std": 0.06483435629062331,
+      "h1h2_mean": 1.67203314841651,
+      "h1h2_std": 4.986288073669527
+    },
+    "metadata": {
+      "total_frames": 92730,
+      "voiced_frames": 22423,
+      "duration_sec": 927.3000000000001
+    }
+  },
+  {
+    "session_id": 344,
+    "baseline_features": {
+      "f0_mean_hz": 89.24654675429494,
+      "f0_std_hz": 20.087979438331438,
+      "f0_range_hz": 126.0,
+      "pause_ratio": 0.6023383768913342,
+      "voiced_ratio": 0.39766162310866576,
+      "energy_std": 1.7739868121003552
+    },
+    "extended_features": {
+      "naq_mean": 0.04371381832050988,
+      "naq_std": 0.035137424474917446,
+      "h1h2_mean": 0.1556175463326364,
+      "h1h2_std": 4.324461942929338
+    },
+    "metadata": {
+      "total_frames": 109050,
+      "voiced_frames": 43365,
+      "duration_sec": 1090.5
+    }
+  },
+  {
+    "session_id": 345,
+    "baseline_features": {
+      "f0_mean_hz": 224.9733644859813,
+      "f0_std_hz": 48.24195686530292,
+      "f0_range_hz": 337.0,
+      "pause_ratio": 0.5013163032661956,
+      "voiced_ratio": 0.4986836967338044,
+      "energy_std": 1.5971658804617193
+    },
+    "extended_features": {
+      "naq_mean": 0.07761294588900226,
+      "naq_std": 0.04995242880121302,
+      "h1h2_mean": 3.330192236154213,
+      "h1h2_std": 5.7816039902079535
+    },
+    "metadata": {
+      "total_frames": 79389,
+      "voiced_frames": 39590,
+      "duration_sec": 793.89
+    }
+  },
+  {
+    "session_id": 346,
+    "baseline_features": {
+      "f0_mean_hz": 186.88480221356835,
+      "f0_std_hz": 52.76957488970903,
+      "f0_range_hz": 274.0,
+      "pause_ratio": 0.6006744092780383,
+      "voiced_ratio": 0.39932559072196167,
+      "energy_std": 1.3120469344996781
+    },
+    "extended_features": {
+      "naq_mean": 0.08327025416576063,
+      "naq_std": 0.068628174873195,
+      "h1h2_mean": 3.2056313738272637,
+      "h1h2_std": 5.619923141564427
+    },
+    "metadata": {
+      "total_frames": 122181,
+      "voiced_frames": 48790,
+      "duration_sec": 1221.81
+    }
+  },
+  {
+    "session_id": 347,
+    "baseline_features": {
+      "f0_mean_hz": 142.6008440845457,
+      "f0_std_hz": 50.146549273468004,
+      "f0_range_hz": 210.5,
+      "pause_ratio": 0.7617435947744478,
+      "voiced_ratio": 0.23825640522555222,
+      "energy_std": 0.9698567217556773
+    },
+    "extended_features": {
+      "naq_mean": 0.06411872004126143,
+      "naq_std": 0.06149021142028186,
+      "h1h2_mean": 2.7733971275997735,
+      "h1h2_std": 6.009486809537246
+    },
+    "metadata": {
+      "total_frames": 61161,
+      "voiced_frames": 14572,
+      "duration_sec": 611.61
+    }
+  },
+  {
+    "session_id": 348,
+    "baseline_features": {
+      "f0_mean_hz": 203.0015040052313,
+      "f0_std_hz": 48.47101165739085,
+      "f0_range_hz": 283.0,
+      "pause_ratio": 0.5748540450375312,
+      "voiced_ratio": 0.4251459549624687,
+      "energy_std": 1.3140031482664791
+    },
+    "extended_features": {
+      "naq_mean": 0.062385213998304136,
+      "naq_std": 0.05559813738792308,
+      "h1h2_mean": 2.713160503780081,
+      "h1h2_std": 5.176684425886968
+    },
+    "metadata": {
+      "total_frames": 71940,
+      "voiced_frames": 30585,
+      "duration_sec": 719.4
+    }
+  },
+  {
+    "session_id": 349,
+    "baseline_features": {
+      "f0_mean_hz": 119.81140871334125,
+      "f0_std_hz": 29.601537245930132,
+      "f0_range_hz": 168.0,
+      "pause_ratio": 0.708928527372758,
+      "voiced_ratio": 0.291071472627242,
+      "energy_std": 0.9687249384238003
+    },
+    "extended_features": {
+      "naq_mean": 0.0613349381045368,
+      "naq_std": 0.059859773135907096,
+      "h1h2_mean": 3.5809513958102444,
+      "h1h2_std": 5.988173716095545
+    },
+    "metadata": {
+      "total_frames": 121599,
+      "voiced_frames": 35394,
+      "duration_sec": 1215.99
+    }
+  },
+  {
+    "session_id": 350,
+    "baseline_features": {
+      "f0_mean_hz": 182.06920531449043,
+      "f0_std_hz": 40.436527763313066,
+      "f0_range_hz": 285.0,
+      "pause_ratio": 0.5441998661812903,
+      "voiced_ratio": 0.45580013381870965,
+      "energy_std": 1.0603580807869775
+    },
+    "extended_features": {
+      "naq_mean": 0.05732625859927241,
+      "naq_std": 0.05554526470601015,
+      "h1h2_mean": 2.891220276997232,
+      "h1h2_std": 5.091769635922074
+    },
+    "metadata": {
+      "total_frames": 88179,
+      "voiced_frames": 40192,
+      "duration_sec": 881.79
+    }
+  },
+  {
+    "session_id": 351,
+    "baseline_features": {
+      "f0_mean_hz": 202.40971283239972,
+      "f0_std_hz": 38.8570641689045,
+      "f0_range_hz": 288.0,
+      "pause_ratio": 0.5963824893774607,
+      "voiced_ratio": 0.40361751062253926,
+      "energy_std": 1.322775399540405
+    },
+    "extended_features": {
+      "naq_mean": 0.08456090616572201,
+      "naq_std": 0.06497899861986953,
+      "h1h2_mean": 5.443934056431553,
+      "h1h2_std": 6.514233538150822
+    },
+    "metadata": {
+      "total_frames": 76959,
+      "voiced_frames": 31062,
+      "duration_sec": 769.59
+    }
+  },
+  {
+    "session_id": 352,
+    "baseline_features": {
+      "f0_mean_hz": 199.04502648616833,
+      "f0_std_hz": 45.74471405366826,
+      "f0_range_hz": 301.0,
+      "pause_ratio": 0.5753114680769889,
+      "voiced_ratio": 0.42468853192301115,
+      "energy_std": 1.3781454350712552
+    },
+    "extended_features": {
+      "naq_mean": 0.05829667746337123,
+      "naq_std": 0.05371846466543562,
+      "h1h2_mean": 4.995123414642143,
+      "h1h2_std": 5.866108724610278
+    },
+    "metadata": {
+      "total_frames": 76011,
+      "voiced_frames": 32281,
+      "duration_sec": 760.11
+    }
+  },
+  {
+    "session_id": 353,
+    "baseline_features": {
+      "f0_mean_hz": 190.92291250624064,
+      "f0_std_hz": 42.39652071030799,
+      "f0_range_hz": 283.0,
+      "pause_ratio": 0.592264631043257,
+      "voiced_ratio": 0.407735368956743,
+      "energy_std": 1.8060616571184758
+    },
+    "extended_features": {
+      "naq_mean": 0.04751071566073066,
+      "naq_std": 0.04790268481593589,
+      "h1h2_mean": 4.852130002630718,
+      "h1h2_std": 6.1539139028682035
+    },
+    "metadata": {
+      "total_frames": 78600,
+      "voiced_frames": 32048,
+      "duration_sec": 786.0
+    }
+  },
+  {
+    "session_id": 354,
+    "baseline_features": {
+      "f0_mean_hz": 115.43929723915382,
+      "f0_std_hz": 36.652407158711945,
+      "f0_range_hz": 148.0,
+      "pause_ratio": 0.7582392815658536,
+      "voiced_ratio": 0.24176071843414643,
+      "energy_std": 0.8478200158580246
+    },
+    "extended_features": {
+      "naq_mean": 0.0569672408289194,
+      "naq_std": 0.05615456491784517,
+      "h1h2_mean": 0.9457021059078379,
+      "h1h2_std": 4.585027441159688
+    },
+    "metadata": {
+      "total_frames": 57681,
+      "voiced_frames": 13945,
+      "duration_sec": 576.8100000000001
+    }
+  },
+  {
+    "session_id": 355,
+    "baseline_features": {
+      "f0_mean_hz": 146.3012854283005,
+      "f0_std_hz": 32.8697194258073,
+      "f0_range_hz": 205.0,
+      "pause_ratio": 0.5779902178746109,
+      "voiced_ratio": 0.4220097821253891,
+      "energy_std": 1.1554445927613741
+    },
+    "extended_features": {
+      "naq_mean": 0.0911246635926812,
+      "naq_std": 0.07232870904724238,
+      "h1h2_mean": 4.245616554029051,
+      "h1h2_std": 6.1420020062360186
+    },
+    "metadata": {
+      "total_frames": 67470,
+      "voiced_frames": 28473,
+      "duration_sec": 674.7
+    }
+  },
+  {
+    "session_id": 356,
+    "baseline_features": {
+      "f0_mean_hz": 117.77489567384191,
+      "f0_std_hz": 30.41973262423443,
+      "f0_range_hz": 169.0,
+      "pause_ratio": 0.6508490566037736,
+      "voiced_ratio": 0.34915094339622643,
+      "energy_std": 1.166516752089142
+    },
+    "extended_features": {
+      "naq_mean": 0.07079395875664875,
+      "naq_std": 0.05938872284860526,
+      "h1h2_mean": 3.1287697139871384,
+      "h1h2_std": 5.48023741491417
+    },
+    "metadata": {
+      "total_frames": 95400,
+      "voiced_frames": 33309,
+      "duration_sec": 954.0
+    }
+  },
+  {
+    "session_id": 357,
+    "baseline_features": {
+      "f0_mean_hz": 134.43800925925925,
+      "f0_std_hz": 39.29237892272904,
+      "f0_range_hz": 180.0,
+      "pause_ratio": 0.7396398351052289,
+      "voiced_ratio": 0.2603601648947711,
+      "energy_std": 1.2496733966132678
+    },
+    "extended_features": {
+      "naq_mean": 0.045442247002237944,
+      "naq_std": 0.04570404758884438,
+      "h1h2_mean": 1.1660741216069042,
+      "h1h2_std": 5.395492054349636
+    },
+    "metadata": {
+      "total_frames": 41481,
+      "voiced_frames": 10800,
+      "duration_sec": 414.81
+    }
+  },
+  {
+    "session_id": 358,
+    "baseline_features": {
+      "f0_mean_hz": 139.80675896194137,
+      "f0_std_hz": 41.67926380502172,
+      "f0_range_hz": 201.0,
+      "pause_ratio": 0.7067956969332161,
+      "voiced_ratio": 0.29320430306678397,
+      "energy_std": 1.1993195222315631
+    },
+    "extended_features": {
+      "naq_mean": 0.05201157654906391,
+      "naq_std": 0.050367729503143006,
+      "h1h2_mean": 1.128018917761572,
+      "h1h2_std": 5.2745844220576235
+    },
+    "metadata": {
+      "total_frames": 64791,
+      "voiced_frames": 18997,
+      "duration_sec": 647.91
+    }
+  },
+  {
+    "session_id": 359,
+    "baseline_features": {
+      "f0_mean_hz": 134.31219975852235,
+      "f0_std_hz": 35.197452437084834,
+      "f0_range_hz": 186.0,
+      "pause_ratio": 0.623380644162579,
+      "voiced_ratio": 0.376619355837421,
+      "energy_std": 1.7102846851087978
+    },
+    "extended_features": {
+      "naq_mean": 0.05845852531085266,
+      "naq_std": 0.05475062192198604,
+      "h1h2_mean": 0.9036743887293608,
+      "h1h2_std": 5.264534814407628
+    },
+    "metadata": {
+      "total_frames": 103359,
+      "voiced_frames": 38927,
+      "duration_sec": 1033.59
+    }
+  },
+  {
+    "session_id": 360,
+    "baseline_features": {
+      "f0_mean_hz": 219.12196695921529,
+      "f0_std_hz": 39.705247324550314,
+      "f0_range_hz": 317.0,
+      "pause_ratio": 0.560172570390554,
+      "voiced_ratio": 0.439827429609446,
+      "energy_std": 1.2838360968382139
+    },
+    "extended_features": {
+      "naq_mean": 0.09404813775927567,
+      "naq_std": 0.07024425500138762,
+      "h1h2_mean": 5.054616161399296,
+      "h1h2_std": 6.034972216937634
+    },
+    "metadata": {
+      "total_frames": 44040,
+      "voiced_frames": 19370,
+      "duration_sec": 440.40000000000003
+    }
+  },
+  {
+    "session_id": 361,
+    "baseline_features": {
+      "f0_mean_hz": 146.84302782581355,
+      "f0_std_hz": 36.52025674032423,
+      "f0_range_hz": 204.0,
+      "pause_ratio": 0.6036204452337555,
+      "voiced_ratio": 0.3963795547662445,
+      "energy_std": 1.1963202567716176
+    },
+    "extended_features": {
+      "naq_mean": 0.06314323428726924,
+      "naq_std": 0.050747237995607354,
+      "h1h2_mean": 1.4664092398989113,
+      "h1h2_std": 5.131594833680388
+    },
+    "metadata": {
+      "total_frames": 64191,
+      "voiced_frames": 25444,
+      "duration_sec": 641.91
+    }
+  },
+  {
+    "session_id": 362,
+    "baseline_features": {
+      "f0_mean_hz": 180.35022296270887,
+      "f0_std_hz": 47.61021235102861,
+      "f0_range_hz": 265.0,
+      "pause_ratio": 0.6542299937308325,
+      "voiced_ratio": 0.34577000626916754,
+      "energy_std": 1.8178796492509073
+    },
+    "extended_features": {
+      "naq_mean": 0.04882804626731867,
+      "naq_std": 0.050365776802330044,
+      "h1h2_mean": 3.215707275677494,
+      "h1h2_std": 5.342999383740512
+    },
+    "metadata": {
+      "total_frames": 59019,
+      "voiced_frames": 20407,
+      "duration_sec": 590.19
+    }
+  },
+  {
+    "session_id": 363,
+    "baseline_features": {
+      "f0_mean_hz": 128.87969770512865,
+      "f0_std_hz": 30.94215279383031,
+      "f0_range_hz": 180.0,
+      "pause_ratio": 0.5433260804016005,
+      "voiced_ratio": 0.4566739195983995,
+      "energy_std": 1.2603567152235564
+    },
+    "extended_features": {
+      "naq_mean": 0.08874563580624067,
+      "naq_std": 0.07045136078920049,
+      "h1h2_mean": 3.179616856748144,
+      "h1h2_std": 6.049146046742138
+    },
+    "metadata": {
+      "total_frames": 122709,
+      "voiced_frames": 56038,
+      "duration_sec": 1227.09
+    }
+  },
+  {
+    "session_id": 364,
+    "baseline_features": {
+      "f0_mean_hz": 101.18283511938334,
+      "f0_std_hz": 27.611363559271318,
+      "f0_range_hz": 146.0,
+      "pause_ratio": 0.6417156425239547,
+      "voiced_ratio": 0.3582843574760453,
+      "energy_std": 1.355870713109955
+    },
+    "extended_features": {
+      "naq_mean": 0.05374132839441484,
+      "naq_std": 0.04535284690169501,
+      "h1h2_mean": 0.771054366186664,
+      "h1h2_std": 5.6155569459622185
+    },
+    "metadata": {
+      "total_frames": 178149,
+      "voiced_frames": 63828,
+      "duration_sec": 1781.49
+    }
+  },
+  {
+    "session_id": 365,
+    "baseline_features": {
+      "f0_mean_hz": 126.40070268649042,
+      "f0_std_hz": 66.50451321212385,
+      "f0_range_hz": 290.0,
+      "pause_ratio": 0.8316198803829478,
+      "voiced_ratio": 0.1683801196170523,
+      "energy_std": 1.3034972935280127
+    },
+    "extended_features": {
+      "naq_mean": 0.037941043979454796,
+      "naq_std": 0.04126996067391362,
+      "h1h2_mean": 0.03658533413887985,
+      "h1h2_std": 4.973642195625667
+    },
+    "metadata": {
+      "total_frames": 138609,
+      "voiced_frames": 23339,
+      "duration_sec": 1386.09
+    }
+  },
+  {
+    "session_id": 366,
+    "baseline_features": {
+      "f0_mean_hz": 123.3538079983466,
+      "f0_std_hz": 36.25132643366859,
+      "f0_range_hz": 177.0,
+      "pause_ratio": 0.6314113551355592,
+      "voiced_ratio": 0.36858864486444076,
+      "energy_std": 1.2142044588083982
+    },
+    "extended_features": {
+      "naq_mean": 0.05701955508672571,
+      "naq_std": 0.047600781214922054,
+      "h1h2_mean": 0.8573795358538367,
+      "h1h2_std": 5.328632640045275
+    },
+    "metadata": {
+      "total_frames": 131271,
+      "voiced_frames": 48385,
+      "duration_sec": 1312.71
+    }
+  },
+  {
+    "session_id": 367,
+    "baseline_features": {
+      "f0_mean_hz": 127.02984037897836,
+      "f0_std_hz": 27.416318014311702,
+      "f0_range_hz": 185.0,
+      "pause_ratio": 0.5602775792450871,
+      "voiced_ratio": 0.4397224207549129,
+      "energy_std": 1.1156053617974264
+    },
+    "extended_features": {
+      "naq_mean": 0.0726463043537657,
+      "naq_std": 0.05526520417977252,
+      "h1h2_mean": 1.7428645125395978,
+      "h1h2_std": 4.8816563194178695
+    },
+    "metadata": {
+      "total_frames": 163701,
+      "voiced_frames": 71983,
+      "duration_sec": 1637.01
+    }
+  },
+  {
+    "session_id": 368,
+    "baseline_features": {
+      "f0_mean_hz": 153.70588618564224,
+      "f0_std_hz": 34.309094454349264,
+      "f0_range_hz": 230.0,
+      "pause_ratio": 0.4335769117212873,
+      "voiced_ratio": 0.5664230882787127,
+      "energy_std": 1.541375480015129
+    },
+    "extended_features": {
+      "naq_mean": 0.06227579760111278,
+      "naq_std": 0.05154046246550225,
+      "h1h2_mean": 1.3260316852115588,
+      "h1h2_std": 5.562803877108389
+    },
+    "metadata": {
+      "total_frames": 135480,
+      "voiced_frames": 76739,
+      "duration_sec": 1354.8
+    }
+  },
+  {
+    "session_id": 369,
+    "baseline_features": {
+      "f0_mean_hz": 218.36567941050396,
+      "f0_std_hz": 45.64518151844179,
+      "f0_range_hz": 311.0,
+      "pause_ratio": 0.5294258901727997,
+      "voiced_ratio": 0.4705741098272003,
+      "energy_std": 1.3544161497530498
+    },
+    "extended_features": {
+      "naq_mean": 0.06869893884712494,
+      "naq_std": 0.0563274463718703,
+      "h1h2_mean": 5.34955973890409,
+      "h1h2_std": 6.010855796651367
+    },
+    "metadata": {
+      "total_frames": 104109,
+      "voiced_frames": 48991,
+      "duration_sec": 1041.09
+    }
+  },
+  {
+    "session_id": 370,
+    "baseline_features": {
+      "f0_mean_hz": 110.41845448358558,
+      "f0_std_hz": 27.405354036926912,
+      "f0_range_hz": 159.0,
+      "pause_ratio": 0.48938036256526096,
+      "voiced_ratio": 0.510619637434739,
+      "energy_std": 1.4506382604564971
+    },
+    "extended_features": {
+      "naq_mean": 0.08363048340302248,
+      "naq_std": 0.05965774056431206,
+      "h1h2_mean": 1.790086315279981,
+      "h1h2_std": 4.937581430604132
+    },
+    "metadata": {
+      "total_frames": 120861,
+      "voiced_frames": 61714,
+      "duration_sec": 1208.6100000000001
+    }
+  },
+  {
+    "session_id": 371,
+    "baseline_features": {
+      "f0_mean_hz": 114.33625080354052,
+      "f0_std_hz": 40.448917700120326,
+      "f0_range_hz": 162.0,
+      "pause_ratio": 0.7781836130306021,
+      "voiced_ratio": 0.22181638696939782,
+      "energy_std": 1.2534036767143983
+    },
+    "extended_features": {
+      "naq_mean": 0.032694640432789294,
+      "naq_std": 0.034911966675941555,
+      "h1h2_mean": 0.1463847531705605,
+      "h1h2_std": 4.901581298456016
+    },
+    "metadata": {
+      "total_frames": 91170,
+      "voiced_frames": 20223,
+      "duration_sec": 911.7
+    }
+  },
+  {
+    "session_id": 372,
+    "baseline_features": {
+      "f0_mean_hz": 220.8334943340145,
+      "f0_std_hz": 55.91754575175992,
+      "f0_range_hz": 320.0,
+      "pause_ratio": 0.6443836666204227,
+      "voiced_ratio": 0.3556163333795773,
+      "energy_std": 1.6264025393956998
+    },
+    "extended_features": {
+      "naq_mean": 0.05650788040060662,
+      "naq_std": 0.05145838871639543,
+      "h1h2_mean": 2.9972322000526592,
+      "h1h2_std": 5.8563943280449235
+    },
+    "metadata": {
+      "total_frames": 151371,
+      "voiced_frames": 53830,
+      "duration_sec": 1513.71
+    }
+  },
+  {
+    "session_id": 373,
+    "baseline_features": {
+      "f0_mean_hz": 81.5577779476692,
+      "f0_std_hz": 17.08248199904135,
+      "f0_range_hz": 120.0,
+      "pause_ratio": 0.5864279503596553,
+      "voiced_ratio": 0.41357204964034466,
+      "energy_std": 1.0505481226665723
+    },
+    "extended_features": {
+      "naq_mean": 0.0422358590740926,
+      "naq_std": 0.04214610988429249,
+      "h1h2_mean": -0.5113928684257419,
+      "h1h2_std": 3.997951418271519
+    },
+    "metadata": {
+      "total_frames": 126510,
+      "voiced_frames": 52321,
+      "duration_sec": 1265.1000000000001
+    }
+  },
+  {
+    "session_id": 374,
+    "baseline_features": {
+      "f0_mean_hz": 169.71147037998583,
+      "f0_std_hz": 38.462635974534535,
+      "f0_range_hz": 238.0,
+      "pause_ratio": 0.6051534142534305,
+      "voiced_ratio": 0.39484658574656945,
+      "energy_std": 1.4636190789636827
+    },
+    "extended_features": {
+      "naq_mean": 0.05640676014121839,
+      "naq_std": 0.04766135420688774,
+      "h1h2_mean": 3.0450448520118663,
+      "h1h2_std": 5.733728672778205
+    },
+    "metadata": {
+      "total_frames": 128769,
+      "voiced_frames": 50844,
+      "duration_sec": 1287.69
+    }
+  },
+  {
+    "session_id": 375,
+    "baseline_features": {
+      "f0_mean_hz": 151.48825802615934,
+      "f0_std_hz": 48.87924036421443,
+      "f0_range_hz": 227.0,
+      "pause_ratio": 0.729238099837414,
+      "voiced_ratio": 0.27076190016258594,
+      "energy_std": 1.0601663481948886
+    },
+    "extended_features": {
+      "naq_mean": 0.056202699444989616,
+      "naq_std": 0.051943590972311444,
+      "h1h2_mean": 1.341061049032453,
+      "h1h2_std": 5.669373070217441
+    },
+    "metadata": {
+      "total_frames": 62121,
+      "voiced_frames": 16820,
+      "duration_sec": 621.21
+    }
+  },
+  {
+    "session_id": 376,
+    "baseline_features": {
+      "f0_mean_hz": 202.13411852436724,
+      "f0_std_hz": 45.249855253627736,
+      "f0_range_hz": 291.0,
+      "pause_ratio": 0.5554840596665691,
+      "voiced_ratio": 0.44451594033343084,
+      "energy_std": 1.47821703860654
+    },
+    "extended_features": {
+      "naq_mean": 0.04965949388146181,
+      "naq_std": 0.047208956617593965,
+      "h1h2_mean": 2.978383349178099,
+      "h1h2_std": 5.6434241890826184
+    },
+    "metadata": {
+      "total_frames": 102570,
+      "voiced_frames": 45594,
+      "duration_sec": 1025.7
+    }
+  },
+  {
+    "session_id": 378,
+    "baseline_features": {
+      "f0_mean_hz": 203.8866243001967,
+      "f0_std_hz": 49.035368175027955,
+      "f0_range_hz": 275.0,
+      "pause_ratio": 0.6216466870470236,
+      "voiced_ratio": 0.3783533129529763,
+      "energy_std": 1.4722540400120625
+    },
+    "extended_features": {
+      "naq_mean": 0.05576165721016212,
+      "naq_std": 0.05466860171803058,
+      "h1h2_mean": 3.4792864177856155,
+      "h1h2_std": 5.779792105896447
+    },
+    "metadata": {
+      "total_frames": 87339,
+      "voiced_frames": 33045,
+      "duration_sec": 873.39
+    }
+  },
+  {
+    "session_id": 379,
+    "baseline_features": {
+      "f0_mean_hz": 100.646623575438,
+      "f0_std_hz": 25.52661058800839,
+      "f0_range_hz": 136.0,
+      "pause_ratio": 0.589328303844964,
+      "voiced_ratio": 0.41067169615503596,
+      "energy_std": 1.440581012279388
+    },
+    "extended_features": {
+      "naq_mean": 0.0631843672576604,
+      "naq_std": 0.049937864324386134,
+      "h1h2_mean": 0.15885627198621097,
+      "h1h2_std": 4.753593212106691
+    },
+    "metadata": {
+      "total_frames": 100209,
+      "voiced_frames": 41153,
+      "duration_sec": 1002.09
+    }
+  },
+  {
+    "session_id": 380,
+    "baseline_features": {
+      "f0_mean_hz": 127.29885815392393,
+      "f0_std_hz": 32.21932060519718,
+      "f0_range_hz": 184.0,
+      "pause_ratio": 0.5372139151663107,
+      "voiced_ratio": 0.4627860848336893,
+      "energy_std": 1.767911515446726
+    },
+    "extended_features": {
+      "naq_mean": 0.05534684761396297,
+      "naq_std": 0.044698742957682364,
+      "h1h2_mean": 1.2665223180912064,
+      "h1h2_std": 5.189885496766663
+    },
+    "metadata": {
+      "total_frames": 196620,
+      "voiced_frames": 90993,
+      "duration_sec": 1966.2
+    }
+  },
+  {
+    "session_id": 381,
+    "baseline_features": {
+      "f0_mean_hz": 105.56940712616823,
+      "f0_std_hz": 30.172393016620923,
+      "f0_range_hz": 160.0,
+      "pause_ratio": 0.6856696961351327,
+      "voiced_ratio": 0.3143303038648673,
+      "energy_std": 0.9825787052112325
+    },
+    "extended_features": {
+      "naq_mean": 0.060070296222605526,
+      "naq_std": 0.051474259447942934,
+      "h1h2_mean": 1.6606498523479847,
+      "h1h2_std": 5.129923957509957
+    },
+    "metadata": {
+      "total_frames": 108930,
+      "voiced_frames": 34240,
+      "duration_sec": 1089.3
+    }
+  },
+  {
+    "session_id": 382,
+    "baseline_features": {
+      "f0_mean_hz": 125.91646696949104,
+      "f0_std_hz": 40.29244207533193,
+      "f0_range_hz": 193.0,
+      "pause_ratio": 0.6607699680898822,
+      "voiced_ratio": 0.3392300319101178,
+      "energy_std": 1.2348722661987614
+    },
+    "extended_features": {
+      "naq_mean": 0.05129958865155,
+      "naq_std": 0.0469361540716596,
+      "h1h2_mean": 1.152102861973471,
+      "h1h2_std": 5.336179988991904
+    },
+    "metadata": {
+      "total_frames": 82419,
+      "voiced_frames": 27959,
+      "duration_sec": 824.19
+    }
+  },
+  {
+    "session_id": 383,
+    "baseline_features": {
+      "f0_mean_hz": 106.21663864261694,
+      "f0_std_hz": 25.826478068264354,
+      "f0_range_hz": 152.0,
+      "pause_ratio": 0.6177370700674161,
+      "voiced_ratio": 0.38226292993258393,
+      "energy_std": 1.4647473102261037
+    },
+    "extended_features": {
+      "naq_mean": 0.05839633482618584,
+      "naq_std": 0.05231810731326324,
+      "h1h2_mean": 0.7548361185000921,
+      "h1h2_std": 5.4374167800754805
+    },
+    "metadata": {
+      "total_frames": 136911,
+      "voiced_frames": 52336,
+      "duration_sec": 1369.1100000000001
+    }
+  },
+  {
+    "session_id": 384,
+    "baseline_features": {
+      "f0_mean_hz": 136.7887620425136,
+      "f0_std_hz": 39.399393131817796,
+      "f0_range_hz": 207.0,
+      "pause_ratio": 0.6336427550836953,
+      "voiced_ratio": 0.3663572449163047,
+      "energy_std": 1.339231290778588
+    },
+    "extended_features": {
+      "naq_mean": 0.05625193087675835,
+      "naq_std": 0.04831532535203511,
+      "h1h2_mean": 0.398551300198115,
+      "h1h2_std": 5.645571464083014
+    },
+    "metadata": {
+      "total_frames": 105681,
+      "voiced_frames": 38717,
+      "duration_sec": 1056.81
+    }
+  },
+  {
+    "session_id": 385,
+    "baseline_features": {
+      "f0_mean_hz": 195.9139097744361,
+      "f0_std_hz": 71.04988553889166,
+      "f0_range_hz": 298.0,
+      "pause_ratio": 0.7520090992150062,
+      "voiced_ratio": 0.24799090078499375,
+      "energy_std": 0.7794309356997278
+    },
+    "extended_features": {
+      "naq_mean": 0.06258556818760772,
+      "naq_std": 0.0613666445176163,
+      "h1h2_mean": 2.9208075999218366,
+      "h1h2_std": 5.295001847403402
+    },
+    "metadata": {
+      "total_frames": 53631,
+      "voiced_frames": 13300,
+      "duration_sec": 536.3100000000001
+    }
+  },
+  {
+    "session_id": 386,
+    "baseline_features": {
+      "f0_mean_hz": 191.69327423471913,
+      "f0_std_hz": 39.142435538518306,
+      "f0_range_hz": 286.0,
+      "pause_ratio": 0.5137914778576308,
+      "voiced_ratio": 0.4862085221423692,
+      "energy_std": 1.4109609218202763
+    },
+    "extended_features": {
+      "naq_mean": 0.059495051539432846,
+      "naq_std": 0.047832540886567236,
+      "h1h2_mean": 3.912145521186279,
+      "h1h2_std": 5.562136440148753
+    },
+    "metadata": {
+      "total_frames": 103941,
+      "voiced_frames": 50537,
+      "duration_sec": 1039.41
+    }
+  },
+  {
+    "session_id": 387,
+    "baseline_features": {
+      "f0_mean_hz": 141.77678522496848,
+      "f0_std_hz": 63.84084654882358,
+      "f0_range_hz": 297.0,
+      "pause_ratio": 0.6972909305064783,
+      "voiced_ratio": 0.3027090694935218,
+      "energy_std": 1.42768489028055
+    },
+    "extended_features": {
+      "naq_mean": 0.06141235904669952,
+      "naq_std": 0.05818353758191645,
+      "h1h2_mean": 1.7227098354115034,
+      "h1h2_std": 5.571284467682854
+    },
+    "metadata": {
+      "total_frames": 60279,
+      "voiced_frames": 18247,
+      "duration_sec": 602.79
+    }
+  },
+  {
+    "session_id": 388,
+    "baseline_features": {
+      "f0_mean_hz": 166.10025362829364,
+      "f0_std_hz": 71.55502786005655,
+      "f0_range_hz": 312.0,
+      "pause_ratio": 0.8292368956100143,
+      "voiced_ratio": 0.17076310438998568,
+      "energy_std": 0.9826417445810796
+    },
+    "extended_features": {
+      "naq_mean": 0.036464079341618834,
+      "naq_std": 0.04315458007989029,
+      "h1h2_mean": 1.2303443925829334,
+      "h1h2_std": 5.0101262778713345
+    },
+    "metadata": {
+      "total_frames": 83121,
+      "voiced_frames": 14194,
+      "duration_sec": 831.21
+    }
+  },
+  {
+    "session_id": 389,
+    "baseline_features": {
+      "f0_mean_hz": 147.384557030615,
+      "f0_std_hz": 64.01113244699953,
+      "f0_range_hz": 294.0,
+      "pause_ratio": 0.8063869742653615,
+      "voiced_ratio": 0.19361302573463843,
+      "energy_std": 0.9471883399442326
+    },
+    "extended_features": {
+      "naq_mean": 0.0460924397940695,
+      "naq_std": 0.05069606080797495,
+      "h1h2_mean": 3.34960104071758,
+      "h1h2_std": 5.8755315709223614
+    },
+    "metadata": {
+      "total_frames": 95319,
+      "voiced_frames": 18455,
+      "duration_sec": 953.19
+    }
+  },
+  {
+    "session_id": 390,
+    "baseline_features": {
+      "f0_mean_hz": 107.92806886420453,
+      "f0_std_hz": 29.280631764283257,
+      "f0_range_hz": 158.0,
+      "pause_ratio": 0.7140024618741201,
+      "voiced_ratio": 0.2859975381258799,
+      "energy_std": 1.113613822569378
+    },
+    "extended_features": {
+      "naq_mean": 0.08023124757316778,
+      "naq_std": 0.06606453696917938,
+      "h1h2_mean": 2.9979377441473734,
+      "h1h2_std": 5.343217329399538
+    },
+    "metadata": {
+      "total_frames": 135669,
+      "voiced_frames": 38801,
+      "duration_sec": 1356.69
+    }
+  }
+]

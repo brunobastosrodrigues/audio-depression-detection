@@ -1,0 +1,121 @@
+{
+  "timestamp": "2026-01-21T16:59:18.963210",
+  "config": {
+    "sample_rate": 16000,
+    "chunk_duration_s": 5.0,
+    "num_iterations": 10,
+    "warmup_iterations": 3,
+    "esp32_max_latency_ms": 100.0,
+    "esp32_max_memory_kb": 200.0
+  },
+  "test_audio_count": 1,
+  "edge_features": [],
+  "hub_features": [
+    {
+      "feature_name": "mfcc_13",
+      "category": "spectral",
+      "mean_latency_ms": 10.65,
+      "std_latency_ms": 3.58,
+      "min_latency_ms": 8.73,
+      "max_latency_ms": 20.93,
+      "p95_latency_ms": 16.78,
+      "memory_peak_kb": 2404.85,
+      "samples_tested": 10,
+      "edge_feasible": false,
+      "notes": "Too much memory (2404.9KB > 200.0KB)."
+    },
+    {
+      "feature_name": "f0_yin",
+      "category": "prosodic",
+      "mean_latency_ms": 9.75,
+      "std_latency_ms": 2.66,
+      "min_latency_ms": 7.58,
+      "max_latency_ms": 14.93,
+      "p95_latency_ms": 14.67,
+      "memory_peak_kb": 6604.58,
+      "samples_tested": 10,
+      "edge_feasible": false,
+      "notes": "Too much memory (6604.6KB > 200.0KB)."
+    },
+    {
+      "feature_name": "rms_energy",
+      "category": "prosodic",
+      "mean_latency_ms": 0.44,
+      "std_latency_ms": 0.01,
+      "min_latency_ms": 0.43,
+      "max_latency_ms": 0.46,
+      "p95_latency_ms": 0.46,
+      "memory_peak_kb": 1611.47,
+      "samples_tested": 10,
+      "edge_feasible": false,
+      "notes": "Too much memory (1611.5KB > 200.0KB)."
+    },
+    {
+      "feature_name": "zcr",
+      "category": "temporal",
+      "mean_latency_ms": 1.4,
+      "std_latency_ms": 0.26,
+      "min_latency_ms": 1.14,
+      "max_latency_ms": 1.82,
+      "p95_latency_ms": 1.81,
+      "memory_peak_kb": 766.25,
+      "samples_tested": 10,
+      "edge_feasible": false,
+      "notes": "Too much memory (766.3KB > 200.0KB)."
+    },
+    {
+      "feature_name": "spectral_centroid",
+      "category": "spectral",
+      "mean_latency_ms": 3.57,
+      "std_latency_ms": 0.08,
+      "min_latency_ms": 3.49,
+      "max_latency_ms": 3.71,
+      "p95_latency_ms": 3.71,
+      "memory_peak_kb": 3912.32,
+      "samples_tested": 10,
+      "edge_feasible": false,
+      "notes": "Too much memory (3912.3KB > 200.0KB)."
+    },
+    {
+      "feature_name": "spectral_flatness",
+      "category": "spectral",
+      "mean_latency_ms": 3.23,
+      "std_latency_ms": 0.05,
+      "min_latency_ms": 3.17,
+      "max_latency_ms": 3.36,
+      "p95_latency_ms": 3.33,
+      "memory_peak_kb": 2323.25,
+      "samples_tested": 10,
+      "edge_feasible": false,
+      "notes": "Too much memory (2323.2KB > 200.0KB)."
+    },
+    {
+      "feature_name": "f0_pyin",
+      "category": "prosodic",
+      "mean_latency_ms": 320.23,
+      "std_latency_ms": 4.32,
+      "min_latency_ms": 311.46,
+      "max_latency_ms": 326.71,
+      "p95_latency_ms": 325.44,
+      "memory_peak_kb": 19179.85,
+      "samples_tested": 10,
+      "edge_feasible": false,
+      "notes": "Too slow for edge (325.4ms > 100.0ms). Too much memory (19179.8KB > 200.0KB)."
+    }
+  ],
+  "summary": {
+    "total_features": 7,
+    "edge_feasible": 0,
+    "hub_only": 7,
+    "edge_names": [],
+    "hub_names": [
+      "mfcc_13",
+      "f0_yin",
+      "rms_energy",
+      "zcr",
+      "spectral_centroid",
+      "spectral_flatness",
+      "f0_pyin"
+    ]
+  }
+}

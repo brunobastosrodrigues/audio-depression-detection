@@ -33,3 +33,21 @@ GEMINI.md
 
 # Board credentials (WiFi passwords, server IPs)
 **/credentials.h
+
+# Datasets (licensed, do not redistribute)
+datasets/
+research-roadmap/experiments/daic_woz_extracted/
+*.wav
+*.mp3
+*.flac
+
+# Binary/compiled files
+*.o
+*.so
+*.a
+research-roadmap/experiments/c_feature_extractor/extract_features
+research-roadmap/experiments/c_feature_extractor/test_features
+
+# Large result files
+*.pkl
+*.npy
