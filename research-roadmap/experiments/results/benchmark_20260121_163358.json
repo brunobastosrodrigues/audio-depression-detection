@@ -1,0 +1,118 @@
+{
+  "timestamp": "2026-01-21T16:32:06.641221",
+  "hostname": "ihearyou",
+  "args": {
+    "duration": 30,
+    "output": null
+  },
+  "docker_running": true,
+  "container_stats": {
+    "depression-detection-voice_metrics-1": {
+      "cpu_percent": "0.92%",
+      "mem_usage": "337.6MiB / 1.5GiB",
+      "mem_percent": "21.98%"
+    },
+    "depression-detection-quality_metrics_service-1": {
+      "cpu_percent": "0.03%",
+      "mem_usage": "30.34MiB / 128MiB",
+      "mem_percent": "23.71%"
+    },
+    "depression-detection-dashboard_layer-1": {
+      "cpu_percent": "0.00%",
+      "mem_usage": "67.82MiB / 512MiB",
+      "mem_percent": "13.25%"
+    },
+    "depression-detection-temporal_context_modeling_layer-1": {
+      "cpu_percent": "0.15%",
+      "mem_usage": "132.8MiB / 256MiB",
+      "mem_percent": "51.86%"
+    },
+    "depression-detection-respeaker_service-1": {
+      "cpu_percent": "6.47%",
+      "mem_usage": "219.6MiB / 256MiB",
+      "mem_percent": "85.76%"
+    },
+    "depression-detection-analysis_layer-1": {
+      "cpu_percent": "0.26%",
+      "mem_usage": "77.68MiB / 512MiB",
+      "mem_percent": "15.17%"
+    },
+    "depression-detection-voice_profiling-1": {
+      "cpu_percent": "3.43%",
+      "mem_usage": "242.3MiB / 256MiB",
+      "mem_percent": "94.67%"
+    },
+    "depression-detection-mqtt-1": {
+      "cpu_percent": "0.04%",
+      "mem_usage": "3.117MiB / 64MiB",
+      "mem_percent": "4.87%"
+    },
+    "mongodb": {
+      "cpu_percent": "0.16%",
+      "mem_usage": "145.1MiB / 512MiB",
+      "mem_percent": "28.34%"
+    }
+  },
+  "service_health": {
+    "temporal_context": {
+      "status": 404,
+      "latency_ms": 40.99,
+      "healthy": false
+    },
+    "analysis": {
+      "status": 404,
+      "latency_ms": 2.88,
+      "healthy": false
+    },
+    "dashboard": {
+      "status": 200,
+      "latency_ms": 47.65,
+      "healthy": true
+    }
+  },
+  "mongodb": {
+    "ping_ms": 2.64,
+    "find_one_ms": 353.73,
+    "count_documents_ms": 11.52,
+    "document_count": 24146,
+    "healthy": true
+  },
+  "memory": {
+    "samples": [
+      1310.8120000000001,
+      1347.402,
+      1404.111,
+      1452.376,
+      1514.8919999999998,
+      1547.652,
+      1572.366,
+      1622.527,
+      1621.867,
+      1620.1629999999998,
+      1620.058,
+      1620.058,
+      1624.3210000000001,
+      1624.281,
+      1624.3010000000002,
+      1624.281,
+      1624.581,
+      1624.391,
+      1624.561,
+      1624.661,
+      1624.7010000000002,
+      1624.7010000000002,
+      1624.7010000000002,
+      1624.7010000000002,
+      1624.7010000000002,
+      1624.8010000000002,
+      1624.8010000000002,
+      1624.8010000000002,
+      1624.8010000000002,
+      1624.8010000000002
+    ],
+    "min_mb": 1310.81,
+    "max_mb": 1624.8,
+    "avg_mb": 1583.24,
+    "duration_seconds": 30
+  }
+}

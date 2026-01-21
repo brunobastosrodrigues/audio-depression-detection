@@ -1,0 +1,89 @@
+# Docker Compose override to simulate Raspberry Pi 5 resource constraints
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.pi5.yml up -d
+#
+# Pi 5 (8GB) realistic available memory after OS: ~6GB
+# We use conservative limits to ensure it works on actual Pi 5
+
+version: "3.7"
+
+services:
+   # Core infrastructure - minimal overhead
+   mqtt:
+      deploy:
+         resources:
+            limits:
+               memory: 64M
+               cpus: '0.25'
+
+   mongodb:
+      deploy:
+         resources:
+            limits:
+               memory: 512M
+               cpus: '1.0'
+      # Disable mongo-express in Pi mode (not needed for production)
+
+   mongo-express:
+      deploy:
+         replicas: 0  # Disabled - saves memory
+
+   # Voice processing - main workload
+   voice_profiling:
+      deploy:
+         resources:
+            limits:
+               memory: 256M
+               cpus: '0.5'
+
+   voice_metrics:
+      deploy:
+         resources:
+            limits:
+               memory: 1536M  # 1.5GB - largest consumer (OpenSMILE, Resemblyzer)
+               cpus: '2.0'
+      environment:
+         - SYSTEM_MODE=live
+         - OMP_NUM_THREADS=2  # Limit OpenMP threads
+
+   # Data ingestion - lightweight
+   respeaker_service:
+      deploy:
+         resources:
+            limits:
+               memory: 256M
+               cpus: '0.5'
+            reservations:
+               memory: 128M
+
+   quality_metrics_service:
+      deploy:
+         resources:
+            limits:
+               memory: 128M
+               cpus: '0.25'
+
+   # Analysis pipeline
+   temporal_context_modeling_layer:
+      deploy:
+         resources:
+            limits:
+               memory: 256M
+               cpus: '0.5'
+
+   analysis_layer:
+      deploy:
+         resources:
+            limits:
+               memory: 512M
+               cpus: '0.5'
+
+   # Dashboard - can be resource-intensive with charts
+   dashboard_layer:
+      deploy:
+         resources:
+            limits:
+               memory: 512M
+               cpus: '0.5'
+
+# Total memory limits: ~4GB (safe margin for 6GB available on Pi 5)
+# Total CPU limits: 5.5 cores (exceeds 4, allows bursting)
