@@ -79,7 +79,7 @@ extractor_ctx_t* extractor_init(const extractor_config_t* config) {
     /* Initialize VAD */
     vad_config_t vad_config = {
         .threshold_db = ctx->config.vad_threshold_db,
-        .hangover_frames = 3
+        .hangover_frames = 1
     };
     ctx->vad = vad_init(&vad_config);
     if (!ctx->vad) {

@@ -35,15 +35,27 @@ vad_ctx_t* vad_init(const vad_config_t* config) {
 float vad_compute_rms(const int16_t* frame, size_t frame_size) {
     if (!frame || frame_size == 0) return 0.0f;
 
-    /* Compute sum of squares */
+    /* Compute sum and sum of squares for DC removal */
+    int64_t sum = 0;
     int64_t sum_sq = 0;
+    
     for (size_t i = 0; i < frame_size; i++) {
         int32_t sample = frame[i];
+        sum += sample;
         sum_sq += sample * sample;
     }
 
-    /* RMS normalized to 0.0-1.0 range (INT16 max = 32767) */
-    float rms = sqrtf((float)sum_sq / frame_size) / 32768.0f;
+    /* Variance = Mean(x^2) - (Mean(x))^2 */
+    double mean_sq = (double)sum_sq / frame_size;
+    double mean = (double)sum / frame_size;
+    double variance = mean_sq - (mean * mean);
+
+    /* Clamp to 0 (floating point noise) */
+    if (variance < 0.0f) variance = 0.0f;
+
+    /* RMS normalized to 0.0-1.0 range (INT16 max = 32768.0) */
+    /* Note: Using 32768.0 matches standard PCM normalization */
+    float rms = sqrtf((float)variance) / 32768.0f;
     return rms;
 }
 

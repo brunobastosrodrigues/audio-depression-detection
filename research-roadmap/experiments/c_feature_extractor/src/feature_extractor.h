@@ -80,7 +80,7 @@ typedef struct {
     .hop_size = 160,               \
     .f0_min_hz = 50.0f,            \
     .f0_max_hz = 500.0f,           \
-    .vad_threshold_db = -35.0f     \
+    .vad_threshold_db = -30.0f     \
 }
 
 /**
