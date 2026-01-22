@@ -82,7 +82,7 @@ The XVF3800's hardware DSP (AEC, beamforming, noise suppression) **preprocesses 
 | **C1: Edge extraction is accurate** | MFCC correlation (INT8 vs float32) | r > 0.95 |
 | **C2: System is real-time** | End-to-end latency | <6 seconds |
 | **C3: Privacy is guaranteed** | Audio reconstruction quality | Unintelligible (STOI < 0.5) |
-| **C4: Clinical validity preserved** | AUC-ROC vs cloud baseline | Within 5% |
+| **C4: Clinical validity preserved** | AUC-ROC vs cloud baseline | Our 8-feature extractor achieves AUC=0.990 (95% CI: [0.964, 1.000]) compared to eGeMAPS AUC=0.982 (95% CI: [0.940, 1.000]).<br><br>*Note: These results are from a mock dataset and will be updated with results from the TESS dataset.* |
 | **C5: Runs on commodity hardware** | Total system cost | <$500 |
 
 ---
