@@ -24,6 +24,8 @@ from utils.validation import (
     run_all_hypothesis_tests,
     calculate_classification_metrics,
     cohens_d,
+    cohens_d_ci,
+    effect_size_change_ci,
     interpret_cohens_d,
     DEFAULT_HYPOTHESES,
     PHQ8_TO_INDICATOR_MAPPING,
@@ -134,6 +136,7 @@ def compute_system_accuracy():
         "avg_effect_size": np.mean(effect_sizes) if effect_sizes else 0,
         "best_feature": best_feature.feature,
         "best_feature_d": best_feature.cohens_d,
+        "best_feature_ci": best_feature.cohens_d_ci,
         "best_accuracy": best_accuracy,
         "best_auc": best_auc or 0,
         "agreement_score": direction_correct_count / total_tests * 100 if total_tests > 0 else 0,
@@ -295,13 +298,15 @@ st.markdown("### Top Discriminating Feature")
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.markdown(f"""
-    The feature with highest discriminative power:
+    best_feature_ci = accuracy_data.get('best_feature_ci', (np.nan, np.nan))
+    ci_str = f" (95% CI: [{best_feature_ci[0]:.2f}, {best_feature_ci[1]:.2f}])" if not np.isnan(best_feature_ci[0]) else ""
 
+    st.markdown("The feature with highest discriminative power:")
+    st.markdown(f"""
     | Metric | Value |
     |--------|-------|
     | **Feature** | `{accuracy_data['best_feature']}` |
-    | **Cohen's d** | {accuracy_data['best_feature_d']:.2f} ({interpret_cohens_d(accuracy_data['best_feature_d'])}) |
+    | **Cohen's d** | {accuracy_data['best_feature_d']:.2f}{ci_str} |
     | **Accuracy** | {accuracy_data['best_accuracy']*100:.1f}% |
     | **AUC-ROC** | {accuracy_data['best_auc']:.2f} |
     """)
@@ -418,7 +423,7 @@ with tab_hypothesis:
                     "Direction": "Correct" if r.direction_correct else "Incorrect",
                     "Dep Mean": f"{r.depressed_mean:.3f}",
                     "NonDep Mean": f"{r.nondepressed_mean:.3f}",
-                    "Cohen's d": f"{r.cohens_d:.2f}",
+                    "Cohen's d": f"{r.cohens_d:.2f} [{r.cohens_d_ci[0]:.2f}, {r.cohens_d_ci[1]:.2f}]",
                     "Effect": interpret_cohens_d(r.cohens_d),
                     "p-value": f"{r.p_value:.4f}",
                     "p-value (FDR)": f"{r.p_value_corrected:.4f}" if r.p_value_corrected is not None else "N/A",
@@ -429,25 +434,55 @@ with tab_hypothesis:
             st.dataframe(df_results, use_container_width=True, hide_index=True)
 
             # Effect size chart
-            st.subheader("Effect Sizes by Feature")
+            st.subheader("Effect Sizes by Feature (Forest Plot)")
 
             effect_data = [
-                {"Feature": r.feature, "Cohen's d": r.cohens_d,
-                 "Direction": "Correct" if r.direction_correct else "Incorrect"}
+                {
+                    "Feature": r.feature,
+                    "Cohen's d": r.cohens_d,
+                    "CI Lower": r.cohens_d_ci[0],
+                    "CI Upper": r.cohens_d_ci[1],
+                    "Direction": "Correct" if r.direction_correct else "Incorrect"
+                }
                 for r in results if not np.isnan(r.cohens_d)
             ]
             effect_df = pd.DataFrame(effect_data).sort_values("Cohen's d")
 
-            fig = px.bar(
-                effect_df, x="Cohen's d", y="Feature", orientation="h",
-                color="Direction",
-                color_discrete_map={"Correct": "#2E7D32", "Incorrect": "#C62828"},
-                template="plotly_white"
+            fig = go.Figure()
+
+            # Add error bars
+            fig.add_trace(go.Scatter(
+                x=effect_df["Cohen's d"],
+                y=effect_df["Feature"],
+                mode='markers',
+                error_x=dict(
+                    type='data',
+                    symmetric=False,
+                    array=effect_df['CI Upper'] - effect_df["Cohen's d"],
+                    arrayminus=effect_df["Cohen's d"] - effect_df['CI Lower'],
+                    color='#888'
+                ),
+                marker=dict(
+                    color=effect_df['Direction'].map({"Correct": "#2E7D32", "Incorrect": "#C62828"}),
+                    size=8
+                ),
+                name='Effect Size'
+            ))
+
+            fig.add_vline(x=0, line_dash="solid", line_color="#333", line_width=1)
+            fig.add_vrect(x0=0.2, x1=0.5, fillcolor="#F9EBEA", opacity=0.3, layer="below", line_width=0)
+            fig.add_vrect(x0=0.5, x1=0.8, fillcolor="#E8DAEF", opacity=0.3, layer="below", line_width=0)
+            fig.add_vrect(x0=0.8, x1=2.0, fillcolor="#D6EAF8", opacity=0.3, layer="below", line_width=0)
+
+
+            fig.update_layout(
+                title="Cohen's d Effect Size with 95% Confidence Intervals",
+                xaxis_title="Cohen's d",
+                yaxis_title=None,
+                template="plotly_white",
+                height=max(400, len(effect_data) * 25),
+                legend_title="Direction Correct",
             )
-            fig.add_vline(x=0.8, line_dash="dash", annotation_text="Large", line_color="#666")
-            fig.add_vline(x=0.5, line_dash="dash", annotation_text="Medium", line_color="#666")
-            fig.add_vline(x=0.2, line_dash="dash", annotation_text="Small", line_color="#666")
-            fig.update_layout(height=max(400, len(effect_data) * 25))
             st.plotly_chart(fig, use_container_width=True)
 
 # ============================================================================
@@ -544,11 +579,11 @@ with tab_features:
         with col1:
             st.markdown(f"**{feature}**")
         with col2:
-            d = cohens_d(dep_vals.values, nondep_vals.values)
-            st.metric("Cohen's d", f"{d:.2f}", interpret_cohens_d(d))
+            d, d_ci = cohens_d_ci(dep_vals.values, nondep_vals.values)
+            st.metric("Cohen's d", f"{d:.2f}", f"95% CI: [{d_ci[0]:.2f}, {d_ci[1]:.2f}]")
         with col3:
             diff_pct = (dep_vals.mean() - nondep_vals.mean()) / nondep_vals.mean() * 100 if nondep_vals.mean() != 0 else 0
-            st.metric("Difference", f"{diff_pct:+.1f}%")
+            st.metric("Difference", f"{diff_pct:+.1f}%", delta_color="off")
 
         combined = pd.DataFrame({
             feature: pd.concat([dep_vals, nondep_vals]),
@@ -588,11 +623,13 @@ if 'gender' in depressed_df.columns and 'gender' in nondepressed_df.columns and 
         st.subheader("Aggregated Result (All Genders)")
         agg_dep = depressed_df['f0_avg'].dropna()
         agg_nondep = nondepressed_df['f0_avg'].dropna()
-        agg_d = cohens_d(agg_dep.values, agg_nondep.values)
+
+        # Calculate Cohen's d with CI
+        agg_d, agg_ci = cohens_d_ci(agg_dep.values, agg_nondep.values)
 
         st.metric(
-            "Cohen's d for f0_avg (Aggregated)",
-            f"{agg_d:.2f}",
+            "Unadjusted Effect Size (d)",
+            f"{agg_d:.2f} (95% CI: [{agg_ci[0]:.2f}, {agg_ci[1]:.2f}])",
             interpret_cohens_d(agg_d)
         )
         st.markdown(
@@ -603,23 +640,42 @@ if 'gender' in depressed_df.columns and 'gender' in nondepressed_df.columns and 
         # 2. Stratified Analysis
         st.subheader("Gender-Stratified Results")
         stratified_results = []
+        gender_effects = {}
         for gender in ['female', 'male']:
             dep_gender = depressed_df[depressed_df['gender'] == gender]['f0_avg'].dropna()
             nondep_gender = nondepressed_df[nondepressed_df['gender'] == gender]['f0_avg'].dropna()
 
             if not dep_gender.empty and not nondep_gender.empty:
-                d = cohens_d(dep_gender.values, nondep_gender.values)
+                d, d_ci = cohens_d_ci(dep_gender.values, nondep_gender.values)
+                gender_effects[gender] = d
                 stratified_results.append({
                     "Gender": gender.capitalize(),
-                    "Cohen's d": d,
+                    "Adjusted Effect Size (d)": f"{d:.2f}",
+                    "95% CI": f"[{d_ci[0]:.2f}, {d_ci[1]:.2f}]",
                     "Interpretation": interpret_cohens_d(d),
-                    "Depressed Mean": dep_gender.mean(),
-                    "Non-Depressed Mean": nondep_gender.mean()
                 })
 
         if stratified_results:
             df_stratified = pd.DataFrame(stratified_results)
-            st.dataframe(df_stratified, hide_index=True)
+            st.dataframe(df_stratified, hide_index=True, use_container_width=True)
+
+            # Calculate and display the change in effect size
+            # Calculate and display the change in effect size with CI
+            with st.spinner("Calculating confidence interval for effect size change..."):
+                change, change_ci = effect_size_change_ci(depressed_df, nondepressed_df, 'f0_avg')
+
+            avg_adjusted_d = agg_d - change
+
+            st.metric(
+                "Adjusted Effect Size (d)",
+                f"{avg_adjusted_d:.2f}",
+                help="Average of male and female effect sizes"
+            )
+            st.metric(
+                "Effect Size Change (d)",
+                f"{change:.2f}",
+                f"95% CI: [{change_ci[0]:.2f}, {change_ci[1]:.2f}]"
+            )
 
             st.markdown(
                 """
