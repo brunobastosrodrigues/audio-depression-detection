@@ -343,6 +343,15 @@ with tab_hypothesis:
             results = run_all_hypothesis_tests(depressed_df, nondepressed_df, available_hypotheses, 0.05)
 
         if results:
+            st.info("""
+            **Why FDR Correction?**
+            When running multiple hypothesis tests, the chance of getting a false positive (a "significant"
+            result by random chance) increases. If we test 20 features at a p<0.05 threshold, there's a
+            high probability that one will appear significant purely by chance.
+
+            The **Benjamini-Hochberg FDR (False Discovery Rate) correction** adjusts the p-values to control
+            for this, giving a more accurate picture of statistical significance.
+            """)
             # Results table
             results_data = []
             for r in results:
@@ -354,7 +363,8 @@ with tab_hypothesis:
                     "NonDep Mean": f"{r.nondepressed_mean:.3f}",
                     "Cohen's d": f"{r.cohens_d:.2f}",
                     "Effect": interpret_cohens_d(r.cohens_d),
-                    "p (FDR)": f"{r.p_value_corrected:.4f}" if r.p_value_corrected else "N/A",
+                    "p-value": f"{r.p_value:.4f}",
+                    "p-value (FDR)": f"{r.p_value_corrected:.4f}" if r.p_value_corrected is not None else "N/A",
                     "Sig.": "Yes" if r.significant else "No",
                 })
 
