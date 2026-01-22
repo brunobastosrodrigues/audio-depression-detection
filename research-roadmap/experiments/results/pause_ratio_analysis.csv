@@ -1,0 +1,2 @@
+feature,unadj_d,adj_d,ci_lower,ci_upper,power,n_for_80_power,mechanism
+pause_ratio,0.003,0.3791093471031959,-0.0775099379999749,0.8415056009872904,0.42815009332186216,222,gender_suppression

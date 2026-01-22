@@ -28,15 +28,19 @@ ALL_SESSIONS = list(range(300, 493))
 EXCLUDED = [342, 394, 398, 460]
 VALID_SESSIONS = [s for s in ALL_SESSIONS if s not in EXCLUDED]
 
-OUTPUT_DIR = Path(__file__).parent / "daic_woz_audio"
+OUTPUT_DIR = Path(__file__).parent.parent / "experiments" / "daic_woz_extracted"
 
 
 def download_session(session_id: int, username: str, password: str, output_dir: Path) -> tuple:
     """Download a single session. Returns (session_id, success, message)."""
-    session_folder = output_dir / f"{session_id}_P"
+    # Use simple numeric folder name to match existing data structure
+    session_folder = output_dir / str(session_id)
 
-    # Skip if already downloaded
+    # Skip if already downloaded (check both naming conventions)
     if session_folder.exists() and any(session_folder.iterdir()):
+        return (session_id, True, "Already exists")
+    alt_folder = output_dir / f"{session_id}_P"
+    if alt_folder.exists() and any(alt_folder.iterdir()):
         return (session_id, True, "Already exists")
 
     url = f"https://dcapswoz.ict.usc.edu/wwwdaicwoz/{session_id}_P.zip"
@@ -51,10 +55,19 @@ def download_session(session_id: int, username: str, password: str, output_dir: 
         elif response.status_code != 200:
             return (session_id, False, f"HTTP {response.status_code}")
 
-        # Extract ZIP
+        # Extract ZIP to temp location, then move contents
         zfile = ZipFile(BytesIO(response.content))
         session_folder.mkdir(parents=True, exist_ok=True)
+
+        # Extract directly - files are in {session_id}_P/ inside the zip
         zfile.extractall(session_folder)
+
+        # Move files from nested {session_id}_P folder to session_folder if needed
+        nested = session_folder / f"{session_id}_P"
+        if nested.exists():
+            for item in nested.iterdir():
+                item.rename(session_folder / item.name)
+            nested.rmdir()
 
         return (session_id, True, "Downloaded")
 
