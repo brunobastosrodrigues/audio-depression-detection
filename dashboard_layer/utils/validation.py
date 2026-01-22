@@ -24,6 +24,7 @@ class HypothesisResult:
     nondepressed_mean: float
     nondepressed_std: float
     cohens_d: float
+    cohens_d_ci: Tuple[float, float]
     u_statistic: float
     p_value: float
     p_value_corrected: Optional[float]
@@ -150,6 +151,30 @@ def cohens_d(group1: np.ndarray, group2: np.ndarray) -> float:
     return (np.mean(group1) - np.mean(group2)) / pooled_std
 
 
+def cohens_d_ci(group1: np.ndarray, group2: np.ndarray, n_boot: int = 1000, ci: float = 0.95) -> Tuple[float, Tuple[float, float]]:
+    """
+    Calculate Cohen's d with bootstrap confidence interval.
+    """
+    # Calculate observed Cohen's d
+    d_observed = cohens_d(group1, group2)
+
+    # Bootstrap resampling
+    boot_d = []
+    if len(group1) > 1 and len(group2) > 1:
+        for _ in range(n_boot):
+            g1_sample = np.random.choice(group1, size=len(group1), replace=True)
+            g2_sample = np.random.choice(group2, size=len(group2), replace=True)
+            boot_d.append(cohens_d(g1_sample, g2_sample))
+
+    if boot_d:
+        # Calculate confidence interval
+        lower_bound = np.percentile(boot_d, (1 - ci) / 2 * 100)
+        upper_bound = np.percentile(boot_d, (1 + ci) / 2 * 100)
+        return d_observed, (lower_bound, upper_bound)
+    else:
+        return d_observed, (np.nan, np.nan)
+
+
 def interpret_cohens_d(d: float) -> str:
     """Interpret Cohen's d effect size magnitude."""
     abs_d = abs(d)
@@ -161,6 +186,66 @@ def interpret_cohens_d(d: float) -> str:
         return "medium"
     else:
         return "large"
+
+
+def effect_size_change_ci(
+    depressed_df: pd.DataFrame,
+    nondepressed_df: pd.DataFrame,
+    feature: str,
+    n_boot: int = 1000,
+    ci: float = 0.95
+) -> Tuple[float, Tuple[float, float]]:
+    """
+    Calculate the confidence interval for the change in effect size after stratification.
+    """
+    boot_diffs = []
+
+    for _ in range(n_boot):
+        # Resample with replacement
+        dep_sample = depressed_df.sample(n=len(depressed_df), replace=True)
+        nondep_sample = nondepressed_df.sample(n=len(nondepressed_df), replace=True)
+
+        # 1. Unadjusted effect size
+        agg_dep = dep_sample[feature].dropna()
+        agg_nondep = nondep_sample[feature].dropna()
+        if len(agg_dep) < 2 or len(agg_nondep) < 2:
+            continue
+        d_unadjusted = cohens_d(agg_dep.values, agg_nondep.values)
+
+        # 2. Adjusted effect size
+        gender_effects = []
+        for gender in ['female', 'male']:
+            dep_gender = dep_sample[dep_sample['gender'] == gender][feature].dropna()
+            nondep_gender = nondep_sample[nondep_sample['gender'] == gender][feature].dropna()
+
+            if len(dep_gender) > 1 and len(nondep_gender) > 1:
+                gender_effects.append(cohens_d(dep_gender.values, nondep_gender.values))
+
+        if not gender_effects:
+            continue
+        d_adjusted = np.mean(gender_effects)
+
+        # 3. Difference
+        boot_diffs.append(d_unadjusted - d_adjusted)
+
+    if boot_diffs:
+        # Observed difference
+        obs_unadjusted = cohens_d(depressed_df[feature].dropna().values, nondepressed_df[feature].dropna().values)
+        obs_gender_effects = [
+            cohens_d(
+                depressed_df[depressed_df['gender'] == g][feature].dropna().values,
+                nondepressed_df[nondepressed_df['gender'] == g][feature].dropna().values
+            )
+            for g in ['female', 'male'] if not depressed_df[depressed_df['gender'] == g][feature].dropna().empty and not nondepressed_df[nondepressed_df['gender'] == g][feature].dropna().empty
+        ]
+        obs_adjusted = np.mean(obs_gender_effects) if obs_gender_effects else 0
+        obs_diff = obs_unadjusted - obs_adjusted
+
+        lower_bound = np.percentile(boot_diffs, (1 - ci) / 2 * 100)
+        upper_bound = np.percentile(boot_diffs, (1 + ci) / 2 * 100)
+        return obs_diff, (lower_bound, upper_bound)
+    else:
+        return np.nan, (np.nan, np.nan)
 
 
 def mann_whitney_u_test(
@@ -256,6 +341,7 @@ def run_hypothesis_test(
             nondepressed_mean=np.nan,
             nondepressed_std=np.nan,
             cohens_d=np.nan,
+            cohens_d_ci=(np.nan, np.nan),
             u_statistic=np.nan,
             p_value=1.0,
             p_value_corrected=None,
@@ -271,8 +357,8 @@ def run_hypothesis_test(
     nondep_mean = np.mean(nondep_clean)
     nondep_std = np.std(nondep_clean, ddof=1)
 
-    # Cohen's d
-    d = cohens_d(dep_clean, nondep_clean)
+    # Cohen's d with CI
+    d, d_ci = cohens_d_ci(dep_clean, nondep_clean)
 
     # Determine actual direction
     actual_direction = "<" if dep_mean < nondep_mean else ">"
@@ -294,6 +380,7 @@ def run_hypothesis_test(
         nondepressed_mean=nondep_mean,
         nondepressed_std=nondep_std,
         cohens_d=d,
+        cohens_d_ci=d_ci,
         u_statistic=u_stat,
         p_value=p_value,
         p_value_corrected=None,  # Set later after FDR
