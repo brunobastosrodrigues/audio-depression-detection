@@ -310,9 +310,10 @@ st.divider()
 # ============================================================================
 st.markdown("## Detailed Analysis")
 
-tab_hypothesis, tab_classification, tab_features = st.tabs([
+tab_hypothesis, tab_classification, tab_power, tab_features = st.tabs([
     "Statistical Tests",
     "Classification Metrics",
+    "Power Analysis",
     "Feature Explorer"
 ])
 
@@ -449,6 +450,60 @@ with tab_classification:
         st.plotly_chart(fig, use_container_width=True)
 
         st.caption(f"**Decision rule:** {direction_text}")
+
+# ============================================================================
+# POWER ANALYSIS TAB
+# ============================================================================
+with tab_power:
+    st.markdown("""
+    ### Statistical Power Analysis
+
+    Statistical power is the probability that a test will correctly reject a
+    false null hypothesis. A power of ≥80% is considered adequate.
+    """)
+
+    # Construct the path to the CSV file relative to the current script
+    csv_path = Path(__file__).parent / "power_analysis.csv"
+    power_df = pd.read_csv(csv_path)
+
+    def get_power_color(power):
+        if power >= 0.8:
+            return "#2E7D32"  # Green
+        elif power >= 0.5:
+            return "#FFD700"  # Yellow
+        else:
+            return "#C62828"  # Red
+
+    power_df["color"] = power_df["power"].apply(get_power_color)
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=power_df["power"],
+        y=power_df["feature"],
+        orientation="h",
+        marker_color=power_df["color"],
+        text=power_df["power"].apply(lambda x: f"{x:.1%}"),
+        textposition="auto",
+    ))
+    fig.update_layout(
+        title="Statistical Power by Feature",
+        xaxis_title="Power (1 - β)",
+        yaxis_title="Feature",
+        template="plotly_white",
+        height=400,
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("#### Minimum Detectable Effect Size")
+    st.dataframe(power_df[["feature", "min_detectable_effect"]], use_container_width=True, hide_index=True)
+
+    underpowered_features = power_df[power_df["power"] < 0.8]
+    if not underpowered_features.empty:
+        st.warning(f"""
+        **Warning:** {len(underpowered_features)} features are underpowered.
+        For these features, we cannot confidently claim there is no effect.
+        """)
+
 
 # ============================================================================
 # FEATURE EXPLORER TAB
