@@ -98,9 +98,14 @@ def load_cohort_data(depressed_path: str, nondepressed_path: str) -> Tuple[pd.Da
         # For time-series data, we need to pivot using timestamp as the index
         # Each timestamp becomes a sample (row)
         if 'timestamp' in df.columns:
-            # Pivot from long to wide format, using timestamp as index
+            # Preserve user-level columns like 'gender' during pivot
+            index_cols = ['timestamp']
+            if 'gender' in df.columns:
+                index_cols.append('gender')
+
+            # Pivot from long to wide format
             pivot_df = df.pivot_table(
-                index='timestamp',
+                index=index_cols,
                 columns='metric_name',
                 values='metric_value',
                 aggfunc='first'  # Take first value if duplicates
