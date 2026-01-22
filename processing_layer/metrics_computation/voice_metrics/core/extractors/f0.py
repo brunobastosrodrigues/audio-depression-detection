@@ -1,6 +1,10 @@
 """
 Fundamental Frequency (F0) Extractor with Dynamic Behavioral Metrics
 
+Note: This Python-based implementation using `librosa.pyin` is the current
+source of truth for F0 calculation. Any legacy C implementations (e.g., yin_f0.c)
+are deprecated and no longer maintained.
+
 This module extracts F0 (pitch) features using both OpenSMILE (eGeMAPS)
 and librosa. It now supports dynamic behavioral metrics for DSM-5
 depression phenotyping.

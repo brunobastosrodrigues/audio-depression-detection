@@ -90,7 +90,9 @@ void audio_calculate_quality_metrics(const int16_t *samples, size_t sample_count
     }
 
     // SNR estimation (simplified - assumes noise floor from quiet periods)
-    // This is a rough estimate; actual SNR requires noise floor tracking
+    // This is a standard S/N (Signal-to-Noise) ratio, where the configured
+    // `s_thresholds.min_rms` value acts as a proxy for the noise floor.
+    // This is a rough estimate; actual SNR requires noise floor tracking.
     if (rms > s_thresholds.min_rms) {
         metrics->snr = 20.0f * log10f((float)rms / s_thresholds.min_rms);
     } else {
