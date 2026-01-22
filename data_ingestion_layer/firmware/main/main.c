@@ -20,19 +20,24 @@
 #include "esp_task_wdt.h"
 #include "nvs_flash.h"
 #include "esp_heap_caps.h"
+#include <inttypes.h>
 
 #include "config/board_config.h"
 #include "config/audio_config.h"
 #include "hal/hal_audio.h"
 #include "audio/audio_buffer.h"
-#include "audio/vad.h"
-#include "audio/audio_quality.h"
+#include "vad.h"
+#include "audio_quality.h"
 #include "network/wifi_manager.h"
 #include "network/tcp_client.h"
 #include "system/watchdog.h"
 
 #if BOARD_TYPE_XVF3800
 #include "drivers/xvf3800/xvf3800.h"
+#endif
+
+#if CONFIG_ENABLE_BENCHMARK
+void run_feature_extractor_benchmark(void);
 #endif
 
 static const char *TAG = "IHEARYOU";
@@ -126,8 +131,8 @@ static void print_system_info(void)
     ESP_LOGI(TAG, "IHearYou Firmware v%s", FIRMWARE_VERSION_STRING);
     ESP_LOGI(TAG, "Board: %s", BOARD_NAME);
     ESP_LOGI(TAG, "========================================");
-    ESP_LOGI(TAG, "Free heap: %lu bytes", esp_get_free_heap_size());
-    ESP_LOGI(TAG, "Free PSRAM: %lu bytes", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    ESP_LOGI(TAG, "Free heap: %lu bytes", (long unsigned int)esp_get_free_heap_size());
+    ESP_LOGI(TAG, "Free PSRAM: %lu bytes", (long unsigned int)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
     ESP_LOGI(TAG, "Audio: %d Hz, %d-bit, %d ch", AUDIO_SAMPLE_RATE, AUDIO_BIT_DEPTH, AUDIO_CHANNELS);
     ESP_LOGI(TAG, "Chunk: %d sec (%d samples, %d bytes)",
              AUDIO_CHUNK_DURATION_S, AUDIO_CHUNK_SAMPLES, AUDIO_CHUNK_BYTES);
@@ -321,6 +326,10 @@ void app_main(void)
         NULL,
         TASK_CORE_NETWORK
     );
+#endif
+
+#if CONFIG_ENABLE_BENCHMARK
+    run_feature_extractor_benchmark();
 #endif
 
     ESP_LOGI(TAG, "Firmware initialization complete. Starting audio capture...");
@@ -612,12 +621,15 @@ static void telemetry_task(void *param)
             s_telemetry.wifi_rssi = ap_info.rssi;
         }
 
-        ESP_LOGI(TAG, "Telemetry: uptime=%lus, chunks_sent=%lu, overflows=%lu, heap=%lu, rssi=%d",
+        ESP_LOGI(TAG, "Telemetry: uptime=%" PRIu32 ", chunks_sent=%" PRIu32 ", overflows=%" PRIu32 ", heap=%" PRIu32 ", rssi=%d",
                  s_telemetry.uptime_seconds,
                  s_telemetry.audio_chunks_sent,
                  s_telemetry.buffer_overflows,
                  s_telemetry.free_heap,
                  s_telemetry.wifi_rssi);
+
+        ESP_LOGI(TAG, "Heap analysis:");
+        heap_caps_print_heap_info(MALLOC_CAP_DEFAULT);
     }
 
     vTaskDelete(NULL);

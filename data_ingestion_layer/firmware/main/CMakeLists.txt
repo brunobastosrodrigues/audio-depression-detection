@@ -7,12 +7,14 @@ set(SRCS
     "main.c"
     "hal/hal_audio.c"
     "audio/audio_buffer.c"
-    "audio/vad.c"
-    "audio/audio_quality.c"
     "network/wifi_manager.c"
     "network/tcp_client.c"
     "system/watchdog.c"
 )
+
+if(CONFIG_ENABLE_BENCHMARK)
+    list(APPEND SRCS "benchmark.c")
+endif()
 
 # Add XVF3800 driver for that board variant
 if(CONFIG_BOARD_RESPEAKER_XVF3800)
@@ -47,6 +49,7 @@ idf_component_register(
         esp_timer
         esp_psram
         esp_system
+        feature_extractor
 )
 
 # Add compiler warnings

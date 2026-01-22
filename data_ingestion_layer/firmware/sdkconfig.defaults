@@ -9,7 +9,7 @@ CONFIG_IDF_TARGET="esp32s3"
 # =============================================================================
 # Flash Configuration
 # =============================================================================
-CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
 CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
 CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
 
@@ -42,6 +42,10 @@ CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1=n
 # =============================================================================
 # WiFi Configuration
 # =============================================================================
+CONFIG_WIFI_SSID="your-ssid"
+CONFIG_WIFI_PASSWORD="your-password"
+CONFIG_SERVER_HOST="192.168.1.100"
+CONFIG_SERVER_PORT=8010
 CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=10
 CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=32
 CONFIG_ESP_WIFI_AMPDU_TX_ENABLED=y

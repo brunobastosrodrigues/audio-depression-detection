@@ -12,6 +12,8 @@
 #include "config/audio_config.h"
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include "freertos/FreeRTOS.h"
 
 #ifdef __cplusplus
 extern "C" {
