@@ -19,9 +19,6 @@ from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 import warnings
 
-# Suppress SSL warnings for MongoDB connections
-warnings.filterwarnings("ignore")
-
 # Adjust path to import utilities
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
