@@ -1,0 +1,9 @@
+feature,power,min_detectable_effect
+f0_mean_hz,0.984,0.21
+energy_std,0.992,0.18
+snr,0.949,0.25
+speech_rate,0.45,0.55
+pause_duration,0.65,0.45
+jitter,0.30,0.60
+shimmer,0.25,0.65
+mfcc_1,0.75,0.40
