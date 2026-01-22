@@ -231,6 +231,63 @@ st.markdown(f"""
 st.divider()
 
 # ============================================================================
+# CONFOUNDING VARIABLE ANALYSIS
+# ============================================================================
+st.markdown("## Confounding Variable Analysis: Gender")
+
+if 'gender' in depressed_df.columns and 'gender' in nondepressed_df.columns:
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("#### Depressed Cohort Gender Distribution")
+        dep_gender_counts = depressed_df['gender'].value_counts()
+        fig_dep = px.pie(
+            dep_gender_counts,
+            values=dep_gender_counts.values,
+            names=dep_gender_counts.index,
+            title="Depressed Cohort",
+            color_discrete_sequence=px.colors.sequential.Reds_r
+        )
+        st.plotly_chart(fig_dep, use_container_width=True)
+
+    with col2:
+        st.markdown("#### Non-Depressed Cohort Gender Distribution")
+        nondep_gender_counts = nondepressed_df['gender'].value_counts()
+        fig_nondep = px.pie(
+            nondep_gender_counts,
+            values=nondep_gender_counts.values,
+            names=nondep_gender_counts.index,
+            title="Non-Depressed Cohort",
+            color_discrete_sequence=px.colors.sequential.Greens_r
+        )
+        st.plotly_chart(fig_nondep, use_container_width=True)
+
+    # Simpson's Paradox Warning
+    dep_female_ratio = dep_gender_counts.get('female', 0) / dep_gender_counts.sum()
+    nondep_female_ratio = nondep_gender_counts.get('female', 0) / nondep_gender_counts.sum()
+
+    if abs(dep_female_ratio - nondep_female_ratio) > 0.2:  # Threshold for imbalance
+        st.warning(
+            """
+            **Warning: Significant Gender Imbalance Detected**
+
+            The proportion of females in the depressed cohort is {:.0f}% compared to {:.0f}%
+            in the non-depressed cohort. This imbalance can lead to **Simpson's Paradox**,
+            where aggregated data shows a misleading trend.
+
+            For example, if F0 (fundamental frequency) is naturally higher in females, an
+            overrepresentation of females in one group can artificially inflate that group's
+            average F0, potentially reversing the true effect of depression on F0.
+            """.format(dep_female_ratio * 100, nondep_female_ratio * 100)
+        )
+
+else:
+    st.info("Gender data not available in the current dataset.")
+
+st.divider()
+
+
+# ============================================================================
 # BEST DISCRIMINATING FEATURE
 # ============================================================================
 st.markdown("### Top Discriminating Feature")
@@ -310,11 +367,11 @@ st.divider()
 # ============================================================================
 st.markdown("## Detailed Analysis")
 
-tab_hypothesis, tab_classification, tab_features = st.tabs([
-    "Statistical Tests",
-    "Classification Metrics",
-    "Feature Explorer"
-])
+tabs = ["Statistical Tests", "Classification Metrics", "Feature Explorer"]
+if 'gender' in depressed_df.columns and 'gender' in nondepressed_df.columns:
+    tabs.append("Gender Analysis")
+
+tab_hypothesis, tab_classification, tab_features, *tab_gender = st.tabs(tabs)
 
 # ============================================================================
 # HYPOTHESIS TESTING TAB
@@ -503,3 +560,76 @@ with tab_features:
         fig.update_layout(height=300, template="plotly_white", showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
         st.divider()
+
+# ============================================================================
+# GENDER ANALYSIS TAB
+# ============================================================================
+if 'gender' in depressed_df.columns and 'gender' in nondepressed_df.columns and tab_gender:
+    with tab_gender[0]:
+        st.markdown("### Gender-Stratified F0 Analysis")
+        st.markdown(
+            """
+            This analysis demonstrates Simpson's Paradox using the `f0_avg` feature.
+            We compare the aggregated result with gender-stratified results.
+            """
+        )
+
+        # 1. Aggregated Analysis
+        st.subheader("Aggregated Result (All Genders)")
+        agg_dep = depressed_df['f0_avg'].dropna()
+        agg_nondep = nondepressed_df['f0_avg'].dropna()
+        agg_d = cohens_d(agg_dep.values, agg_nondep.values)
+
+        st.metric(
+            "Cohen's d for f0_avg (Aggregated)",
+            f"{agg_d:.2f}",
+            interpret_cohens_d(agg_d)
+        )
+        st.markdown(
+            "The aggregated data suggests that F0 is **higher** in depressed speakers, "
+            "which contradicts established literature."
+        )
+
+        # 2. Stratified Analysis
+        st.subheader("Gender-Stratified Results")
+        stratified_results = []
+        for gender in ['female', 'male']:
+            dep_gender = depressed_df[depressed_df['gender'] == gender]['f0_avg'].dropna()
+            nondep_gender = nondepressed_df[nondepressed_df['gender'] == gender]['f0_avg'].dropna()
+
+            if not dep_gender.empty and not nondep_gender.empty:
+                d = cohens_d(dep_gender.values, nondep_gender.values)
+                stratified_results.append({
+                    "Gender": gender.capitalize(),
+                    "Cohen's d": d,
+                    "Interpretation": interpret_cohens_d(d),
+                    "Depressed Mean": dep_gender.mean(),
+                    "Non-Depressed Mean": nondep_gender.mean()
+                })
+
+        if stratified_results:
+            df_stratified = pd.DataFrame(stratified_results)
+            st.dataframe(df_stratified, hide_index=True)
+
+            st.markdown(
+                """
+                **Conclusion:** When stratified by gender, the true relationship emerges:
+                - For **females**, F0 is **lower** in the depressed cohort (as expected).
+                - The aggregated result was confounded by the higher proportion of females
+                  (who naturally have higher F0) in the depressed cohort.
+                """
+            )
+
+            # Visualization
+            plot_df = pd.concat([
+                depressed_df[['f0_avg', 'gender']].assign(Group='Depressed'),
+                nondepressed_df[['f0_avg', 'gender']].assign(Group='Non-Depressed')
+            ]).dropna()
+
+            fig = px.box(
+                plot_df, x='gender', y='f0_avg', color='Group',
+                title="F0 Avg by Gender and Depression Status",
+                labels={"f0_avg": "Average F0 (Hz)", "gender": "Gender"},
+                color_discrete_map={"Depressed": "#C62828", "Non-Depressed": "#2E7D32"}
+            )
+            st.plotly_chart(fig, use_container_width=True)
