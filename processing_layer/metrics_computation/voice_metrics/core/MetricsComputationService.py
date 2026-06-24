@@ -37,9 +37,9 @@ from core.extractors.rms_energy import get_rms_energy_dynamic
 from core.extractors.formants import get_formant_dynamic
 from core.extractors.voicing_states import (
     classify_voicing_states,
-    get_t13_voiced_to_silence,
     compute_voiced16_20_feature,
-    get_interaction_dynamics,
+    get_interaction_dynamics_from_states,
+    get_t13_from_states,
 )
 
 # Legacy extractors (still used for some non-upgraded metrics)
@@ -194,10 +194,13 @@ class MetricsComputationService:
             ("hnr_dynamic", get_hnr_dynamic, (features_LLD,)),
             ("rms_dynamic", get_rms_energy_dynamic, (rms_series,)),
             ("formant_dynamic", get_formant_dynamic, (features_LLD,)),
-            ("interaction_dynamics", get_interaction_dynamics, (audio_np, sample_rate)),
         ]
 
-        # Legacy extractors (return single values)
+        # Legacy extractors (return single values).
+        # NOTE: voicing classification (classify_voicing_states) is the single most
+        # expensive call in this service (pyin). It is computed ONCE here as
+        # "voiced_states"; interaction_dynamics, t13 and voiced16:20 are then derived
+        # from that one state sequence below instead of recomputing it 3x.
         legacy_tasks = [
             ("jitter", get_jitter, (features_LLD,)),
             ("shimmer", get_shimmer, (features_LLD,)),
@@ -208,7 +211,6 @@ class MetricsComputationService:
             ("voice_onset_time", get_vot, (audio_np, sample_rate)),
             ("glottal_pulse_rate", get_glottal_pulse_rate, (audio_np, sample_rate)),
             ("psd_subbands", get_psd_subbands, (audio_np, sample_rate)),
-            ("t13", get_t13_voiced_to_silence, (audio_np, sample_rate)),
             ("voiced_states", classify_voicing_states, (audio_np, sample_rate)),
             ("f2_transition_speed", get_f2_transition_speed, (audio_np, sample_rate)),
         ]
@@ -230,11 +232,17 @@ class MetricsComputationService:
                     print(f"Error extracting feature {key}: {e}")
                     results[key] = None
 
-        # Post-processing for features that depend on other results
-        if results.get("voiced_states") is not None:
-            voiced16_20 = compute_voiced16_20_feature(results["voiced_states"])
+        # Post-processing: derive every voicing-dependent feature from the single
+        # state sequence computed above, instead of re-running classification.
+        voiced_states = results.get("voiced_states")
+        if voiced_states is not None:
+            voiced16_20 = compute_voiced16_20_feature(voiced_states)
+            t13_value = get_t13_from_states(voiced_states)
+            results["interaction_dynamics"] = get_interaction_dynamics_from_states(voiced_states)
         else:
             voiced16_20 = 0.0
+            t13_value = 0.0
+            results["interaction_dynamics"] = None
 
         # Define which myprosody metrics should be returned
         myprosody_metrics_to_extract = [
@@ -289,7 +297,7 @@ class MetricsComputationService:
             "psd-4": safe_float(psd.get("psd-4")),
             "psd-5": safe_float(psd.get("psd-5")),
             "psd-7": safe_float(psd.get("psd-7")),
-            "t13": safe_float(results.get("t13")),
+            "t13": safe_float(t13_value),
             "voiced16_20": safe_float(voiced16_20),
             "f2_transition_speed": safe_float(results.get("f2_transition_speed")),
         })

@@ -9,7 +9,13 @@ markers). A correct classifier must separate a periodic tone (voiced) from noise
 """
 import numpy as np
 
-from core.extractors.voicing_states import get_interaction_dynamics
+from core.extractors.voicing_states import (
+    classify_voicing_states,
+    get_interaction_dynamics,
+    get_interaction_dynamics_from_states,
+    get_t13_from_states,
+    get_t13_voiced_to_silence,
+)
 
 SR = 16000
 DUR = 1.0
@@ -46,3 +52,12 @@ def test_silence_is_predominantly_silence():
     d = get_interaction_dynamics(_silence(), SR)
     assert d["silence_ratio"] > 0.8
     assert d["voiced_ratio"] < 0.1
+
+
+def test_from_states_matches_all_in_one():
+    # Optimization invariant: deriving metrics from a single precomputed state
+    # sequence must equal computing them end-to-end (which re-runs classification).
+    audio = np.concatenate([_tone(), _noise(seed=1), _silence()])
+    states = classify_voicing_states(audio, SR)
+    assert get_interaction_dynamics_from_states(states) == get_interaction_dynamics(audio, SR)
+    assert get_t13_from_states(states) == get_t13_voiced_to_silence(audio, SR)
