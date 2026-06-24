@@ -1,9 +1,10 @@
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pymongo import MongoClient
 from typing import List
 from core.models.IndicatorScoreRecord import IndicatorScoreRecord
 from core.mapping.ConfigManager import ConfigManager
+from core.services.compute_baseline import compute_baseline_partitions
 from core.user_id_match import user_id_match
 import os
 
@@ -157,6 +158,47 @@ class BaselineManager:
             timestamp=latest_doc["timestamp"],
             indicator_scores=latest_doc["indicator_scores"],
         )
+
+    def compute_and_store_baseline(self, user_id, system_mode=None, min_samples=10):
+        """Derive a per-user baseline from the user's ingested raw metrics and store it.
+
+        Reads raw_metrics from the mode-appropriate database, computes mean/std/count
+        per metric per circadian context (V2 schema), and upserts a single
+        "computed_from_data" baseline document for the user. Returns the computed
+        context_partitions, or None when there is not enough data for any metric yet.
+        """
+        raw_collection = self._db(system_mode)["raw_metrics"]
+        records = list(
+            raw_collection.find(
+                {"user_id": user_id_match(user_id)},
+                {"_id": 0, "metric_name": 1, "metric_value": 1, "timestamp": 1},
+            )
+        )
+        if not records:
+            return None
+
+        partitions = compute_baseline_partitions(records, min_samples=min_samples)
+        if not partitions.get("general", {}).get("metrics"):
+            # Not enough data to establish a baseline for any metric yet.
+            return None
+
+        doc = {
+            "user_id": user_id,
+            "timestamp": datetime.now(timezone.utc),
+            "schema_version": 2,
+            "source": "computed_from_data",
+            "context_partitions": partitions,
+            "system_mode": system_mode or "live",
+        }
+        # Keep a single computed baseline per user (refreshed in place). PHQ-9
+        # finetuning writes its own later-timestamped documents that refine this one;
+        # get_user_baseline always reads the latest by timestamp.
+        self._baseline_collection(system_mode).replace_one(
+            {"user_id": user_id, "source": "computed_from_data"},
+            doc,
+            upsert=True,
+        )
+        return partitions
 
     def finetune_baseline(
         self, user_id, phq9_scores, total_score, functional_impact, timestamp, system_mode=None
