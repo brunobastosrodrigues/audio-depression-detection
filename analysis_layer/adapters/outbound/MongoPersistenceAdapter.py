@@ -7,6 +7,7 @@ from core.models.IndicatorScoreRecord import IndicatorScoreRecord
 from core.models.Board import Board
 from core.models.Environment import Environment
 from ports.PersistencePort import PersistencePort
+from core.user_id_match import user_id_match
 from pymongo import MongoClient
 
 
@@ -48,7 +49,7 @@ class MongoPersistenceAdapter(PersistencePort):
         for db_name in ALL_DBS:
             db = self.client[db_name]
             cursor = (
-                db["analyzed_metrics"].find({"user_id": user_id})
+                db["analyzed_metrics"].find({"user_id": user_id_match(user_id)})
                 .sort("timestamp", -1)
                 .limit(1)
             )
@@ -64,7 +65,7 @@ class MongoPersistenceAdapter(PersistencePort):
         for db_name in ALL_DBS:
             db = self.client[db_name]
             cursor = (
-                db["indicator_scores"].find({"user_id": user_id})
+                db["indicator_scores"].find({"user_id": user_id_match(user_id)})
                 .sort("timestamp", 1)
                 .limit(1)
             )
@@ -80,7 +81,7 @@ class MongoPersistenceAdapter(PersistencePort):
         for db_name in ALL_DBS:
             db = self.client[db_name]
             cursor = (
-                db["indicator_scores"].find({"user_id": user_id})
+                db["indicator_scores"].find({"user_id": user_id_match(user_id)})
                 .sort("timestamp", -1)
                 .limit(1)
             )
@@ -99,7 +100,7 @@ class MongoPersistenceAdapter(PersistencePort):
         for db_name in ALL_DBS:
             db = self.client[db_name]
             doc = db["indicator_scores"].find_one(
-                {"user_id": user_id},
+                {"user_id": user_id_match(user_id)},
                 sort=[("timestamp", -1)],
             )
             if doc and doc.get("timestamp"):
@@ -114,7 +115,7 @@ class MongoPersistenceAdapter(PersistencePort):
         start_date: Optional[datetime] = None,
     ) -> List[ContextualMetricRecord]:
         """Query all databases and combine results."""
-        query = {"user_id": user_id}
+        query = {"user_id": user_id_match(user_id)}
         if start_date:
             query["timestamp"] = {"$gte": start_date}
 
@@ -142,7 +143,7 @@ class MongoPersistenceAdapter(PersistencePort):
         start_date: Optional[datetime] = None,
     ) -> List[AnalyzedMetricRecord]:
         """Query all databases and combine results."""
-        query = {"user_id": user_id}
+        query = {"user_id": user_id_match(user_id)}
         if start_date:
             query["timestamp"] = {"$gte": start_date}
 
@@ -220,7 +221,7 @@ class MongoPersistenceAdapter(PersistencePort):
 
     # Board operations
     def get_boards_by_user(self, user_id: int) -> List[Board]:
-        docs = self.collection_boards.find({"user_id": user_id})
+        docs = self.collection_boards.find({"user_id": user_id_match(user_id)})
         return [
             Board(
                 board_id=doc["board_id"],
@@ -289,7 +290,7 @@ class MongoPersistenceAdapter(PersistencePort):
 
     # Environment operations
     def get_environments_by_user(self, user_id: int) -> List[Environment]:
-        docs = self.collection_environments.find({"user_id": user_id})
+        docs = self.collection_environments.find({"user_id": user_id_match(user_id)})
         return [
             Environment(
                 environment_id=doc["environment_id"],

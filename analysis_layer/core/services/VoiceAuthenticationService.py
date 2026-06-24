@@ -4,6 +4,8 @@ import os
 import numpy as np
 import logging
 
+from core.user_id_match import user_id_match
+
 class VoiceAuthenticationService:
     def __init__(self, model_name="WAV2VEC2_BASE"):
         self.logger = logging.getLogger(__name__)
@@ -70,7 +72,7 @@ class VoiceAuthenticationService:
 
     def verify_user(self, audio_path, user_id, db_collection, threshold=0.75):
         """Compares audio against stored profile."""
-        user_doc = db_collection.find_one({"user_id": user_id})
+        user_doc = db_collection.find_one({"user_id": user_id_match(user_id)})
         if not user_doc or "voice_profile" not in user_doc:
             return False, 0.0, "User profile not found."
 

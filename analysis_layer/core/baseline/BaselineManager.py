@@ -4,6 +4,7 @@ from pymongo import MongoClient
 from typing import List
 from core.models.IndicatorScoreRecord import IndicatorScoreRecord
 from core.mapping.ConfigManager import ConfigManager
+from core.user_id_match import user_id_match
 import os
 
 class BaselineManager:
@@ -87,7 +88,7 @@ class BaselineManager:
             dict or metric value: The baseline metrics or a specific metric value
         """
         latest_doc = self.collection_baseline.find_one(
-            {"user_id": user_id}, sort=[("timestamp", -1)]
+            {"user_id": user_id_match(user_id)}, sort=[("timestamp", -1)]
         )
 
         if not latest_doc:
@@ -126,7 +127,7 @@ class BaselineManager:
     def get_indicator_scores(self, user_id: int) -> IndicatorScoreRecord:
 
         latest_doc = self.collection_indicator_scores.find_one(
-            {"user_id": user_id}, sort=[("timestamp", -1)]
+            {"user_id": user_id_match(user_id)}, sort=[("timestamp", -1)]
         )
 
         if not latest_doc or "indicator_scores" not in latest_doc:
@@ -237,7 +238,7 @@ class BaselineManager:
 
         # Get existing document to preserve other partitions
         existing_doc = self.collection_baseline.find_one(
-            {"user_id": user_id}, sort=[("timestamp", -1)]
+            {"user_id": user_id_match(user_id)}, sort=[("timestamp", -1)]
         )
 
         # Build context partitions

@@ -5,6 +5,7 @@ from core.models.RawMetricRecord import RawMetricRecord
 from core.models.AggregatedMetricRecord import AggregatedMetricRecord
 from core.models.ContextualMetricRecord import ContextualMetricRecord
 from ports.PersistencePort import PersistencePort
+from core.user_id_match import user_id_match
 from pymongo import MongoClient
 
 
@@ -43,7 +44,7 @@ class MongoPersistenceAdapter(PersistencePort):
         for db_name in ALL_DBS:
             db = self.client[db_name]
             cursor = (
-                db["aggregated_metrics"].find({"user_id": user_id})
+                db["aggregated_metrics"].find({"user_id": user_id_match(user_id)})
                 .sort("timestamp", -1)
                 .limit(1)
             )
@@ -59,7 +60,7 @@ class MongoPersistenceAdapter(PersistencePort):
         for db_name in ALL_DBS:
             db = self.client[db_name]
             cursor = (
-                db["contextual_metrics"].find({"user_id": user_id})
+                db["contextual_metrics"].find({"user_id": user_id_match(user_id)})
                 .sort("timestamp", -1)
                 .limit(1)
             )
@@ -78,7 +79,7 @@ class MongoPersistenceAdapter(PersistencePort):
         Query all databases and combine results.
         Supports both legacy flat format and new grouped format by unpacking grouped records.
         """
-        query = {"user_id": user_id}
+        query = {"user_id": user_id_match(user_id)}
         if start_date:
             query["timestamp"] = {"$gte": start_date}
 
@@ -143,7 +144,7 @@ class MongoPersistenceAdapter(PersistencePort):
         start_date: Optional[datetime] = None,
     ) -> List[dict]:
         """Query all databases and combine results as dicts for DataFrame."""
-        query = {"user_id": user_id}
+        query = {"user_id": user_id_match(user_id)}
         if start_date:
             query["timestamp"] = {"$gte": start_date}
 
@@ -189,7 +190,7 @@ class MongoPersistenceAdapter(PersistencePort):
         start_date: Optional[datetime] = None,
     ) -> List[ContextualMetricRecord]:
         """Query all databases and combine results."""
-        query = {"user_id": user_id}
+        query = {"user_id": user_id_match(user_id)}
         if start_date:
             query["timestamp"] = {"$gte": start_date}
 
