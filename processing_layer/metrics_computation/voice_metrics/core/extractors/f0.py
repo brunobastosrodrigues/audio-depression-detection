@@ -45,8 +45,8 @@ def _extract_f0_contour(features_LLD, audio_signal, sr):
     Returns:
         Tuple of (f0_opensmile_hz, f0_librosa) arrays
     """
-    # OpenSMILE F0 extraction (eGeMAPS semitones)
-    f0_semitones = features_LLD["F0semitone_sma3nz"]
+    # OpenSMILE F0 extraction (eGeMAPSv02 semitones, relative to 27.5 Hz)
+    f0_semitones = features_LLD["F0semitoneFrom27.5Hz_sma3nz"]
     f0_opensmile = f0_semitones[f0_semitones > 0]
 
     if not f0_opensmile.empty:

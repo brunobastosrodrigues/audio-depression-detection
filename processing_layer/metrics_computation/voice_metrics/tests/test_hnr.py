@@ -1,7 +1,9 @@
 """Tests for the HNR extractor's voiced-frame selection.
 
-OpenSMILE's `logHNR_sma3nz` is set to exactly 0.0 on unvoiced frames; on voiced
-frames it carries the real log-HNR, which is legitimately **negative** for
+OpenSMILE eGeMAPSv02's HNR column is `HNRdBACF_sma3nz` (the code previously read a
+non-existent `logHNR_sma3nz`, silently yielding 0.0 in production). It is set to
+exactly 0.0 on unvoiced frames; on voiced frames it carries the real HNR (dB), which
+is legitimately **negative** for
 breathy/noisy voices (noise > harmonics) -- precisely the low-HNR pattern that is
 clinically relevant for fatigue/depression. Selecting voiced frames must therefore
 key off "!= 0" (unvoiced sentinel), not "> 0", otherwise the most relevant frames
@@ -14,7 +16,7 @@ from core.extractors.hnr import get_hnr_dynamic, get_hnr_mean
 
 
 def _lld(values):
-    return pd.DataFrame({"logHNR_sma3nz": pd.Series(values, dtype=float)})
+    return pd.DataFrame({"HNRdBACF_sma3nz": pd.Series(values, dtype=float)})
 
 
 def test_negative_voiced_frames_are_kept():
