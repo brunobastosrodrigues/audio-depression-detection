@@ -11,6 +11,7 @@ class PHQ9Submission(BaseModel):
     total_score: int
     functional_impact: Dict[str, Any]
     timestamp: str
+    system_mode: Optional[str] = None
 
 def create_service_calibration(calibration_service: CalibrationService):
     @router.post("/submit_phq9")
@@ -21,7 +22,8 @@ def create_service_calibration(calibration_service: CalibrationService):
                 phq9_scores=submission.phq9_scores,
                 total_score=submission.total_score,
                 functional_impact=submission.functional_impact.get("label", ""), # Extract label
-                timestamp=submission.timestamp
+                timestamp=submission.timestamp,
+                system_mode=submission.system_mode,
             )
             return {"status": "success", "message": "Calibration processed"}
         except Exception as e:

@@ -16,7 +16,7 @@ class FakeBaselineManager:
     def __init__(self, baseline):
         self._baseline = baseline
 
-    def get_user_baseline(self, user_id, timestamp=None):
+    def get_user_baseline(self, user_id, timestamp=None, system_mode=None):
         return self._baseline
 
 

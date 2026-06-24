@@ -49,7 +49,7 @@ def analyze_metrics(
         system_mode = getattr(record, "system_mode", None) or "live"
 
         user_baseline = baseline_manager.get_user_baseline(
-            user_id, timestamp=record.timestamp
+            user_id, timestamp=record.timestamp, system_mode=system_mode
         )
 
         stats = user_baseline.get(metric) if user_baseline else None

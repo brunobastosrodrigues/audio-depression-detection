@@ -502,10 +502,13 @@ def seed_user_data(
     baseline_doc = {
         "user_id": user_id,
         "schema_version": 2,
+        # Reader (BaselineManager.get_user_baseline) looks up "general"/"morning"/
+        # "evening" and reads stats from a nested "metrics" key, so the seed must use
+        # that exact V2 shape -- otherwise the per-user baseline is silently ignored.
         "context_partitions": {
-            "default": baseline_stats,
-            "morning": baseline_stats,
-            "evening": baseline_stats
+            "general": {"metrics": baseline_stats},
+            "morning": {"metrics": baseline_stats},
+            "evening": {"metrics": baseline_stats}
         },
         "timestamp": datetime.utcnow(),
         "system_mode": "demo"

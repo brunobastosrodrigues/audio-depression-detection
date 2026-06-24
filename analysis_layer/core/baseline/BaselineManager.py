@@ -7,13 +7,22 @@ from core.mapping.ConfigManager import ConfigManager
 from core.user_id_match import user_id_match
 import os
 
+# Database routing by system_mode. Baselines and indicator scores are mode-isolated
+# exactly like metrics/scores; there is no bare "iotsensing" database (only the three
+# below exist), so a hardcoded client["iotsensing"] read every baseline as missing and
+# silently fell back to the population baseline for every user.
+DB_MAP = {
+    "live": "iotsensing_live",
+    "dataset": "iotsensing_dataset",
+    "demo": "iotsensing_demo",
+    None: "iotsensing_live",
+}
+
+
 class BaselineManager:
     def __init__(self):
         mongo_uri = os.getenv("MONGO_URI", "mongodb://mongodb:27017")
         self.client = MongoClient(mongo_uri)
-        self.db = self.client["iotsensing"]
-        self.collection_baseline = self.db["baseline"]
-        self.collection_indicator_scores = self.db["indicator_scores"]
 
         self.config_manager = ConfigManager()
 
@@ -24,6 +33,15 @@ class BaselineManager:
         # Load default config initially, but we should use config_manager.get_config(user_id) when needed
         self.config = self.config_manager._default_config
         self.day_adder = 1
+
+    def _db(self, system_mode=None):
+        return self.client[DB_MAP.get(system_mode, "iotsensing_live")]
+
+    def _baseline_collection(self, system_mode=None):
+        return self._db(system_mode)["baseline"]
+
+    def _indicator_collection(self, system_mode=None):
+        return self._db(system_mode)["indicator_scores"]
 
     def _load_json_file(self, path):
         if not os.path.exists(path):
@@ -71,7 +89,7 @@ class BaselineManager:
             return self.population_baseline.get(metric_name)
         return self.population_baseline
 
-    def get_user_baseline(self, user_id, metric_name=None, timestamp=None):
+    def get_user_baseline(self, user_id, metric_name=None, timestamp=None, system_mode=None):
         """
         Retrieves baseline for a user.
 
@@ -87,7 +105,7 @@ class BaselineManager:
         Returns:
             dict or metric value: The baseline metrics or a specific metric value
         """
-        latest_doc = self.collection_baseline.find_one(
+        latest_doc = self._baseline_collection(system_mode).find_one(
             {"user_id": user_id_match(user_id)}, sort=[("timestamp", -1)]
         )
 
@@ -124,9 +142,9 @@ class BaselineManager:
         merged.update(user_metrics)
         return merged
 
-    def get_indicator_scores(self, user_id: int) -> IndicatorScoreRecord:
+    def get_indicator_scores(self, user_id: int, system_mode=None) -> IndicatorScoreRecord:
 
-        latest_doc = self.collection_indicator_scores.find_one(
+        latest_doc = self._indicator_collection(system_mode).find_one(
             {"user_id": user_id_match(user_id)}, sort=[("timestamp", -1)]
         )
 
@@ -141,7 +159,7 @@ class BaselineManager:
         )
 
     def finetune_baseline(
-        self, user_id, phq9_scores, total_score, functional_impact, timestamp
+        self, user_id, phq9_scores, total_score, functional_impact, timestamp, system_mode=None
     ):
         """
         Fine-tune the baseline for a user based on PHQ-9 feedback.
@@ -157,8 +175,8 @@ class BaselineManager:
             timestamp: Timestamp of the assessment
         """
         # Get baseline for the specific context
-        old_baseline = self.get_user_baseline(user_id, timestamp=timestamp)
-        user_indicator_score_record = self.get_indicator_scores(user_id)
+        old_baseline = self.get_user_baseline(user_id, timestamp=timestamp, system_mode=system_mode)
+        user_indicator_score_record = self.get_indicator_scores(user_id, system_mode=system_mode)
         user_indicator_scores = (
             user_indicator_score_record.indicator_scores
             if user_indicator_score_record
@@ -237,7 +255,7 @@ class BaselineManager:
         context_key = self._get_context_key(timestamp)
 
         # Get existing document to preserve other partitions
-        existing_doc = self.collection_baseline.find_one(
+        existing_doc = self._baseline_collection(system_mode).find_one(
             {"user_id": user_id_match(user_id)}, sort=[("timestamp", -1)]
         )
 
@@ -280,7 +298,7 @@ class BaselineManager:
             "context_partitions": partitions,
         }
 
-        self.collection_baseline.replace_one(
+        self._baseline_collection(system_mode).replace_one(
             {"user_id": user_id, "timestamp": timestamp},
             updated_doc,
             upsert=True,
