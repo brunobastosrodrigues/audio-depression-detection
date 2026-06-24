@@ -38,17 +38,25 @@ METRIC_FRIENDLY_NAMES = {
     "response_latency": "response time",
 }
 
-# Critical metrics per indicator (if missing, confidence drops significantly)
+# Critical metrics per indicator (if missing, confidence drops significantly).
+# Keys MUST match the indicator keys in core/mapping/config.json, and every listed
+# metric MUST be one of that indicator's configured metrics -- otherwise the
+# critical-metric availability ratio is computed against metrics that can never be
+# present, silently capping confidence. (See tests/test_explanation_generator.py.)
 CRITICAL_METRICS = {
     "1_depressed_mood": ["f0_avg", "f0_std", "rate_of_speech"],
-    "2_loss_of_interest": ["f0_std", "f0_range", "energy_std"],
+    "2_loss_of_interest": ["f0_std", "f0_range", "rms_energy_std"],
     "3_significant_weight_changes": [],  # Not acoustically measurable
-    "4_insomnia_hypersomnia": ["rate_of_speech", "pause_duration", "energy_mean"],
-    "5_psychomotor_changes": ["rate_of_speech", "articulation_rate", "pause_duration"],
-    "6_fatigue": ["f0_avg", "energy_mean", "rate_of_speech"],
-    "7_worthlessness": ["f0_std", "f0_range", "shimmer"],
-    "8_concentration_issues": ["pause_count", "rate_of_speech", "f0_std"],
-    "9_suicidal_ideation": ["f0_std", "pause_duration", "energy_std"],
+    "4_insomnia_hypersomnia": ["hnr_mean", "temporal_modulation", "spectral_modulation"],
+    "5_psychomotor_retardation_agitation": [
+        "rate_of_speech", "articulation_rate", "voice_onset_time",
+    ],
+    "6_fatigue_loss_of_energy": ["temporal_modulation", "spectral_modulation"],
+    "7_feelings_of_worthlessness_guilt": [],  # Not acoustically measurable
+    "8_diminished_ability_to_think_or_concentrate": [
+        "pause_count", "pause_duration", "f0_std",
+    ],
+    "9_recurrent_thoughts_of_death_or_being_suicidal": [],  # Not acoustically measurable
 }
 
 # Default critical metrics if indicator not in mapping
@@ -94,7 +102,10 @@ def calculate_confidence(
         Tuple of (confidence score 0-1, data quality label)
     """
     if not expected_metrics:
-        return 1.0, "full"
+        # Indicator has no acoustic metrics (e.g. weight changes, worthlessness,
+        # suicidality). It is not measurable from voice, so report no confidence
+        # rather than a misleading "full".
+        return 0.0, "insufficient"
 
     # Get critical metrics for this indicator
     critical = CRITICAL_METRICS.get(indicator, DEFAULT_CRITICAL_METRICS)
@@ -107,7 +118,7 @@ def calculate_confidence(
     total_expected = len(expected_set)
 
     if total_expected == 0:
-        return 1.0, "full"
+        return 0.0, "insufficient"
 
     availability_ratio = available_count / total_expected
 

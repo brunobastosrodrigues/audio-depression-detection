@@ -127,46 +127,45 @@ def derive_indicator_scores(
             # S_i(t) = sum(W_{i,m})
             # Equation 3: Directional Transformation
 
-            s_i_t = 0.0
-
-            # If we don't have any metrics for this indicator in this update,
-            # should we assume S_i(t) is 0? Or skip?
-            # The prompt implies we process the "current time window".
-            # If data is missing for a metric, we treat it as 0 contribution (baseline).
+            # S_i(t) is the weighted *average* of the directional clipped z-scores
+            # (Eq. 3) of the metrics that are actually available this window. Using a
+            # weighted average (normalized by the summed weight of available metrics)
+            # instead of a raw sum keeps S_i(t) bounded to roughly [-tau, tau], so the
+            # severity_threshold (a small 0-1-scale value, e.g. 0.5) is comparable
+            # across indicators regardless of how many metrics they have. Missing or
+            # non-finite metrics are excluded from both numerator and denominator
+            # rather than diluting the score toward baseline.
+            weighted_sum = 0.0
+            weight_total = 0.0
 
             for metric, props in details.get("metrics", {}).items():
                 weight = props.get("weight", 0)
                 if weight == 0:
                     continue
 
-                direction = props.get("direction", "positive")
-                z_hat = analyzed_value.get(metric, 0.0) # Default to 0 (baseline) if missing
+                if metric not in analyzed_value:
+                    continue  # metric not measured this window -> unavailable
 
-                # Eq 3
-                w_im = 0.0
-                if direction == "positive":
-                    w_im = z_hat # Already clipped
-                elif direction == "negative":
+                z_hat = analyzed_value[metric]
+                if z_hat is None or (
+                    isinstance(z_hat, float) and (math.isnan(z_hat) or math.isinf(z_hat))
+                ):
+                    continue  # undefined standardization -> unavailable
+
+                direction = props.get("direction", "positive")
+
+                # Eq 3: directional transformation
+                if direction == "negative":
                     w_im = -z_hat
                 elif direction == "both" or direction == "anomaly":
                     w_im = abs(z_hat)
+                else:  # "positive" (default)
+                    w_im = z_hat
 
-                # Note: The prompt description for Eq 3 says:
-                # W_{i,m} is the weighted contribution...
-                # Wait, the prompt says W_{i,m} = z_hat (if positive), etc.
-                # But typically weighted sum implies multiplying by weight.
-                # The prompt text says "Segments are sized by their weighted score".
-                # It doesn't explicitly show W * z in Eq 3, but Eq 3 defines W_{i,m}.
-                # The text "S_i(t): The instantaneous score ... (sum of all W_{i,m} contributions)"
-                # implies S_i(t) = sum(W_{i,m}).
-                # But where does the weight from config come in?
-                # Usually Weighted Score = Sum(Weight * Score).
-                # The config has "weight": 1.0.
-                # Let's assume W_{i,m} includes the config weight multiplication.
-                # Or W_{i,m} is the transformed value, and S_i(t) is the weighted sum.
-                # Given the "Weighted contribution" wording, I will multiply by weight.
+                weighted_sum += w_im * weight
+                weight_total += weight
 
-                s_i_t += w_im * weight
+            s_i_t = weighted_sum / weight_total if weight_total > 0 else 0.0
 
             # Equation 4: Temporal Persistence (EMA)
             # S_bar(t) = (1 - alpha) * S_i(t) + alpha * S_bar(t-1)

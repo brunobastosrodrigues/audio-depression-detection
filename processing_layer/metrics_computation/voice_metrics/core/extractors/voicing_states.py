@@ -32,25 +32,54 @@ from core.extractors.dynamic_metrics_utils import (
 RMS_THRESHOLD = 0.01
 
 
+F0_MIN_HZ = 50.0
+F0_MAX_HZ = 500.0
+
+
 def classify_voicing_states(audio_np, sample_rate, frame_length=0.04, hop_length=0.01):
     """
     Segments audio into 3 states: 1=voiced, 2=unvoiced, 3=silence
-    Optimized with vectorization for better performance
+
+    Voicing is decided by pyin's harmonicity-based voicing flag, which (unlike the
+    previous "any piptrack peak > 0" test) does NOT label broadband/noise frames as
+    voiced. Frames that are not voiced are then split into unvoiced vs silence by an
+    RMS energy gate.
+
+    NOTE (perf, Phase 2 / edge): pyin is the most expensive call in this module and
+    duplicates the pitch estimation done by the F0 extractor. For the Raspberry Pi
+    target this should be unified with F0 estimation (compute once, share the voicing
+    flag) or replaced with a cheaper voiced/unvoiced detector.
     """
     frame_len = int(frame_length * sample_rate)
     hop_len = int(hop_length * sample_rate)
+    audio_np = np.asarray(audio_np, dtype=float)
 
     rms = librosa.feature.rms(y=audio_np, frame_length=frame_len, hop_length=hop_len)[0]
-    pitches, _ = librosa.piptrack(y=audio_np, sr=sample_rate, hop_length=hop_len)
 
-    pitch_present = np.any(pitches > 0, axis=0)
+    # pyin needs a window long enough to resolve F0_MIN; keep the 10 ms hop for time
+    # resolution but use a sufficiently large analysis frame.
+    pyin_frame = max(frame_len, 2048)
+    _, voiced_flag, _ = librosa.pyin(
+        audio_np,
+        sr=sample_rate,
+        fmin=F0_MIN_HZ,
+        fmax=F0_MAX_HZ,
+        frame_length=pyin_frame,
+        hop_length=hop_len,
+        center=True,
+    )
+    voiced_flag = np.asarray(voiced_flag, dtype=bool)
 
-    # Vectorized state assignment using np.where
+    # Align lengths (center padding keeps these equal, but be defensive).
+    n = min(len(rms), len(voiced_flag))
+    rms = rms[:n]
+    voiced_flag = voiced_flag[:n]
+
     # Priority: voiced (1) > unvoiced (2) > silence (3)
     state_sequence = np.where(
-        pitch_present,
-        1,  # Voiced
-        np.where(rms > RMS_THRESHOLD, 2, 3)  # Unvoiced or Silence
+        voiced_flag,
+        1,  # Voiced (periodic / harmonic)
+        np.where(rms > RMS_THRESHOLD, 2, 3),  # Unvoiced (energy, no pitch) or Silence
     )
 
     return state_sequence.tolist()
