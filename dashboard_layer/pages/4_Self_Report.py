@@ -22,15 +22,17 @@ apply_custom_css()
 
 st.title("Self-Report Assessment")
 
-# --- DATABASE CONNECTION ---
+# --- SIDEBAR ---
+# render_mode_selector() initializes st.session_state.system_mode; it MUST run before
+# get_database(), otherwise get_database() falls back to the "live" DB on first load
+# and binds these collections to the wrong (live) database for the selected mode.
+render_mode_selector()
+
+# --- DATABASE CONNECTION (after the mode is resolved) ---
 db = get_database()
 collection_metrics = db["raw_metrics"]
 collection_phq9 = db["phq9_submissions"]
 collection_indicators = db["indicator_scores"]
-
-
-# --- SIDEBAR ---
-render_mode_selector()
 
 st.sidebar.title("Actions")
 
