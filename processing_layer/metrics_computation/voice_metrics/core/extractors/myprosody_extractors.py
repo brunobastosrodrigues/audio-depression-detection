@@ -67,7 +67,11 @@ def myprosody_extractors_handler(
         MYPROSODY_DIR_PATH, "dataset", "audioFiles", f"{temp_wav_name}.wav"
     )
 
-    # Write temporary file and ensure cleanup
+    # Write temporary file and ensure cleanup. The audioFiles/ dir only ever holds
+    # gitignored temp files, so it is NOT tracked in git -- a fresh build/clone (e.g.
+    # an ARM image for the Raspberry Pi) won't have it, and sf.write would raise,
+    # taking down the whole extraction. Create it on demand to be self-healing.
+    os.makedirs(os.path.dirname(temp_wav_path), exist_ok=True)
     try:
         sf.write(temp_wav_path, audio_np, sample_rate, subtype="PCM_16")
 
