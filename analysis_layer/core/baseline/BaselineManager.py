@@ -159,21 +159,25 @@ class BaselineManager:
             indicator_scores=latest_doc["indicator_scores"],
         )
 
-    def compute_and_store_baseline(self, user_id, system_mode=None, min_samples=10):
-        """Derive a per-user baseline from the user's ingested raw metrics and store it.
-
-        Reads raw_metrics from the mode-appropriate database, computes mean/std/count
-        per metric per circadian context (V2 schema), and upserts a single
-        "computed_from_data" baseline document for the user. Returns the computed
-        context_partitions, or None when there is not enough data for any metric yet.
-        """
-        raw_collection = self._db(system_mode)["raw_metrics"]
-        records = list(
-            raw_collection.find(
+    def _fetch_raw_metric_records(self, user_id, system_mode=None):
+        return list(
+            self._db(system_mode)["raw_metrics"].find(
                 {"user_id": user_id_match(user_id)},
                 {"_id": 0, "metric_name": 1, "metric_value": 1, "timestamp": 1},
             )
         )
+
+    def compute_and_store_baseline(self, user_id, system_mode=None, min_samples=10, records=None):
+        """Derive a per-user baseline from the user's ingested raw metrics and store it.
+
+        Reads raw_metrics from the mode-appropriate database (unless `records` is passed
+        in to avoid a re-read), computes mean/std/count per metric per circadian context
+        (V2 schema), and upserts a single "computed_from_data" baseline document for the
+        user. Returns the computed context_partitions, or None when there is not enough
+        data for any metric yet.
+        """
+        if records is None:
+            records = self._fetch_raw_metric_records(user_id, system_mode)
         if not records:
             return None
 
@@ -199,6 +203,46 @@ class BaselineManager:
             upsert=True,
         )
         return partitions
+
+    def _past_learning_period(self, records, learning_period_days):
+        """True when the user's raw metrics span at least learning_period_days."""
+        times = []
+        for record in records:
+            ts = record.get("timestamp")
+            if isinstance(ts, str):
+                try:
+                    ts = datetime.fromisoformat(ts)
+                except ValueError:
+                    continue
+            if isinstance(ts, datetime):
+                # Normalize to naive for safe comparison (Mongo stores naive UTC).
+                times.append(ts.replace(tzinfo=None) if ts.tzinfo else ts)
+        if len(times) < 2:
+            return False
+        return (max(times) - min(times)).days >= learning_period_days
+
+    def maybe_compute_baseline(self, user_id, system_mode=None, learning_period_days=14, min_samples=10):
+        """Compute a data-derived baseline once the user is past the learning period.
+
+        Intended to be called from the analysis pipeline on each run. It is a no-op
+        (returns None) when a computed baseline already exists, or when the user has not
+        yet accumulated `learning_period_days` of data -- so a user transitions from the
+        population baseline to their own data-derived one exactly once, automatically.
+        PHQ-9 finetuning continues to refine the computed baseline afterwards.
+        """
+        existing = self._baseline_collection(system_mode).find_one(
+            {"user_id": user_id_match(user_id), "source": "computed_from_data"}
+        )
+        if existing:
+            return None
+
+        records = self._fetch_raw_metric_records(user_id, system_mode)
+        if not records or not self._past_learning_period(records, learning_period_days):
+            return None
+
+        return self.compute_and_store_baseline(
+            user_id, system_mode=system_mode, min_samples=min_samples, records=records
+        )
 
     def finetune_baseline(
         self, user_id, phq9_scores, total_score, functional_impact, timestamp, system_mode=None

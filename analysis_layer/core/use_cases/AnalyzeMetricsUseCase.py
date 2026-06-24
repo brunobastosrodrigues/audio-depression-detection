@@ -28,6 +28,12 @@ class AnalyzeMetricsUseCase:
         if not metrics:
             return {}
 
+        # Once the user is past the learning period, establish a data-derived baseline
+        # (no-op if one already exists or there isn't enough history yet) so the z-scoring
+        # below measures against the user's own baseline rather than the population one.
+        for mode in {getattr(m, "system_mode", None) or "live" for m in metrics}:
+            baseline_manager.maybe_compute_baseline(user_id, system_mode=mode)
+
         analyzed_metrics = analyze_metrics(user_id, metrics, baseline_manager)
 
         self.repository.save_analyzed_metrics(analyzed_metrics)
