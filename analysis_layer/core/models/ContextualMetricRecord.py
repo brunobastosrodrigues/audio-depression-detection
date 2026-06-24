@@ -25,10 +25,10 @@ class ContextualMetricRecord:
 
         result = {
             "user_id": self.user_id,
-            "timestamp": self.timestamp,
+            "timestamp": ts,
             "metric_name": self.metric_name,
             "contextual_value": self.contextual_value,
-            "metric_dev": self.metric_name,
+            "metric_dev": self.metric_dev,
         }
         if self.system_mode is not None:
             result["system_mode"] = self.system_mode
