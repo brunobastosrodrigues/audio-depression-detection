@@ -79,6 +79,19 @@ def get_current_mode() -> str:
     return st.session_state.get("system_mode", "live")
 
 
+@st.cache_data(ttl=30, show_spinner=False)
+def load_indicator_scores(mode: str, user_id, ascending: bool = True) -> list:
+    """Cached load of a user's indicator_scores.
+
+    Pages previously re-ran ``find(...)`` on every widget interaction; this memoizes the
+    result per (mode, user_id, order) so only the first render (or a 30s refresh) hits Mongo.
+    Returns the raw docs so callers keep their existing DataFrame logic.
+    """
+    db = get_database(mode)
+    direction = 1 if ascending else -1
+    return list(db["indicator_scores"].find({"user_id": user_id}).sort("timestamp", direction))
+
+
 @st.cache_data(ttl=60)
 def get_config_mode() -> str:
     """Resolve the active indicator-config mode ("legacy" or "dynamic").
