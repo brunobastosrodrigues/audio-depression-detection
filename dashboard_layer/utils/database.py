@@ -79,6 +79,26 @@ def get_current_mode() -> str:
     return st.session_state.get("system_mode", "live")
 
 
+@st.cache_data(ttl=60)
+def get_config_mode() -> str:
+    """Resolve the active indicator-config mode ("legacy" or "dynamic").
+
+    Mirrors the analysis layer's ConfigManager so the dashboard loads the SAME mapping
+    file the scoring layer uses: MongoDB iotsensing.system_settings {"setting":
+    "config_mode"} first, then the CONFIG_MODE env var, then "legacy". config_mode is a
+    global setting stored in the (non-mode-isolated) iotsensing database. Cached briefly
+    so it tracks runtime changes (e.g. the analysis /config/reload endpoint) without a
+    query on every call.
+    """
+    try:
+        doc = get_client()["iotsensing"]["system_settings"].find_one({"setting": "config_mode"})
+        if doc and doc.get("value"):
+            return str(doc["value"]).lower()
+    except Exception:
+        pass
+    return os.getenv("CONFIG_MODE", "legacy").lower()
+
+
 def set_mode(mode: str):
     """Set system mode in session state."""
     if mode in DB_MAP:
