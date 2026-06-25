@@ -19,6 +19,11 @@ def derive_indicator_scores(
     if not records:
         return []
 
+    # Write the score records with the user_id type stored in the data (from the analyzed
+    # records) rather than the REST string param, keeping indicator_scores consistent with
+    # raw/aggregated/contextual/analyzed instead of relying on downstream type coercion.
+    resolved_user_id = getattr(records[0], "user_id", user_id)
+
     if config_manager:
         mapping_config = config_manager.get_config(user_id)
     else:
@@ -218,7 +223,7 @@ def derive_indicator_scores(
 
         all_scores.append(
             IndicatorScoreRecord(
-                user_id=user_id,
+                user_id=resolved_user_id,
                 timestamp=record_date,
                 indicator_scores=current_smoothed_scores,
                 mdd_signal=mdd_signal,
