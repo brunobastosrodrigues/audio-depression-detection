@@ -569,7 +569,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mongo-uri", default="mongodb://localhost:27017")
     parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--seed", type=int, default=42, help="RNG seed for reproducible demo data")
     args = parser.parse_args()
+
+    # Seed both RNGs so the demo cohorts (and their baselines/scores) are reproducible
+    # across runs instead of changing every time the seeder is run.
+    random.seed(args.seed)
+    np.random.seed(args.seed)
 
     client = MongoClient(args.mongo_uri)
     db_name = "iotsensing_demo"
