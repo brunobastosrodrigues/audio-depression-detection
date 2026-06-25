@@ -6,7 +6,19 @@ from core.models.AggregatedMetricRecord import AggregatedMetricRecord
 from core.models.ContextualMetricRecord import ContextualMetricRecord
 from ports.PersistencePort import PersistencePort
 from core.user_id_match import user_id_match
-from pymongo import MongoClient
+from pymongo import MongoClient, UpdateOne
+
+
+def _upsert_by_key(collection, dict_records, key_fields):
+    """Idempotent bulk write: upsert each record on its natural key so re-runs overwrite
+    instead of appending duplicates."""
+    if not dict_records:
+        return
+    ops = [
+        UpdateOne({k: rec.get(k) for k in key_fields}, {"$set": rec}, upsert=True)
+        for rec in dict_records
+    ]
+    collection.bulk_write(ops, ordered=False)
 
 
 # Database routing map based on system_mode
@@ -132,9 +144,12 @@ class MongoPersistenceAdapter(PersistencePort):
         total = 0
         for system_mode, dict_records in records_by_mode.items():
             db = self._get_db(system_mode)
-            db["aggregated_metrics"].insert_many(dict_records)
+            _upsert_by_key(
+                db["aggregated_metrics"], dict_records,
+                ("user_id", "timestamp", "metric_name", "system_mode"),
+            )
             db_name = DB_MAP.get(system_mode, "iotsensing_live")
-            print(f"Inserted {len(dict_records)} aggregated metrics to {db_name}")
+            print(f"Upserted {len(dict_records)} aggregated metrics to {db_name}")
             total += len(dict_records)
         print(f"Total: {total} aggregated metrics records inserted.")
 
@@ -178,9 +193,12 @@ class MongoPersistenceAdapter(PersistencePort):
         total = 0
         for system_mode, dict_records in records_by_mode.items():
             db = self._get_db(system_mode)
-            db["contextual_metrics"].insert_many(dict_records)
+            _upsert_by_key(
+                db["contextual_metrics"], dict_records,
+                ("user_id", "timestamp", "metric_name", "system_mode"),
+            )
             db_name = DB_MAP.get(system_mode, "iotsensing_live")
-            print(f"Inserted {len(dict_records)} contextual metrics to {db_name}")
+            print(f"Upserted {len(dict_records)} contextual metrics to {db_name}")
             total += len(dict_records)
         print(f"Total: {total} contextual metrics records inserted.")
 
