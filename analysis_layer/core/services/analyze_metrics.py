@@ -1,9 +1,26 @@
-import pandas as pd
 from typing import List
+import math
+
 from core.models.AnalyzedMetricRecord import AnalyzedMetricRecord
 from core.models.ContextualMetricRecord import ContextualMetricRecord
 from core.baseline.BaselineManager import BaselineManager
-import math
+
+
+def _clipping_threshold_for(baseline_manager, user_id, metric) -> float:
+    """Look up the per-metric clipping threshold (Eq. 2), defaulting to 3.0."""
+    default = 3.0
+    config = None
+    if hasattr(baseline_manager, "config_manager"):
+        config = baseline_manager.config_manager.get_config(user_id)
+    elif hasattr(baseline_manager, "config"):
+        config = baseline_manager.config
+    if not config:
+        return default
+    for indicator_data in config.values():
+        metrics = indicator_data.get("metrics", {}) if isinstance(indicator_data, dict) else {}
+        if metric in metrics:
+            return metrics[metric].get("clipping_threshold", default)
+    return default
 
 
 def analyze_metrics(
@@ -11,96 +28,54 @@ def analyze_metrics(
     records: List[ContextualMetricRecord],
     baseline_manager: BaselineManager,
 ) -> List[AnalyzedMetricRecord]:
+    """Standardize contextual metrics into clipped z-scores against the user baseline.
+
+    Eq. 1 (standardization): z = (x - mean) / std
+    Eq. 2 (robustness):      z_hat = sign(z) * min(|z|, tau)
+
+    A metric is *excluded* from the output when it cannot be standardized -- no
+    baseline entry, or a baseline std that is None or <= 0 -- rather than being
+    emitted as 0.0. Emitting 0.0 would be read downstream as "exactly at baseline"
+    (a real, neutral measurement); excluding it instead lets the scorer and the
+    confidence layer treat the metric as genuinely unavailable.
+    """
     if not records:
         return []
 
-    df = pd.DataFrame(
-        {
-            "user_id": [r.user_id for r in records],
-            "timestamp": [r.timestamp for r in records],
-            "metric_name": [r.metric_name for r in records],
-            "contextual_value": [r.contextual_value for r in records],
-            "metric_dev": [r.metric_dev for r in records],
-            "system_mode": [getattr(r, 'system_mode', None) or 'live' for r in records],
-        }
-    )
+    results: List[AnalyzedMetricRecord] = []
+    for record in records:
+        metric = record.metric_name
+        value = record.contextual_value
+        system_mode = getattr(record, "system_mode", None) or "live"
 
-    z_scores = []
-    for _, row in df.iterrows():
-        metric = row["metric_name"]
-        value = row["contextual_value"]
-        record_timestamp = row["timestamp"]
-
-        # Fetch baseline specific to this record's timestamp for context-aware retrieval
         user_baseline = baseline_manager.get_user_baseline(
-            user_id, timestamp=record_timestamp
+            user_id, timestamp=record.timestamp, system_mode=system_mode
         )
 
-        if metric in user_baseline:
-            mean = user_baseline[metric]["mean"]
-            std = user_baseline[metric]["std"]
+        stats = user_baseline.get(metric) if user_baseline else None
+        if not stats:
+            continue  # no baseline -> cannot standardize -> exclude
 
-            if std is not None and std > 0:
-                z = (value - mean) / std
-            else:
-                z = None
-        else:
-            z = None
+        mean = stats.get("mean")
+        std = stats.get("std")
+        if mean is None or std is None or std <= 0 or value is None:
+            continue  # undefined standardization -> exclude
 
-        # Equation 1: Feature Standardization
-        # z = (x - mean) / max(std, epsilon)
-        if metric in user_baseline:
-            mean = user_baseline[metric]["mean"]
-            std = user_baseline[metric]["std"]
-            epsilon = 1e-6
+        z = (value - mean) / std
+        if math.isnan(z) or math.isinf(z):
+            continue  # non-finite -> exclude
 
-            if std is not None:
-                z = (value - mean) / max(std, epsilon)
-            else:
-                z = 0.0
-        else:
-            z = 0.0
+        tau = _clipping_threshold_for(baseline_manager, user_id, metric)
+        z_clipped = math.copysign(1, z) * min(abs(z), tau)
 
-        # Equation 2: Robustness via Clipping
-        # z_hat = sign(z) * min(|z|, tau)
-        # We need to fetch the clipping threshold from config if possible,
-        # but analyze_metrics doesn't have access to config easily right now.
-        # However, the requirement says "typically set to 3.0".
-        # We'll use a default of 3.0 here or check if we can pass it.
-        # Access config from baseline_manager if available to get user-specific thresholds
-        clipping_threshold = 3.0 # Default
-
-        if hasattr(baseline_manager, 'config_manager'):
-            user_config = baseline_manager.config_manager.get_config(user_id)
-            # Reverse lookup metric in config
-            for indicator_data in user_config.values():
-                if "metrics" in indicator_data and metric in indicator_data["metrics"]:
-                     metric_config = indicator_data["metrics"][metric]
-                     clipping_threshold = metric_config.get("clipping_threshold", 3.0)
-                     break
-        elif hasattr(baseline_manager, 'config'):
-             # Fallback to default config stored in manager
-            for indicator_data in baseline_manager.config.values():
-                if "metrics" in indicator_data and metric in indicator_data["metrics"]:
-                     metric_config = indicator_data["metrics"][metric]
-                     clipping_threshold = metric_config.get("clipping_threshold", 3.0)
-                     break
-
-        if isinstance(z, (int, float)) and not (math.isnan(z) or math.isinf(z)):
-             z_clipped = math.copysign(1, z) * min(abs(z), clipping_threshold)
-             z_scores.append(z_clipped)
-        else:
-            z_scores.append(0.0)
-
-    df["analyzed_value"] = z_scores
-
-    return [
-        AnalyzedMetricRecord(
-            user_id=row["user_id"],
-            timestamp=row["timestamp"],
-            metric_name=row["metric_name"],
-            analyzed_value=row["analyzed_value"],
-            system_mode=row["system_mode"],
+        results.append(
+            AnalyzedMetricRecord(
+                user_id=record.user_id,
+                timestamp=record.timestamp,
+                metric_name=metric,
+                analyzed_value=z_clipped,
+                system_mode=system_mode,
+            )
         )
-        for _, row in df.iterrows()
-    ]
+
+    return results

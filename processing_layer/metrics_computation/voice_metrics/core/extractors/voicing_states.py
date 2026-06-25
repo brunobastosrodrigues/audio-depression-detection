@@ -32,28 +32,99 @@ from core.extractors.dynamic_metrics_utils import (
 RMS_THRESHOLD = 0.01
 
 
-def classify_voicing_states(audio_np, sample_rate, frame_length=0.04, hop_length=0.01):
+F0_MIN_HZ = 50.0
+F0_MAX_HZ = 500.0
+
+
+def classify_voicing_states(audio_np, sample_rate, frame_length=0.04, hop_length=0.01, voiced_flag=None):
     """
     Segments audio into 3 states: 1=voiced, 2=unvoiced, 3=silence
-    Optimized with vectorization for better performance
+
+    Voicing is decided by pyin's harmonicity-based voicing flag, which (unlike the
+    previous "any piptrack peak > 0" test) does NOT label broadband/noise frames as
+    voiced. Frames that are not voiced are then split into unvoiced vs silence by an
+    RMS energy gate.
+
+    `voiced_flag` is the optional precomputed voicing decision from the shared pitch pass
+    (one pyin call feeds both this and the F0 extractor). When None it is computed here so
+    this stays standalone. The flag must be sampled on the same hop as `hop_length`.
     """
     frame_len = int(frame_length * sample_rate)
     hop_len = int(hop_length * sample_rate)
+    audio_np = np.asarray(audio_np, dtype=float)
 
     rms = librosa.feature.rms(y=audio_np, frame_length=frame_len, hop_length=hop_len)[0]
-    pitches, _ = librosa.piptrack(y=audio_np, sr=sample_rate, hop_length=hop_len)
 
-    pitch_present = np.any(pitches > 0, axis=0)
+    if voiced_flag is None:
+        # pyin needs a window long enough to resolve F0_MIN; keep the 10 ms hop for time
+        # resolution but use a sufficiently large analysis frame.
+        pyin_frame = max(frame_len, 2048)
+        _, voiced_flag, _ = librosa.pyin(
+            audio_np,
+            sr=sample_rate,
+            fmin=F0_MIN_HZ,
+            fmax=F0_MAX_HZ,
+            frame_length=pyin_frame,
+            hop_length=hop_len,
+            center=True,
+        )
+    voiced_flag = np.asarray(voiced_flag, dtype=bool)
 
-    # Vectorized state assignment using np.where
+    # Align lengths (center padding keeps these equal, but be defensive).
+    n = min(len(rms), len(voiced_flag))
+    rms = rms[:n]
+    voiced_flag = voiced_flag[:n]
+
     # Priority: voiced (1) > unvoiced (2) > silence (3)
     state_sequence = np.where(
-        pitch_present,
-        1,  # Voiced
-        np.where(rms > RMS_THRESHOLD, 2, 3)  # Unvoiced or Silence
+        voiced_flag,
+        1,  # Voiced (periodic / harmonic)
+        np.where(rms > RMS_THRESHOLD, 2, 3),  # Unvoiced (energy, no pitch) or Silence
     )
 
     return state_sequence.tolist()
+
+
+def get_interaction_dynamics_from_states(state_sequence, hop_length=0.01) -> dict:
+    """Compute interaction-dynamics metrics from a precomputed voicing state sequence.
+
+    Split out from get_interaction_dynamics so the (expensive) state classification
+    can be computed once per utterance and reused by t13 / voiced16:20 / interaction
+    dynamics instead of being recomputed 3x. `hop_length` is the per-frame duration
+    (seconds) used when classifying.
+    """
+    if not state_sequence:
+        return {
+            "silence_ratio": 0.0,
+            "speech_velocity": 0.0,
+            "voiced_ratio": 0.0,
+            "unvoiced_ratio": 0.0,
+            "pause_count_dynamic": 0,
+            "pause_mean_duration": 0.0,
+            "pause_std_duration": 0.0,
+            "pause_max_duration": 0.0,
+            "pause_total_duration": 0.0,
+        }
+
+    total_frames = len(state_sequence)
+    voiced_count = sum(1 for s in state_sequence if s == 1)
+    unvoiced_count = sum(1 for s in state_sequence if s == 2)
+    silence_count = sum(1 for s in state_sequence if s == 3)
+
+    pause_stats = compute_pause_statistics(state_sequence, frame_duration=hop_length)
+
+    return {
+        "silence_ratio": float(silence_count / total_frames),
+        "speech_velocity": compute_speech_velocity(state_sequence, frame_duration=hop_length),
+        "voiced_ratio": float(voiced_count / total_frames),
+        "unvoiced_ratio": float(unvoiced_count / total_frames),
+        **pause_stats,
+    }
+
+
+def get_t13_from_states(state_sequence):
+    """t13 (voiced->silence transition probability) from a precomputed state sequence."""
+    return compute_transition_probability(state_sequence, from_state=1, to_state=3)
 
 
 def get_interaction_dynamics(audio_np, sample_rate, frame_length=0.04, hop_length=0.01) -> dict:
@@ -83,37 +154,7 @@ def get_interaction_dynamics(audio_np, sample_rate, frame_length=0.04, hop_lengt
         - pause_total_duration: Total pause time (seconds)
     """
     state_sequence = classify_voicing_states(audio_np, sample_rate, frame_length, hop_length)
-
-    if not state_sequence:
-        return {
-            "silence_ratio": 0.0,
-            "speech_velocity": 0.0,
-            "voiced_ratio": 0.0,
-            "unvoiced_ratio": 0.0,
-            "pause_count_dynamic": 0,
-            "pause_mean_duration": 0.0,
-            "pause_std_duration": 0.0,
-            "pause_max_duration": 0.0,
-            "pause_total_duration": 0.0,
-        }
-
-    total_frames = len(state_sequence)
-
-    # Compute state ratios
-    voiced_count = sum(1 for s in state_sequence if s == 1)
-    unvoiced_count = sum(1 for s in state_sequence if s == 2)
-    silence_count = sum(1 for s in state_sequence if s == 3)
-
-    # Get pause statistics
-    pause_stats = compute_pause_statistics(state_sequence, frame_duration=hop_length)
-
-    return {
-        "silence_ratio": float(silence_count / total_frames),
-        "speech_velocity": compute_speech_velocity(state_sequence, frame_duration=hop_length),
-        "voiced_ratio": float(voiced_count / total_frames),
-        "unvoiced_ratio": float(unvoiced_count / total_frames),
-        **pause_stats,  # Includes pause_count_dynamic, pause_mean/std/max/total_duration
-    }
+    return get_interaction_dynamics_from_states(state_sequence, hop_length)
 
 
 def compute_transition_probability(state_sequence, from_state, to_state):
@@ -145,7 +186,7 @@ def get_t13_voiced_to_silence(audio_np, sample_rate):
     Computes t13: probability of transitioning from voiced to silence
     """
     state_seq = classify_voicing_states(audio_np, sample_rate)
-    return compute_transition_probability(state_seq, from_state=1, to_state=3)
+    return get_t13_from_states(state_seq)
 
 
 def get_voiced_interval_histogram(state_sequence, frame_duration=0.04):

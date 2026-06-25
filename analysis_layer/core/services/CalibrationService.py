@@ -7,7 +7,7 @@ class CalibrationService:
         self.config_manager = ConfigManager()
         self.baseline_manager = BaselineManager()
 
-    def process_phq9_submission(self, user_id: int, phq9_scores: Dict[str, int], total_score: int, functional_impact: str, timestamp: str):
+    def process_phq9_submission(self, user_id: int, phq9_scores: Dict[str, int], total_score: int, functional_impact: str, timestamp: str, system_mode: str = None):
         """
         Processes a PHQ-9 submission to:
         1. Fine-tune baselines (existing logic in BaselineManager).
@@ -15,8 +15,9 @@ class CalibrationService:
         """
 
         # 1. Fine-tune baseline (updates Mean/Std based on error)
-        # This calls the existing logic in BaselineManager
-        self.baseline_manager.finetune_baseline(user_id, phq9_scores, total_score, functional_impact, timestamp)
+        # This calls the existing logic in BaselineManager. system_mode routes the
+        # baseline read/write to the correct mode-isolated database.
+        self.baseline_manager.finetune_baseline(user_id, phq9_scores, total_score, functional_impact, timestamp, system_mode=system_mode)
 
         # 2. Personalized Calibration (Threshold Tuning)
         # Requirement: "If acoustic system detects 'Fatigue' but PHQ-9 does not, the threshold for Indicator 6 can be automatically raised"

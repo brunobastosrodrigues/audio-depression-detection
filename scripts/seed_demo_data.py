@@ -502,10 +502,13 @@ def seed_user_data(
     baseline_doc = {
         "user_id": user_id,
         "schema_version": 2,
+        # Reader (BaselineManager.get_user_baseline) looks up "general"/"morning"/
+        # "evening" and reads stats from a nested "metrics" key, so the seed must use
+        # that exact V2 shape -- otherwise the per-user baseline is silently ignored.
         "context_partitions": {
-            "default": baseline_stats,
-            "morning": baseline_stats,
-            "evening": baseline_stats
+            "general": {"metrics": baseline_stats},
+            "morning": {"metrics": baseline_stats},
+            "evening": {"metrics": baseline_stats}
         },
         "timestamp": datetime.utcnow(),
         "system_mode": "demo"
@@ -566,7 +569,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mongo-uri", default="mongodb://localhost:27017")
     parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--seed", type=int, default=42, help="RNG seed for reproducible demo data")
     args = parser.parse_args()
+
+    # Seed both RNGs so the demo cohorts (and their baselines/scores) are reproducible
+    # across runs instead of changing every time the seeder is run.
+    random.seed(args.seed)
+    np.random.seed(args.seed)
 
     client = MongoClient(args.mongo_uri)
     db_name = "iotsensing_demo"

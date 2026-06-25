@@ -612,7 +612,14 @@ DEFAULT_HYPOTHESES = [
     ("pause_count", ">"),
     ("silence_ratio", ">"),
 
-    # Energy/Intensity - typically lower/less dynamic in depression
+    # Energy/Intensity - typically lower/less dynamic in depression.
+    # The pipeline produces rms_energy_* (not energy_*/intensity_*); without these the
+    # energy markers were silently filtered out of validation even though the cohort
+    # data contains them. The generic aliases below are kept (harmlessly filtered out
+    # when absent) for datasets that use different names.
+    ("rms_energy_mean", "<"),
+    ("rms_energy_std", "<"),
+    ("rms_energy_range", "<"),
     ("intensity_mean", "<"),
     ("intensity_std", "<"),
     ("energy_mean", "<"),

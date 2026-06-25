@@ -28,9 +28,12 @@ from core.extractors.dynamic_metrics_utils import (
     compute_entropy,
 )
 
-# Librosa F0 extraction parameters
-LIBROSA_FMIN = 30
-LIBROSA_FMAX = 2000
+# Librosa F0 extraction parameters (standalone fallback). Bounded to the human F0 range:
+# fmax was 2000 Hz, which let pyin admit octave/harmonic errors and inflated f0_range/std.
+# The production path uses the shared pitch pass (core/extractors/pitch.py) with the same
+# bounds.
+LIBROSA_FMIN = 65
+LIBROSA_FMAX = 500
 
 
 def semitone_to_hz(semitones):
@@ -38,15 +41,19 @@ def semitone_to_hz(semitones):
     return 27.5 * (2 ** (semitones / 12.0))
 
 
-def _extract_f0_contour(features_LLD, audio_signal, sr):
+def _extract_f0_contour(features_LLD, audio_signal, sr, librosa_f0=None):
     """
     Extract the combined F0 contour from OpenSMILE and librosa.
+
+    `librosa_f0` is the per-frame pyin F0 contour (Hz, NaN on unvoiced) from the shared
+    pitch pass; when None (e.g. direct/legacy callers) it is computed here so this stays
+    standalone.
 
     Returns:
         Tuple of (f0_opensmile_hz, f0_librosa) arrays
     """
-    # OpenSMILE F0 extraction (eGeMAPS semitones)
-    f0_semitones = features_LLD["F0semitone_sma3nz"]
+    # OpenSMILE F0 extraction (eGeMAPSv02 semitones, relative to 27.5 Hz)
+    f0_semitones = features_LLD["F0semitoneFrom27.5Hz_sma3nz"]
     f0_opensmile = f0_semitones[f0_semitones > 0]
 
     if not f0_opensmile.empty:
@@ -54,9 +61,12 @@ def _extract_f0_contour(features_LLD, audio_signal, sr):
     else:
         f0_opensmile_hz = np.array([])
 
-    # librosa F0 extraction
-    y = np.array(audio_signal, dtype=np.float32)
-    f0_librosa, _, _ = librosa.pyin(y, fmin=LIBROSA_FMIN, fmax=LIBROSA_FMAX, sr=sr)
+    # librosa F0: use the shared pitch pass when provided, else compute standalone.
+    if librosa_f0 is None:
+        y = np.array(audio_signal, dtype=np.float32)
+        f0_librosa, _, _ = librosa.pyin(y, fmin=LIBROSA_FMIN, fmax=LIBROSA_FMAX, sr=sr)
+    else:
+        f0_librosa = np.asarray(librosa_f0, dtype=float)
 
     if f0_librosa is not None:
         f0_librosa = f0_librosa[~np.isnan(f0_librosa)]
@@ -66,12 +76,14 @@ def _extract_f0_contour(features_LLD, audio_signal, sr):
     return f0_opensmile_hz, f0_librosa
 
 
-def get_f0_dynamic(features_LLD, audio_signal, sr) -> dict:
+def get_f0_dynamic(features_LLD, audio_signal, sr, librosa_f0=None) -> dict:
     """
     Compute all F0 dynamic behavioral metrics in a single pass.
 
     This is the Phase 1 "Silent Expansion" function that returns a
     dictionary of metrics for flattening into the database.
+
+    `librosa_f0` is the optional precomputed pyin F0 contour from the shared pitch pass.
 
     Returns:
         Dictionary with keys:
@@ -82,7 +94,7 @@ def get_f0_dynamic(features_LLD, audio_signal, sr) -> dict:
         - f0_iqr: Interquartile range (NEW - robust variability)
         - f0_entropy: Normalized entropy (NEW - predictability)
     """
-    f0_opensmile_hz, f0_librosa = _extract_f0_contour(features_LLD, audio_signal, sr)
+    f0_opensmile_hz, f0_librosa = _extract_f0_contour(features_LLD, audio_signal, sr, librosa_f0)
 
     # Combine both sources for more robust estimates
     all_f0 = []

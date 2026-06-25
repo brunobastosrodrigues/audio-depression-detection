@@ -311,6 +311,24 @@ The Dataset mode includes tools for research validation:
 | **TESS** | Available | Toronto Emotional Speech Set. Sad emotion as depression proxy. |
 | **DAIC-WOZ** | Pending Access | Clinical interviews with PHQ-8 scores. |
 
+> **⚠️ Data integrity — re-ingestion required.** Acoustic metrics ingested before the
+> extractor fixes are **invalid**: F0, HNR and shimmer were silently `0` (wrong OpenSMILE
+> column names), myprosody crashed, and voice_onset_time was negative. Any historical
+> `raw_metrics` (and everything derived from them) must be **re-ingested** through the
+> fixed pipeline before the results are trusted.
+>
+> **Validating a cohort comparison.** Score both cohorts against ONE shared baseline (the
+> healthy cohort's distribution) — per-user baselining z-scores each user against
+> themselves (~0) and is not comparable. Use `scripts/cohort_compare.py`:
+>
+> ```bash
+> PYTHONPATH=analysis_layer python scripts/cohort_compare.py \
+>     --depressed <uid> --healthy <uid>
+> ```
+>
+> On the TESS sad/happy proxy this yields depressed > healthy on every measurable DSM-5
+> indicator and `mdd_signal=True` for depressed only.
+
 ## Configuration
 
 ### Scene Analysis (`processing_layer/scene_analysis/scene_config.json`)

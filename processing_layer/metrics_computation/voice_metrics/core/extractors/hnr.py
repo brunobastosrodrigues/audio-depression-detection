@@ -30,9 +30,13 @@ def _extract_hnr_series(features_LLD) -> np.ndarray:
     Returns:
         numpy array of HNR values (voiced frames only)
     """
-    # logHNR_sma3nz is non-zero only for voiced frames
-    hnr_series = features_LLD["logHNR_sma3nz"]
-    hnr_voiced = hnr_series[hnr_series > 0].values
+    # eGeMAPSv02's HNR column is HNRdBACF_sma3nz; it uses 0.0 as the unvoiced sentinel
+    # (the `_nz` suffix). On voiced frames it carries the real HNR (dB), which is
+    # legitimately negative for breathy/noisy voices. Select voiced frames by "!= 0"
+    # so those low-/negative-HNR frames -- the clinically relevant ones -- are kept
+    # rather than discarded.
+    hnr_series = features_LLD["HNRdBACF_sma3nz"]
+    hnr_voiced = hnr_series[hnr_series != 0].values
     return hnr_voiced
 
 

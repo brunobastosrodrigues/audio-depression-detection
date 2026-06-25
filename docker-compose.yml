@@ -1,26 +1,38 @@
 version: "3.7"
 
+# Port exposure note: this stack holds depression biomarkers (PHI). Internal
+# data-plane / inter-service ports (Mongo, Mongo Express, MQTT, and the layer APIs)
+# are bound to 127.0.0.1 so they are reachable from the host (and via SSH tunnel) but
+# NOT exposed on the LAN. Services talk to each other over the Docker network by name
+# (e.g. http://analysis_layer:8083, mongodb://mongodb:27017), which is unaffected. Only
+# the dashboard (users) and the respeaker TCP server (ESP32 boards) stay LAN-public.
+# NOTE: authentication for Mongo/MQTT is still open; add credentials before exposing
+# any of these beyond localhost.
+
 services:
    mqtt:
       image: eclipse-mosquitto
+      restart: unless-stopped
       ports:
-         - "1883:1883"
+         - "127.0.0.1:1883:1883"
       volumes:
          - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
 
    mongodb:
       image: mongo:latest
       container_name: mongodb
+      restart: unless-stopped
       ports:
-         - "27017:27017"
+         - "127.0.0.1:27017:27017"
       volumes:
          - mongo_data:/data/db
       command: mongod --setParameter diagnosticDataCollectionEnabled=false
 
    mongo-express:
       image: mongo-express
+      restart: unless-stopped
       ports:
-         - "8081:8081"
+         - "127.0.0.1:8081:8081"
       environment:
          ME_CONFIG_MONGODB_SERVER: mongodb
       depends_on:
@@ -30,8 +42,9 @@ services:
       build:
          context: ./processing_layer/user_profiling/voice_profiling
          dockerfile: Dockerfile
+      restart: unless-stopped
       ports:
-         - "8000:8000"
+         - "127.0.0.1:8000:8000"
       volumes:
          - ./processing_layer/user_profiling/voice_profiling:/app
       depends_on:
@@ -41,6 +54,7 @@ services:
       build:
          context: ./processing_layer/metrics_computation/voice_metrics
          dockerfile: Dockerfile
+      restart: unless-stopped
       deploy:
          resources:
             limits:
@@ -60,6 +74,7 @@ services:
       build:
          context: ./data_ingestion_layer
          dockerfile: Dockerfile.respeaker
+      restart: unless-stopped
       deploy:
          resources:
             limits:
@@ -84,6 +99,7 @@ services:
       build:
          context: ./data_ingestion_layer
          dockerfile: Dockerfile.respeaker
+      restart: unless-stopped
       deploy:
          resources:
             limits:
@@ -103,8 +119,9 @@ services:
       build:
          context: ./temporal_context_modeling_layer
          dockerfile: Dockerfile
+      restart: unless-stopped
       ports:
-         - "8082:8082"
+         - "127.0.0.1:8082:8082"
       depends_on:
          - mongodb
 
@@ -112,12 +129,13 @@ services:
       build:
          context: ./analysis_layer
          dockerfile: Dockerfile
+      restart: unless-stopped
       deploy:
          resources:
             limits:
                memory: 1G
       ports:
-         - "8083:8083"
+         - "127.0.0.1:8083:8083"
       depends_on:
          - mongodb
 
@@ -125,6 +143,7 @@ services:
       build:
          context: ./dashboard_layer
          dockerfile: Dockerfile
+      restart: unless-stopped
       ports:
          - "8084:8084"
       volumes:
@@ -136,7 +155,12 @@ services:
       depends_on:
          - mongodb
       environment:
-         - PYTHONBUFFERED=1
+         - PYTHONUNBUFFERED=1
 
 volumes:
    mongo_data:
+      # Pin the volume name so the stack reuses the existing data volume regardless of the
+      # compose project/directory name. Without this, a project named "audio-depression-
+      # detection" creates a fresh "audio-depression-detection_mongo_data" and the stack
+      # starts with an EMPTY database instead of the existing demo/dataset/live data.
+      name: depression-detection_mongo_data

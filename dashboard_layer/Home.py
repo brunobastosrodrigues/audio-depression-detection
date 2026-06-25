@@ -153,47 +153,35 @@ if current_mode == "live":
     else:
         st.info("No users registered. Go to User Management to add users.")
 
-# In Dataset mode, show available datasets
+# In Dataset mode, show the loaded dataset participants
 elif current_mode == "dataset":
-    st.markdown("### Available Datasets")
-    st.markdown("Each dataset represents a cohort of audio samples that can be analyzed as a virtual 'user'.")
+    st.markdown("### DAIC-WOZ Participants")
+    st.markdown("Each participant in the clinical dataset is analyzed as a 'user'. Select one from the sidebar.")
 
-    cols = st.columns(len(DATASET_USERS))
-    for i, du in enumerate(DATASET_USERS):
-        with cols[i]:
-            cohort_icon = "🔴" if du.cohort_type == "depressed" else "🟢"
-            st.markdown(
-                f"""
-                <div style="padding: 1rem; background: {du.color}15; border-radius: 8px; border-left: 4px solid {du.color};">
-                    <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">{cohort_icon}</div>
-                    <div style="font-weight: 600; color: #2C3E50; margin-bottom: 0.25rem;">{du.name}</div>
-                    <div style="font-size: 0.8rem; color: #7F8C8D; margin-bottom: 0.5rem;">{du.source_dataset} Dataset</div>
-                    <div style="font-size: 0.75rem; color: #999;">{du.description[:80]}...</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+    participant_ids = set()
+    for col_name in ["raw_metrics", "indicator_scores", "analyzed_metrics"]:
+        try:
+            participant_ids.update(db[col_name].distinct("user_id"))
+        except Exception:
+            pass
+
+    st.metric("Participants loaded", len(participant_ids))
 
     st.markdown("<br>", unsafe_allow_html=True)
 
     with st.expander("About Dataset Mode"):
         st.markdown(
             """
-            **Dataset Mode** allows you to analyze pre-loaded research datasets using the same
+            **Dataset Mode** analyzes a pre-loaded research dataset using the same
             visualization and analysis tools as live monitoring.
 
-            **Current Datasets:**
-            - **TESS (Toronto Emotional Speech Set):** Acted emotional speech samples.
-              Sad emotion is used as a proxy for depressed speech patterns,
-              while happy emotion represents non-depressed controls.
+            **Current Dataset — DAIC-WOZ:** clinical interviews with PHQ-8 scores. Each
+            participant is treated as a separate user; select one from the sidebar to view
+            their indicator scores and trends.
 
             **Limitations:**
-            - Acted emotions differ from clinical depression manifestations
-            - PHQ-9 self-report is not applicable (hidden in this mode)
+            - PHQ-9 self-report submission is not applicable in this mode
             - Results should be interpreted as research validation, not clinical diagnosis
-
-            **Future Datasets:**
-            - DAIC-WOZ (pending access) - Clinical interviews with PHQ-8 scores
             """
         )
 

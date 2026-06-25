@@ -16,16 +16,19 @@ class MqttConsumerAdapter(ConsumerPort):
         self.client = mqtt_client
         self.topic_handlers = {}
 
-        # Threaded processing with monitoring
+        # Threaded processing with monitoring. Initialize ALL state the worker reads
+        # BEFORE starting the thread -- otherwise the worker races __init__ and hits
+        # AttributeError on _max_queue_depth/etc. on the first iterations.
         self.message_queue = queue.Queue()
         self.is_running = True
-        self.worker_thread = threading.Thread(target=self._worker, daemon=True)
-        self.worker_thread.start()
 
         # Queue monitoring stats
         self._max_queue_depth = 0
         self._total_messages_processed = 0
         self._queue_warnings = 0
+
+        self.worker_thread = threading.Thread(target=self._worker, daemon=True)
+        self.worker_thread.start()
 
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message

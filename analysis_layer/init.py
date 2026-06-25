@@ -12,6 +12,7 @@ from adapters.inbound.RestListUsersAdapter import router as users_router
 from adapters.inbound.RestBoardsAdapter import create_service_boards
 from adapters.inbound.RestEnvironmentsAdapter import create_service_environments
 from adapters.inbound.RestCalibrationAdapter import create_service_calibration
+from adapters.inbound.RestComputeBaselineAdapter import create_service_compute_baseline
 
 # Outbound adapters
 from adapters.outbound.MongoPersistenceAdapter import MongoPersistenceAdapter
@@ -61,6 +62,7 @@ app_derive_indicator_scores = create_service_derive_indicator_scores(
 )
 app_finetune_baseline = create_service_finetune_baseline(baseline_manager)
 app_calibration = create_service_calibration(calibration_service)
+app_compute_baseline = create_service_compute_baseline(baseline_manager)
 app_boards = create_service_boards(repository)
 app_environments = create_service_environments(repository)
 
@@ -72,6 +74,7 @@ app.include_router(app_analyze_metrics)
 app.include_router(app_derive_indicator_scores)
 app.include_router(app_finetune_baseline)
 app.include_router(app_calibration)
+app.include_router(app_compute_baseline)
 app.include_router(users_router)
 app.include_router(app_boards)
 app.include_router(app_environments)

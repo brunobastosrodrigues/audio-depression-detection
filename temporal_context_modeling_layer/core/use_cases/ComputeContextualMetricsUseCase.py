@@ -28,6 +28,17 @@ class ComputeContextualMetricsUseCase:
 
         df = pd.DataFrame(metrics)
 
+        # Use the user_id type as stored in the data (int for dataset users, strings for
+        # live/demo) rather than the REST string param, so contextual_metrics stay
+        # type-consistent with raw/aggregated. Otherwise the output is written as a string
+        # while raw/aggregated are ints, and the chain only survives because downstream
+        # queries coerce types.
+        resolved_user_id = df["user_id"].iloc[0] if "user_id" in df.columns and len(df) else user_id
+        # pandas yields numpy scalar types (e.g. numpy.int64) that pymongo cannot encode;
+        # coerce to a native Python value. String user_ids come back as plain str already.
+        if hasattr(resolved_user_id, "item"):
+            resolved_user_id = resolved_user_id.item()
+
         # Handle system_mode - if not present, default to 'live'
         if "system_mode" not in df.columns:
             df["system_mode"] = "live"
@@ -56,7 +67,7 @@ class ComputeContextualMetricsUseCase:
                     if start_date is None or timestamp >= start_date:
                         contextual_records.append(
                             ContextualMetricRecord(
-                                user_id=user_id,
+                                user_id=resolved_user_id,
                                 timestamp=timestamp,
                                 metric_name=metric,
                                 contextual_value=float(base_val),

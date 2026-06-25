@@ -20,6 +20,8 @@ from pymongo import MongoClient
 from typing import Dict, Any
 from datetime import datetime
 
+from core.user_id_match import user_id_match
+
 
 # Config mode constants
 CONFIG_MODE_LEGACY = "legacy"
@@ -108,7 +110,7 @@ class ConfigManager:
         """
         Retrieves configuration for a user, merging defaults with user overrides.
         """
-        user_config_doc = self.collection_user_config.find_one({"user_id": user_id})
+        user_config_doc = self.collection_user_config.find_one({"user_id": user_id_match(user_id)})
 
         if not user_config_doc:
             return self._default_config
@@ -148,7 +150,7 @@ class ConfigManager:
         Updates the severity threshold for a specific indicator for a user.
         """
         # Fetch current overrides or create new
-        user_config_doc = self.collection_user_config.find_one({"user_id": user_id})
+        user_config_doc = self.collection_user_config.find_one({"user_id": user_id_match(user_id)})
         if user_config_doc:
             config = user_config_doc.get("config", {})
         else:
@@ -169,7 +171,7 @@ class ConfigManager:
         """
         Updates the weight for a specific metric in an indicator.
         """
-        user_config_doc = self.collection_user_config.find_one({"user_id": user_id})
+        user_config_doc = self.collection_user_config.find_one({"user_id": user_id_match(user_id)})
         if user_config_doc:
             config = user_config_doc.get("config", {})
         else:

@@ -1,18 +1,29 @@
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pymongo import MongoClient
 from typing import List
 from core.models.IndicatorScoreRecord import IndicatorScoreRecord
 from core.mapping.ConfigManager import ConfigManager
+from core.services.compute_baseline import compute_baseline_partitions
+from core.user_id_match import user_id_match
 import os
+
+# Database routing by system_mode. Baselines and indicator scores are mode-isolated
+# exactly like metrics/scores; there is no bare "iotsensing" database (only the three
+# below exist), so a hardcoded client["iotsensing"] read every baseline as missing and
+# silently fell back to the population baseline for every user.
+DB_MAP = {
+    "live": "iotsensing_live",
+    "dataset": "iotsensing_dataset",
+    "demo": "iotsensing_demo",
+    None: "iotsensing_live",
+}
+
 
 class BaselineManager:
     def __init__(self):
         mongo_uri = os.getenv("MONGO_URI", "mongodb://mongodb:27017")
         self.client = MongoClient(mongo_uri)
-        self.db = self.client["iotsensing"]
-        self.collection_baseline = self.db["baseline"]
-        self.collection_indicator_scores = self.db["indicator_scores"]
 
         self.config_manager = ConfigManager()
 
@@ -23,6 +34,15 @@ class BaselineManager:
         # Load default config initially, but we should use config_manager.get_config(user_id) when needed
         self.config = self.config_manager._default_config
         self.day_adder = 1
+
+    def _db(self, system_mode=None):
+        return self.client[DB_MAP.get(system_mode, "iotsensing_live")]
+
+    def _baseline_collection(self, system_mode=None):
+        return self._db(system_mode)["baseline"]
+
+    def _indicator_collection(self, system_mode=None):
+        return self._db(system_mode)["indicator_scores"]
 
     def _load_json_file(self, path):
         if not os.path.exists(path):
@@ -70,7 +90,7 @@ class BaselineManager:
             return self.population_baseline.get(metric_name)
         return self.population_baseline
 
-    def get_user_baseline(self, user_id, metric_name=None, timestamp=None):
+    def get_user_baseline(self, user_id, metric_name=None, timestamp=None, system_mode=None):
         """
         Retrieves baseline for a user.
 
@@ -86,8 +106,8 @@ class BaselineManager:
         Returns:
             dict or metric value: The baseline metrics or a specific metric value
         """
-        latest_doc = self.collection_baseline.find_one(
-            {"user_id": user_id}, sort=[("timestamp", -1)]
+        latest_doc = self._baseline_collection(system_mode).find_one(
+            {"user_id": user_id_match(user_id)}, sort=[("timestamp", -1)]
         )
 
         if not latest_doc:
@@ -123,10 +143,10 @@ class BaselineManager:
         merged.update(user_metrics)
         return merged
 
-    def get_indicator_scores(self, user_id: int) -> IndicatorScoreRecord:
+    def get_indicator_scores(self, user_id: int, system_mode=None) -> IndicatorScoreRecord:
 
-        latest_doc = self.collection_indicator_scores.find_one(
-            {"user_id": user_id}, sort=[("timestamp", -1)]
+        latest_doc = self._indicator_collection(system_mode).find_one(
+            {"user_id": user_id_match(user_id)}, sort=[("timestamp", -1)]
         )
 
         if not latest_doc or "indicator_scores" not in latest_doc:
@@ -139,8 +159,93 @@ class BaselineManager:
             indicator_scores=latest_doc["indicator_scores"],
         )
 
+    def _fetch_raw_metric_records(self, user_id, system_mode=None):
+        return list(
+            self._db(system_mode)["raw_metrics"].find(
+                {"user_id": user_id_match(user_id)},
+                {"_id": 0, "metric_name": 1, "metric_value": 1, "timestamp": 1},
+            )
+        )
+
+    def compute_and_store_baseline(self, user_id, system_mode=None, min_samples=10, records=None):
+        """Derive a per-user baseline from the user's ingested raw metrics and store it.
+
+        Reads raw_metrics from the mode-appropriate database (unless `records` is passed
+        in to avoid a re-read), computes mean/std/count per metric per circadian context
+        (V2 schema), and upserts a single "computed_from_data" baseline document for the
+        user. Returns the computed context_partitions, or None when there is not enough
+        data for any metric yet.
+        """
+        if records is None:
+            records = self._fetch_raw_metric_records(user_id, system_mode)
+        if not records:
+            return None
+
+        partitions = compute_baseline_partitions(records, min_samples=min_samples)
+        if not partitions.get("general", {}).get("metrics"):
+            # Not enough data to establish a baseline for any metric yet.
+            return None
+
+        doc = {
+            "user_id": user_id,
+            "timestamp": datetime.now(timezone.utc),
+            "schema_version": 2,
+            "source": "computed_from_data",
+            "context_partitions": partitions,
+            "system_mode": system_mode or "live",
+        }
+        # Keep a single computed baseline per user (refreshed in place). PHQ-9
+        # finetuning writes its own later-timestamped documents that refine this one;
+        # get_user_baseline always reads the latest by timestamp.
+        self._baseline_collection(system_mode).replace_one(
+            {"user_id": user_id, "source": "computed_from_data"},
+            doc,
+            upsert=True,
+        )
+        return partitions
+
+    def _past_learning_period(self, records, learning_period_days):
+        """True when the user's raw metrics span at least learning_period_days."""
+        times = []
+        for record in records:
+            ts = record.get("timestamp")
+            if isinstance(ts, str):
+                try:
+                    ts = datetime.fromisoformat(ts)
+                except ValueError:
+                    continue
+            if isinstance(ts, datetime):
+                # Normalize to naive for safe comparison (Mongo stores naive UTC).
+                times.append(ts.replace(tzinfo=None) if ts.tzinfo else ts)
+        if len(times) < 2:
+            return False
+        return (max(times) - min(times)).days >= learning_period_days
+
+    def maybe_compute_baseline(self, user_id, system_mode=None, learning_period_days=14, min_samples=10):
+        """Compute a data-derived baseline once the user is past the learning period.
+
+        Intended to be called from the analysis pipeline on each run. It is a no-op
+        (returns None) when a computed baseline already exists, or when the user has not
+        yet accumulated `learning_period_days` of data -- so a user transitions from the
+        population baseline to their own data-derived one exactly once, automatically.
+        PHQ-9 finetuning continues to refine the computed baseline afterwards.
+        """
+        existing = self._baseline_collection(system_mode).find_one(
+            {"user_id": user_id_match(user_id), "source": "computed_from_data"}
+        )
+        if existing:
+            return None
+
+        records = self._fetch_raw_metric_records(user_id, system_mode)
+        if not records or not self._past_learning_period(records, learning_period_days):
+            return None
+
+        return self.compute_and_store_baseline(
+            user_id, system_mode=system_mode, min_samples=min_samples, records=records
+        )
+
     def finetune_baseline(
-        self, user_id, phq9_scores, total_score, functional_impact, timestamp
+        self, user_id, phq9_scores, total_score, functional_impact, timestamp, system_mode=None
     ):
         """
         Fine-tune the baseline for a user based on PHQ-9 feedback.
@@ -156,8 +261,8 @@ class BaselineManager:
             timestamp: Timestamp of the assessment
         """
         # Get baseline for the specific context
-        old_baseline = self.get_user_baseline(user_id, timestamp=timestamp)
-        user_indicator_score_record = self.get_indicator_scores(user_id)
+        old_baseline = self.get_user_baseline(user_id, timestamp=timestamp, system_mode=system_mode)
+        user_indicator_score_record = self.get_indicator_scores(user_id, system_mode=system_mode)
         user_indicator_scores = (
             user_indicator_score_record.indicator_scores
             if user_indicator_score_record
@@ -236,8 +341,8 @@ class BaselineManager:
         context_key = self._get_context_key(timestamp)
 
         # Get existing document to preserve other partitions
-        existing_doc = self.collection_baseline.find_one(
-            {"user_id": user_id}, sort=[("timestamp", -1)]
+        existing_doc = self._baseline_collection(system_mode).find_one(
+            {"user_id": user_id_match(user_id)}, sort=[("timestamp", -1)]
         )
 
         # Build context partitions
@@ -279,7 +384,7 @@ class BaselineManager:
             "context_partitions": partitions,
         }
 
-        self.collection_baseline.replace_one(
+        self._baseline_collection(system_mode).replace_one(
             {"user_id": user_id, "timestamp": timestamp},
             updated_doc,
             upsert=True,

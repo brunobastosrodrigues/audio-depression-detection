@@ -1,8 +1,19 @@
-import torch
-import torchaudio
 import os
 import numpy as np
 import logging
+
+from core.user_id_match import user_id_match
+
+# torch is optional in the analysis layer: this speaker-auth service is not wired into
+# the analysis pipeline (speaker verification happens in the processing layer), so the
+# analysis image no longer ships torch/CUDA. Import lazily so the module stays
+# importable; the methods below raise clearly if ever used without torch installed.
+try:
+    import torch
+    import torchaudio
+except ImportError:  # pragma: no cover
+    torch = None
+    torchaudio = None
 
 class VoiceAuthenticationService:
     def __init__(self, model_name="WAV2VEC2_BASE"):
@@ -70,7 +81,7 @@ class VoiceAuthenticationService:
 
     def verify_user(self, audio_path, user_id, db_collection, threshold=0.75):
         """Compares audio against stored profile."""
-        user_doc = db_collection.find_one({"user_id": user_id})
+        user_doc = db_collection.find_one({"user_id": user_id_match(user_id)})
         if not user_doc or "voice_profile" not in user_doc:
             return False, 0.0, "User profile not found."
 
