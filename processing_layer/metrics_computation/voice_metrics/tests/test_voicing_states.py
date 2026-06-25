@@ -54,6 +54,16 @@ def test_silence_is_predominantly_silence():
     assert d["voiced_ratio"] < 0.1
 
 
+def test_precomputed_voiced_flag_is_used():
+    # Forcing the voicing flag all-True must override pyin (which would call noise
+    # unvoiced) -- proving classify_voicing_states uses the shared pitch pass's flag.
+    audio = _noise(seed=3)
+    n = len(audio) // int(0.01 * SR) + 5
+    forced_voiced = np.ones(n, dtype=bool)
+    states = classify_voicing_states(audio, SR, voiced_flag=forced_voiced)
+    assert states.count(1) / len(states) > 0.9
+
+
 def test_from_states_matches_all_in_one():
     # Optimization invariant: deriving metrics from a single precomputed state
     # sequence must equal computing them end-to-end (which re-runs classification).

@@ -36,7 +36,7 @@ F0_MIN_HZ = 50.0
 F0_MAX_HZ = 500.0
 
 
-def classify_voicing_states(audio_np, sample_rate, frame_length=0.04, hop_length=0.01):
+def classify_voicing_states(audio_np, sample_rate, frame_length=0.04, hop_length=0.01, voiced_flag=None):
     """
     Segments audio into 3 states: 1=voiced, 2=unvoiced, 3=silence
 
@@ -45,10 +45,9 @@ def classify_voicing_states(audio_np, sample_rate, frame_length=0.04, hop_length
     voiced. Frames that are not voiced are then split into unvoiced vs silence by an
     RMS energy gate.
 
-    NOTE (perf, Phase 2 / edge): pyin is the most expensive call in this module and
-    duplicates the pitch estimation done by the F0 extractor. For the Raspberry Pi
-    target this should be unified with F0 estimation (compute once, share the voicing
-    flag) or replaced with a cheaper voiced/unvoiced detector.
+    `voiced_flag` is the optional precomputed voicing decision from the shared pitch pass
+    (one pyin call feeds both this and the F0 extractor). When None it is computed here so
+    this stays standalone. The flag must be sampled on the same hop as `hop_length`.
     """
     frame_len = int(frame_length * sample_rate)
     hop_len = int(hop_length * sample_rate)
@@ -56,18 +55,19 @@ def classify_voicing_states(audio_np, sample_rate, frame_length=0.04, hop_length
 
     rms = librosa.feature.rms(y=audio_np, frame_length=frame_len, hop_length=hop_len)[0]
 
-    # pyin needs a window long enough to resolve F0_MIN; keep the 10 ms hop for time
-    # resolution but use a sufficiently large analysis frame.
-    pyin_frame = max(frame_len, 2048)
-    _, voiced_flag, _ = librosa.pyin(
-        audio_np,
-        sr=sample_rate,
-        fmin=F0_MIN_HZ,
-        fmax=F0_MAX_HZ,
-        frame_length=pyin_frame,
-        hop_length=hop_len,
-        center=True,
-    )
+    if voiced_flag is None:
+        # pyin needs a window long enough to resolve F0_MIN; keep the 10 ms hop for time
+        # resolution but use a sufficiently large analysis frame.
+        pyin_frame = max(frame_len, 2048)
+        _, voiced_flag, _ = librosa.pyin(
+            audio_np,
+            sr=sample_rate,
+            fmin=F0_MIN_HZ,
+            fmax=F0_MAX_HZ,
+            frame_length=pyin_frame,
+            hop_length=hop_len,
+            center=True,
+        )
     voiced_flag = np.asarray(voiced_flag, dtype=bool)
 
     # Align lengths (center padding keeps these equal, but be defensive).

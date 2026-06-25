@@ -31,6 +31,7 @@ from datetime import datetime, timezone, timedelta
 import opensmile
 
 # Dynamic extractor functions (Phase 1)
+from core.extractors.pitch import compute_pitch
 from core.extractors.f0 import get_f0_dynamic
 from core.extractors.hnr import get_hnr_dynamic
 from core.extractors.rms_energy import get_rms_energy_dynamic
@@ -188,20 +189,19 @@ class MetricsComputationService:
         # Phase 1: Use new dynamic extractors that return dictionaries
         # ----------------------------
 
-        # Dynamic extractors (return dictionaries)
+        # pyin (pitch tracking) is the single most expensive call in this service. Both
+        # F0 dynamics and voicing-state classification need it, so it is run ONCE here as
+        # the "pitch" task; f0_dynamic and voiced_states are derived from that one pass
+        # afterwards (instead of each running its own pyin). Voicing is then reused a
+        # further 3x for interaction_dynamics / t13 / voiced16:20.
         dynamic_tasks = [
-            ("f0_dynamic", get_f0_dynamic, (features_LLD, audio_np, sample_rate)),
             ("hnr_dynamic", get_hnr_dynamic, (features_LLD,)),
             ("rms_dynamic", get_rms_energy_dynamic, (rms_series,)),
             ("formant_dynamic", get_formant_dynamic, (features_LLD,)),
         ]
 
-        # Legacy extractors (return single values).
-        # NOTE: voicing classification (classify_voicing_states) is the single most
-        # expensive call in this service (pyin). It is computed ONCE here as
-        # "voiced_states"; interaction_dynamics, t13 and voiced16:20 are then derived
-        # from that one state sequence below instead of recomputing it 3x.
         legacy_tasks = [
+            ("pitch", compute_pitch, (audio_np, sample_rate)),
             ("jitter", get_jitter, (features_LLD,)),
             ("shimmer", get_shimmer, (features_LLD,)),
             ("snr", get_snr, (audio_np, rms_series)),
@@ -211,15 +211,21 @@ class MetricsComputationService:
             ("voice_onset_time", get_vot, (audio_np, sample_rate)),
             ("glottal_pulse_rate", get_glottal_pulse_rate, (audio_np, sample_rate)),
             ("psd_subbands", get_psd_subbands, (audio_np, sample_rate)),
-            ("voiced_states", classify_voicing_states, (audio_np, sample_rate)),
             ("f2_transition_speed", get_f2_transition_speed, (audio_np, sample_rate)),
         ]
 
         all_tasks = dynamic_tasks + legacy_tasks
 
-        # Use ThreadPoolExecutor to run tasks in parallel
+        # Size the pool to the available cores (env-overridable). The previous fixed 8
+        # oversubscribes a Raspberry Pi's 4 cores; the extractors are CPU-bound (numpy/
+        # opensmile/parselmouth release the GIL), so more workers than cores just adds
+        # context-switching.
+        max_workers = min(
+            len(all_tasks),
+            max(1, int(os.getenv("METRICS_MAX_WORKERS", os.cpu_count() or 4))),
+        )
         results = {}
-        with ThreadPoolExecutor(max_workers=min(len(all_tasks), 8)) as executor:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_key = {
                 executor.submit(fn, *args): key for key, fn, args in all_tasks
             }
@@ -232,8 +238,22 @@ class MetricsComputationService:
                     print(f"Error extracting feature {key}: {e}")
                     results[key] = None
 
+        # Derive the pitch-dependent features from the single shared pitch pass.
+        pitch_result = results.get("pitch")
+        librosa_f0, voiced_flag = pitch_result if pitch_result is not None else (None, None)
+        try:
+            results["f0_dynamic"] = get_f0_dynamic(features_LLD, audio_np, sample_rate, librosa_f0=librosa_f0)
+        except Exception as e:
+            print(f"Error extracting feature f0_dynamic: {e}")
+            results["f0_dynamic"] = None
+        try:
+            results["voiced_states"] = classify_voicing_states(audio_np, sample_rate, voiced_flag=voiced_flag)
+        except Exception as e:
+            print(f"Error extracting feature voiced_states: {e}")
+            results["voiced_states"] = None
+
         # Post-processing: derive every voicing-dependent feature from the single
-        # state sequence computed above, instead of re-running classification.
+        # state sequence above, instead of re-running classification.
         voiced_states = results.get("voiced_states")
         if voiced_states is not None:
             voiced16_20 = compute_voiced16_20_feature(voiced_states)
