@@ -51,6 +51,7 @@ from core.extractors.spectral_flatness import get_spectral_flatness
 from core.extractors.myprosody_extractors import myprosody_extractors_handler
 from core.extractors.temporal_modulation import get_temporal_modulation
 from core.extractors.spectral_modulation import get_spectral_modulation
+from core.extractors.spectro_utils import log_melspectrogram
 from core.extractors.voice_onset_time import get_vot
 from core.extractors.glottal_pulse_rate import get_glottal_pulse_rate
 from core.extractors.psd_subbands import get_psd_subbands
@@ -200,14 +201,21 @@ class MetricsComputationService:
             ("formant_dynamic", get_formant_dynamic, (features_LLD,)),
         ]
 
+        # temporal_modulation and spectral_modulation use the SAME log-mel spectrogram;
+        # compute it once here and share it so the STFT isn't done twice per utterance.
+        try:
+            shared_log_S = log_melspectrogram(audio_np, sample_rate)
+        except Exception:
+            shared_log_S = None  # extractors recompute individually on failure
+
         legacy_tasks = [
             ("pitch", compute_pitch, (audio_np, sample_rate)),
             ("jitter", get_jitter, (features_LLD,)),
             ("shimmer", get_shimmer, (features_LLD,)),
             ("snr", get_snr, (audio_np, rms_series)),
             ("spectral_flatness", get_spectral_flatness, (audio_np,)),
-            ("temporal_modulation", get_temporal_modulation, (audio_np, sample_rate)),
-            ("spectral_modulation", get_spectral_modulation, (audio_np, sample_rate)),
+            ("temporal_modulation", get_temporal_modulation, (audio_np, sample_rate, shared_log_S)),
+            ("spectral_modulation", get_spectral_modulation, (audio_np, sample_rate, shared_log_S)),
             ("voice_onset_time", get_vot, (audio_np, sample_rate)),
             ("glottal_pulse_rate", get_glottal_pulse_rate, (audio_np, sample_rate)),
             ("psd_subbands", get_psd_subbands, (audio_np, sample_rate)),

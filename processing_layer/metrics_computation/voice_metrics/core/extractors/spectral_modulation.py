@@ -1,17 +1,16 @@
 import numpy as np
-import librosa
+
+from core.extractors.spectro_utils import log_melspectrogram
 
 
-def get_spectral_modulation(audio_np, sample_rate):
+def get_spectral_modulation(audio_np, sample_rate, log_S=None):
     """
     Computes the spectral modulation energy around ~2 cycles/octave
-    Optimized with vectorization for better performance
+    Optimized with vectorization for better performance. `log_S` may be a precomputed
+    log-mel spectrogram (shared with temporal_modulation) to avoid recomputing the STFT.
     """
-
-    S = librosa.feature.melspectrogram(
-        y=audio_np, sr=sample_rate, n_fft=1024, hop_length=256, n_mels=64, fmax=8000
-    )
-    log_S = librosa.power_to_db(S)
+    if log_S is None:
+        log_S = log_melspectrogram(audio_np, sample_rate)
 
     # Vectorized zero-mean operation per frequency bin (axis=0 centers each time frame's spectrum)
     log_S_centered = log_S - np.mean(log_S, axis=0, keepdims=True)
