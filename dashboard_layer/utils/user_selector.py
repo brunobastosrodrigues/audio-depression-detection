@@ -91,9 +91,25 @@ def _load_users_with_status_cached(mode: str) -> List[Dict]:
             print(f"Warning: Could not load registered users: {e}", file=sys.stderr)
 
     elif mode == "dataset":
-        # In dataset mode, use pre-defined dataset users (cohorts)
-        # Each dataset cohort is treated as a virtual "user"
-        users = get_dataset_users()
+        # In dataset mode, load the actual dataset participants from the data (e.g.
+        # DAIC-WOZ participants keyed by id), the same way demo mode does, rather than
+        # hardcoded virtual cohorts that don't match the ingested data.
+        user_ids = set()
+        for col_name in ["raw_metrics", "indicator_scores", "analyzed_metrics"]:
+            try:
+                user_ids.update(db[col_name].distinct("user_id"))
+            except Exception as e:
+                print(f"Warning: Could not load dataset users from {col_name}: {e}", file=sys.stderr)
+
+        # Sort ints numerically, any non-int ids after, without raising on mixed types.
+        for uid in sorted(user_ids, key=lambda u: (0, u) if isinstance(u, int) else (1, str(u))):
+            users.append({
+                "user_id": uid,
+                "name": f"DAIC-WOZ {uid}",
+                "status": "live",
+                "has_calibration": True,
+                "embedding_count": 0,
+            })
 
     else:
         # In demo mode, load from data collections
