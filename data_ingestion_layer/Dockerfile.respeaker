@@ -13,14 +13,16 @@ RUN apt-get update && apt-get install -y \
 # Install only the required dependencies for respeaker_service. Versions are pinned
 # (from the known-good image) so fresh builds -- including the ARM/aarch64 build for the
 # Raspberry Pi 5 -- are reproducible instead of pulling whatever is latest at build time.
+# torch/torchaudio (Silero VAD) come from the CPU index: VAD runs on CPU, so the default
+# CUDA build (~3GB of unused GPU libraries) is avoided.
+RUN pip install --no-cache-dir torch==2.10.0 torchaudio==2.10.0 \
+    --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir \
     pymongo==4.16.0 \
     paho-mqtt==2.1.0 \
     numpy==2.4.3 \
     soundfile==0.13.1 \
     pyaudio==0.2.14 \
-    torch==2.10.0 \
-    torchaudio==2.10.0 \
     scipy==1.17.1 \
     librosa==0.11.0
 
