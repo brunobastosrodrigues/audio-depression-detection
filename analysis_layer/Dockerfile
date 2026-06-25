@@ -1,10 +1,9 @@
 FROM python:3.10-slim
 WORKDIR /app
 COPY requirements.txt .
-# Install build tools required for some Python packages (like webrtcvad)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential && \
-    rm -rf /var/lib/apt/lists/*
+# The minimal analysis deps (FastAPI/numpy/pandas/pydantic/pymongo) are all wheels, so no
+# compiler is needed -- build-essential (only required by the old webrtcvad/resemblyzer
+# deps, now gone) is dropped, removing ~300MB.
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 EXPOSE 8083
