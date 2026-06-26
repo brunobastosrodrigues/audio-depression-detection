@@ -22,6 +22,9 @@ class ComputeMetricsHandler(Handler):
                 "source_topic": topic,
                 "system_mode": data.get("system_mode", "live"),  # Default to live
                 "quality_metrics": data.get("quality_metrics"),
+                # Edge-offload: metrics the node computed on-device (gap-filler skips these).
+                "provided_features": data.get("provided_features"),
+                "node_capabilities_version": data.get("node_capabilities_version"),
             }
 
             self.use_case.execute(audio_bytes, metadata=metadata)
