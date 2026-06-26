@@ -12,6 +12,13 @@ set(SRCS
     "network/wifi_manager.c"
     "network/tcp_client.c"
     "system/watchdog.c"
+    # --- Plug-and-play edge-offload (see docs/firmware/PLUG_AND_PLAY_OFFLOAD_DESIGN.md) ---
+    "app/offload_app.c"
+    "provisioning/provisioning.c"
+    "net/discovery.c"
+    "net/mqtt_client.c"
+    "protocol/node_protocol.c"
+    "features/edge_features.c"
 )
 
 # Add XVF3800 driver for that board variant
@@ -31,6 +38,11 @@ set(INCLUDE_DIRS
     "network"
     "system"
     "drivers"
+    "app"
+    "provisioning"
+    "net"
+    "protocol"
+    "features"
 )
 
 # Register component with ESP-IDF build system
@@ -47,6 +59,13 @@ idf_component_register(
         esp_timer
         esp_psram
         esp_system
+        # Plug-and-play edge-offload deps:
+        mqtt                 # esp-mqtt (broker transport)
+        mdns                 # sink discovery (_iotsensing-mqtt._tcp)
+        wifi_provisioning    # SoftAP/BLE first-boot Wi-Fi setup
+        json                 # cJSON (protocol payloads)
+        # esp-dsp is a managed component: add espressif/esp-dsp to idf_component.yml for
+        # on-node feature extraction (features/edge_features.c).
 )
 
 # Add compiler warnings
