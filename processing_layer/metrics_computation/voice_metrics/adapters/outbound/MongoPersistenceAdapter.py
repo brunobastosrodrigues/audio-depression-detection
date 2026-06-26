@@ -1,3 +1,4 @@
+import os
 from pymongo import MongoClient
 from ports.PersistencePort import PersistencePort
 from collections import defaultdict
@@ -16,10 +17,11 @@ DB_MAP = {
 class MongoPersistenceAdapter(PersistencePort):
     def __init__(
         self,
-        mongo_url="mongodb://mongodb:27017",
+        mongo_url=None,
         db_name="iotsensing_live",  # Default to live database
         collection_name="raw_metrics",
     ):
+        mongo_url = mongo_url or os.getenv("MONGO_URL", "mongodb://mongodb:27017")
         self.client = MongoClient(mongo_url)
         self.db = self.client[db_name]
         self.raw_metrics_collection = self.db[collection_name]

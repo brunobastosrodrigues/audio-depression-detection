@@ -1,3 +1,4 @@
+import os
 from paho.mqtt.client import Client, CallbackAPIVersion
 from adapters.inbound.MqttConsumerAdapter import (
     MqttConsumerAdapter,
@@ -9,6 +10,10 @@ from core.MetricsComputationService import MetricsComputationService
 from adapters.inbound.handlers.ComputeMetricsHandler import ComputeMetricsHandler
 
 client = Client(callback_api_version=CallbackAPIVersion.VERSION2)
+# MQTT auth from env (no-op if MQTT_USER unset).
+_mqtt_user = os.getenv("MQTT_USER")
+if _mqtt_user:
+    client.username_pw_set(_mqtt_user, os.getenv("MQTT_PASS"))
 
 # wire all dependencies
 user_profiling = RestUserProfilingAdapter()
@@ -30,5 +35,5 @@ mqtt_adapter.register_handler("voice/#", compute_metrics_handler)
 mqtt_adapter.register_handler("voice/mic1", compute_metrics_handler)
 
 
-client.connect("mqtt", 1883, 60)
+client.connect(os.getenv("MQTT_HOST", "mqtt"), int(os.getenv("MQTT_PORT", "1883")), 60)
 mqtt_adapter.start()

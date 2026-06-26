@@ -6,8 +6,21 @@ version: "3.7"
 # NOT exposed on the LAN. Services talk to each other over the Docker network by name
 # (e.g. http://analysis_layer:8083, mongodb://mongodb:27017), which is unaffected. Only
 # the dashboard (users) and the respeaker TCP server (ESP32 boards) stay LAN-public.
-# NOTE: authentication for Mongo/MQTT is still open; add credentials before exposing
-# any of these beyond localhost.
+#
+# Authentication: Mongo and MQTT now REQUIRE credentials. The secrets live in a gitignored
+# .env file (MONGO_USER/MONGO_PASS/MQTT_USER/MQTT_PASS); see .env.example. The Mongo URI and
+# MQTT username/password are injected into every service from those variables below.
+
+# Shared credential env injected into services (map-merged via YAML anchors).
+x-mongo-env: &mongo-env
+  MONGO_URL: "mongodb://${MONGO_USER}:${MONGO_PASS}@mongodb:27017/?authSource=admin"
+  MONGO_URI: "mongodb://${MONGO_USER}:${MONGO_PASS}@mongodb:27017/?authSource=admin"
+
+x-mqtt-env: &mqtt-env
+  MQTT_HOST: mqtt
+  MQTT_PORT: "1883"
+  MQTT_USER: "${MQTT_USER}"
+  MQTT_PASS: "${MQTT_PASS}"
 
 services:
    mqtt:
@@ -17,6 +30,7 @@ services:
          - "127.0.0.1:1883:1883"
       volumes:
          - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+         - ./mosquitto.passwd:/mosquitto/config/passwd:ro
 
    mongodb:
       image: mongo:latest
@@ -26,7 +40,13 @@ services:
          - "127.0.0.1:27017:27017"
       volumes:
          - mongo_data:/data/db
-      command: mongod --setParameter diagnosticDataCollectionEnabled=false
+      environment:
+         # On a FRESH volume the entrypoint creates this root user and enables auth. On an
+         # EXISTING volume the user must be created once manually (see scripts/setup_mongo_auth.sh);
+         # either way --auth below enforces authentication.
+         MONGO_INITDB_ROOT_USERNAME: "${MONGO_USER}"
+         MONGO_INITDB_ROOT_PASSWORD: "${MONGO_PASS}"
+      command: mongod --auth --setParameter diagnosticDataCollectionEnabled=false
 
    mongo-express:
       image: mongo-express
@@ -35,6 +55,11 @@ services:
          - "127.0.0.1:8081:8081"
       environment:
          ME_CONFIG_MONGODB_SERVER: mongodb
+         ME_CONFIG_MONGODB_ADMINUSERNAME: "${MONGO_USER}"
+         ME_CONFIG_MONGODB_ADMINPASSWORD: "${MONGO_PASS}"
+         ME_CONFIG_MONGODB_AUTH_DATABASE: admin
+         ME_CONFIG_BASICAUTH_USERNAME: "${MONGO_USER}"
+         ME_CONFIG_BASICAUTH_PASSWORD: "${MONGO_PASS}"
       depends_on:
          - mongodb
 
@@ -47,6 +72,8 @@ services:
          - "127.0.0.1:8000:8000"
       volumes:
          - ./processing_layer/user_profiling/voice_profiling:/app
+      environment:
+         <<: *mongo-env
       depends_on:
          - mongodb
 
@@ -60,7 +87,8 @@ services:
             limits:
                memory: 2G
       environment:
-         - SYSTEM_MODE=live
+         <<: [*mongo-env, *mqtt-env]
+         SYSTEM_MODE: live
       volumes:
          - ./processing_layer/metrics_computation/voice_metrics:/app
          - ./processing_layer/scene_analysis:/app/processing_layer/scene_analysis:ro
@@ -90,10 +118,8 @@ services:
          - mqtt
          - mongodb
       environment:
-         - MONGO_URL=mongodb://mongodb:27017
-         - MQTT_HOST=mqtt
-         - MQTT_PORT=1883
-         - BASE_PORT=8010
+         <<: [*mongo-env, *mqtt-env]
+         BASE_PORT: "8010"
 
    quality_metrics_service:
       build:
@@ -111,9 +137,7 @@ services:
          - mqtt
          - mongodb
       environment:
-         - MONGO_URL=mongodb://mongodb:27017
-         - MQTT_HOST=mqtt
-         - MQTT_PORT=1883
+         <<: [*mongo-env, *mqtt-env]
 
    temporal_context_modeling_layer:
       build:
@@ -122,6 +146,8 @@ services:
       restart: unless-stopped
       ports:
          - "127.0.0.1:8082:8082"
+      environment:
+         <<: *mongo-env
       depends_on:
          - mongodb
 
@@ -136,6 +162,8 @@ services:
                memory: 1G
       ports:
          - "127.0.0.1:8083:8083"
+      environment:
+         <<: *mongo-env
       depends_on:
          - mongodb
 
@@ -152,10 +180,11 @@ services:
          - ./data_ingestion_layer:/app/data_ingestion_layer:ro
          - ./processing_layer/scene_analysis:/app/processing_layer/scene_analysis:ro
          - ./docs:/app/docs:ro
+      environment:
+         <<: [*mongo-env, *mqtt-env]
+         PYTHONUNBUFFERED: "1"
       depends_on:
          - mongodb
-      environment:
-         - PYTHONUNBUFFERED=1
 
 volumes:
    mongo_data:

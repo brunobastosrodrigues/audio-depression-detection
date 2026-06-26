@@ -32,6 +32,7 @@ from datetime import datetime
 
 from framework.payloads.AudioPayload import AudioPayload
 from framework.audio_utils import encode_audio_to_base64, calculate_audio_metrics, int2float
+from framework.mqtt_auth import apply_mqtt_auth
 
 
 class DatasetInjector:
@@ -67,6 +68,7 @@ class DatasetInjector:
 
         # MQTT client
         self.client = mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION2)
+        apply_mqtt_auth(self.client)
         self.client.connect(mqtt_host, mqtt_port, 60)
         self.client.loop_start()
 

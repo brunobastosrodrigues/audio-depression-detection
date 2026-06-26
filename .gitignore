@@ -36,3 +36,6 @@ GEMINI.md
 
 # Board credentials (WiFi passwords, server IPs)
 **/credentials.h
+# Secrets (Mongo/MQTT auth)
+.env
+mosquitto.passwd
