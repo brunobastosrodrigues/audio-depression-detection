@@ -52,6 +52,7 @@ from core.extractors.myprosody_extractors import myprosody_extractors_handler
 from core.extractors.temporal_modulation import get_temporal_modulation
 from core.extractors.spectral_modulation import get_spectral_modulation
 from core.extractors.spectro_utils import log_melspectrogram
+from core.gap_filler import select_tasks
 from core.extractors.voice_onset_time import get_vot
 from core.extractors.glottal_pulse_rate import get_glottal_pulse_rate
 from core.extractors.psd_subbands import get_psd_subbands
@@ -224,27 +225,35 @@ class MetricsComputationService:
 
         all_tasks = dynamic_tasks + legacy_tasks
 
+        # --- Edge-offload gap-filler ---------------------------------------------------
+        # If the node computed some features on-device (metadata["provided_features"]), skip
+        # the matching server extractors and use the node values. Backward compatible: with
+        # no provided_features every task runs exactly as before.
+        provided_features = (metadata or {}).get("provided_features") or {}
+        all_tasks, results = select_tasks(all_tasks, provided_features)
+        # -------------------------------------------------------------------------------
+
         # Size the pool to the available cores (env-overridable). The previous fixed 8
         # oversubscribes a Raspberry Pi's 4 cores; the extractors are CPU-bound (numpy/
         # opensmile/parselmouth release the GIL), so more workers than cores just adds
         # context-switching.
-        max_workers = min(
-            len(all_tasks),
-            max(1, int(os.getenv("METRICS_MAX_WORKERS", os.cpu_count() or 4))),
-        )
-        results = {}
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_key = {
-                executor.submit(fn, *args): key for key, fn, args in all_tasks
-            }
+        if all_tasks:
+            max_workers = min(
+                len(all_tasks),
+                max(1, int(os.getenv("METRICS_MAX_WORKERS", os.cpu_count() or 4))),
+            )
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_key = {
+                    executor.submit(fn, *args): key for key, fn, args in all_tasks
+                }
 
-            for future in as_completed(future_to_key):
-                key = future_to_key[future]
-                try:
-                    results[key] = future.result()
-                except Exception as e:
-                    print(f"Error extracting feature {key}: {e}")
-                    results[key] = None
+                for future in as_completed(future_to_key):
+                    key = future_to_key[future]
+                    try:
+                        results[key] = future.result()
+                    except Exception as e:
+                        print(f"Error extracting feature {key}: {e}")
+                        results[key] = None
 
         # Derive the pitch-dependent features from the single shared pitch pass.
         pitch_result = results.get("pitch")
@@ -332,6 +341,11 @@ class MetricsComputationService:
 
         # Add myprosody results
         flat_metrics.update(myprosody_results)
+
+        # Edge-offload: node-provided features are authoritative for whatever the node
+        # computed (and include any node-only feature not produced server-side).
+        for _name, _value in provided_features.items():
+            flat_metrics[_name] = safe_float(_value)
 
         # SAFETY GUARD: Use real-time unless simulation is forced
         if self.simulation_mode:
