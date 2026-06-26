@@ -139,6 +139,24 @@ services:
       environment:
          <<: [*mongo-env, *mqtt-env]
 
+   node_registry_service:
+      build:
+         context: ./data_ingestion_layer
+         dockerfile: Dockerfile.respeaker
+      restart: unless-stopped
+      deploy:
+         resources:
+            limits:
+               memory: 256M
+      command: python node_registry_service.py
+      volumes:
+         - ./data_ingestion_layer:/app
+      depends_on:
+         - mqtt
+         - mongodb
+      environment:
+         <<: [*mongo-env, *mqtt-env]
+
    temporal_context_modeling_layer:
       build:
          context: ./temporal_context_modeling_layer
