@@ -13,17 +13,25 @@ from utils.database import get_database, render_mode_selector, render_mode_badge
 from utils.user_selector import render_user_selector, get_user_display_name, load_users_with_status
 from utils.dataset_users import get_dataset_users, get_dataset_user_info, DATASET_USERS
 
-# Initialize database indexes
-try:
-    setup_indexes()
-except Exception as e:
-    print(f"Index setup failed (expected if DB is not ready): {e}")
-
 st.set_page_config(
     page_title="IHearYou - Depression Detection",
     page_icon="🧠",
     layout="wide",
 )
+
+
+# Ensure indexes ONCE per process (cache_resource persists across reruns/sessions) instead
+# of opening a new client + 12 create_index calls on every Home render.
+@st.cache_resource(show_spinner=False)
+def _ensure_indexes_once():
+    try:
+        setup_indexes()
+    except Exception as e:
+        print(f"Index setup failed (expected if DB is not ready): {e}")
+    return True
+
+
+_ensure_indexes_once()
 
 # --- SIDEBAR ---
 # Mode selector MUST be called first to initialize session state with default mode
@@ -80,11 +88,19 @@ if current_mode == "live":
         # Calculate status for each user
         user_statuses = {"normal": 0, "monitoring": 0, "attention": 0, "no_data": 0}
 
+        # Fetch the latest indicator doc for ALL users in one aggregation instead of a
+        # find_one per user (N+1).
+        latest_by_user = {
+            row["_id"]: row["doc"]
+            for row in db["indicator_scores"].aggregate([
+                {"$sort": {"timestamp": -1}},
+                {"$group": {"_id": "$user_id", "doc": {"$first": "$$ROOT"}}},
+            ])
+        }
+
         for user in all_users:
             uid = user["user_id"]
-            latest_doc = db["indicator_scores"].find_one(
-                {"user_id": uid}, sort=[("timestamp", -1)]
-            )
+            latest_doc = latest_by_user.get(uid)
             if latest_doc:
                 scores = latest_doc.get("indicator_scores", {})
                 active = sum(1 for v in scores.values() if v is not None and v >= 0.5)

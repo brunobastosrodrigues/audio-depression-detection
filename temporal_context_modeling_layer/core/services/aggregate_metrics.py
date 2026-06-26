@@ -21,7 +21,12 @@ def aggregate_metrics(records: List[RawMetricRecord]) -> List[AggregatedMetricRe
     df["metric_value"] = pd.to_numeric(df["metric_value"], errors="coerce")
     df = df.dropna(subset=["metric_value"])
 
-    # Group by system_mode as well to keep data separate
+    # Aggregate per DAY: floor the timestamp to the day so multiple utterances on the same
+    # day collapse into one daily mean. Previously the groupby keyed on the full
+    # (microsecond) timestamp, so every record formed its own group and the "daily mean"
+    # was a no-op (output 1:1 with input).
+    df["timestamp"] = pd.to_datetime(df["timestamp"]).dt.floor("D")
+
     grouped = (
         df.groupby(["user_id", "timestamp", "metric_name", "system_mode"])["metric_value"]
         .mean()
@@ -31,9 +36,9 @@ def aggregate_metrics(records: List[RawMetricRecord]) -> List[AggregatedMetricRe
     return [
         AggregatedMetricRecord(
             user_id=row["user_id"],
-            timestamp=row["timestamp"],
+            timestamp=row["timestamp"].to_pydatetime(),
             metric_name=row["metric_name"],
-            aggregated_value=row["metric_value"],
+            aggregated_value=float(row["metric_value"]),
             system_mode=row["system_mode"],
         )
         for _, row in grouped.iterrows()

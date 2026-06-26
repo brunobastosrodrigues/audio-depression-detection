@@ -1,6 +1,6 @@
 import numpy as np
 import librosa
-from resemblyzer import VoiceEncoder
+from resemblyzer import VoiceEncoder, preprocess_wav
 from collections import deque
 import logging
 import threading
@@ -30,7 +30,19 @@ class SceneResolver:
         # Embedding cache lock (for concurrent lazy-loading)
         self._cache_lock = threading.Lock()
 
+        # The VoiceEncoder (a PyTorch model) is shared across boards; serialize forward
+        # passes so concurrent embed_utterance calls can't corrupt internal buffers.
+        self._encoder_lock = threading.Lock()
+
         print("SceneResolver initialized (thread-safe mode).")
+
+    def _embed(self, audio_np):
+        """Embed an audio chunk the SAME way enrollment does (preprocess_wav: normalize +
+        VAD-trim at 16 kHz) so query and reference embeddings are comparable. Serialized
+        with the encoder lock for thread-safety."""
+        processed = preprocess_wav(audio_np)
+        with self._encoder_lock:
+            return self.encoder.embed_utterance(processed)
 
     def _get_user_embedding(self, user_id):
         """
@@ -146,25 +158,28 @@ class SceneResolver:
         # 1. Get Reference
         ref_emb = self._get_user_embedding(user_id)
         if ref_emb is None:
-            # Fail Open (Allow) if no enrollment data.
-            # CALIBRATION WARNING: Log visible warning for missing enrollment
+            # No enrollment -> the speaker cannot be verified. Fail CLOSED (discard) so
+            # unverified audio is never attributed to the patient in a clinical system.
+            # Set scene_config "fail_open_on_missing_enrollment": true to restore the old
+            # permissive behavior (process everything as solo_activity).
+            fail_open = getattr(self.config, "fail_open_on_missing_enrollment", False)
             logging.warning(
                 f"⚠️ CALIBRATION WARNING: User '{user_id}' has no voice enrollment. "
-                "Scene verification disabled - all audio treated as 'solo_activity'. "
-                "Enroll user voice profile to enable speaker verification."
+                f"Speaker verification unavailable -> "
+                f"{'PROCESSING (fail-open)' if fail_open else 'DISCARDING (fail-closed)'}. "
+                "Enroll the user's voice profile to enable speaker verification."
             )
             return {
-                "decision": "process",
+                "decision": "process" if fail_open else "discard",
                 "classification": "unverified",
-                "context": "solo_activity",
+                "context": "solo_activity" if fail_open else "unverified",
                 "similarity": 0.0,
                 "calibration_status": "missing_enrollment"
             }
 
-        # 2. Compute Embedding of incoming chunk
+        # 2. Compute Embedding of incoming chunk (preprocessed like enrollment, encoder-locked)
         try:
-            # Resemblyzer expects a specific format. audio_np is float32 usually.
-            curr_emb = self.encoder.embed_utterance(audio_np)
+            curr_emb = self._embed(audio_np)
         except Exception as e:
             logging.error(f"Error generating embedding: {e}")
             return {
@@ -175,8 +190,9 @@ class SceneResolver:
                 "calibration_status": "enrolled"
             }
 
-        # 3. Compute Similarity (Cosine)
-        similarity = np.dot(ref_emb, curr_emb) / (np.linalg.norm(ref_emb) * np.linalg.norm(curr_emb))
+        # 3. Compute Similarity (Cosine), guarding against a zero-norm (silent) embedding
+        denom = float(np.linalg.norm(ref_emb) * np.linalg.norm(curr_emb))
+        similarity = float(np.dot(ref_emb, curr_emb) / denom) if denom > 1e-8 else 0.0
         
         # 4. Classify using config thresholds
         classification = "unknown"

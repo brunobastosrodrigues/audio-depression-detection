@@ -20,7 +20,10 @@ class AggregateMetricsUseCase:
             if latest.tzinfo is None:
                 latest = latest.replace(tzinfo=timezone.utc)
 
-            start_date = latest + timedelta(days=1)
+            # Re-process from the last aggregated DAY (inclusive), not the next day. Aggregation
+            # is day-bucketed and now idempotent (upsert), so revisiting the latest day picks up
+            # late-arriving same-day utterances; `+1 day` would silently drop them.
+            start_date = latest
 
         metrics = self.repository.get_raw_metrics(
             user_id=user_id, start_date=start_date

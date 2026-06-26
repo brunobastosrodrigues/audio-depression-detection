@@ -14,9 +14,13 @@ class HMM(Contextualizer):
         if not values or len(values) < self.n_states:
             return values
 
-        series = np.array(values)
+        series = np.array(values, dtype=float)
         mean = np.mean(series)
         std = np.std(series)
+        # A constant series has std == 0 -> normalization would divide by zero (inf/nan that
+        # GaussianHMM rejects). There is nothing to model, so return the series unchanged.
+        if std == 0 or not np.isfinite(std):
+            return list(series)
         normed = (series - mean) / std
 
         X = normed.reshape(-1, 1)

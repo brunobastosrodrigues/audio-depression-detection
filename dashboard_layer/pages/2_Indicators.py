@@ -26,7 +26,7 @@ from utils.theme import (
 )
 from utils.MetricExplainerAdapter import MetricExplainerAdapter
 from utils.DSM5Descriptions import DSM5Descriptions
-from utils.database import get_database, render_mode_selector
+from utils.database import get_database, render_mode_selector, get_current_mode, load_indicator_scores
 from utils.user_selector import render_user_selector
 
 st.set_page_config(page_title="Indicators", page_icon="📊", layout="wide")
@@ -70,10 +70,8 @@ if not selected_user:
     st.warning("Please select a user.")
     st.stop()
 
-# Load indicator data
-indicator_docs = list(
-    collection_indicators.find({"user_id": selected_user}).sort("timestamp", -1)
-)
+# Load indicator data (cached per mode+user across reruns/widget interactions)
+indicator_docs = load_indicator_scores(get_current_mode(), selected_user, ascending=False)
 
 if not indicator_docs:
     st.info("No indicator data available for this user. Click 'Refresh Analysis' to process data.")

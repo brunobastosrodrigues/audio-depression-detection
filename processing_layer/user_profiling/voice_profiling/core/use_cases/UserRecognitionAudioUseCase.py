@@ -1,7 +1,13 @@
 import numpy as np
-from resemblyzer import VoiceEncoder
+from resemblyzer import VoiceEncoder, preprocess_wav
 from audio_utils import wav_bytes_to_np_float32
 from ports.UserRepositoryPort import UserRepositoryPort
+
+
+def _cosine(a, b) -> float:
+    """Cosine similarity with a zero-norm guard (silent chunk -> 0.0, not NaN)."""
+    denom = float(np.linalg.norm(a) * np.linalg.norm(b))
+    return float(np.dot(a, b) / denom) if denom > 1e-8 else 0.0
 
 
 class UserRecognitionAudioUseCase:
@@ -23,11 +29,15 @@ class UserRecognitionAudioUseCase:
         # Reload profiles to ensure we have the latest registered users
         self.reload_user_profiles()
         
-        wav, _ = wav_bytes_to_np_float32(audio_bytes)
+        wav, sr = wav_bytes_to_np_float32(audio_bytes)
+
+        # Preprocess identically to enrollment (normalize + VAD-trim) so the query embedding
+        # is comparable to the enrolled reference embeddings.
+        processed = preprocess_wav(wav, source_sr=sr)
 
         # Generate query vector for the short incoming chunk
         query_embedding = np.array(
-            self.encoder.embed_utterance(wav).tolist(), dtype=np.float32
+            self.encoder.embed_utterance(processed).tolist(), dtype=np.float32
         )
 
         # Compare against known profiles
@@ -53,10 +63,7 @@ class UserRecognitionAudioUseCase:
 
         for user_id, embeddings in self.user_profiles.items():
             # Calculate max similarity against all embeddings for this user
-            sims = [
-                np.dot(embedding, e) / (np.linalg.norm(embedding) * np.linalg.norm(e))
-                for e in embeddings
-            ]
+            sims = [_cosine(embedding, e) for e in embeddings]
 
             if not sims:
                 continue
@@ -74,10 +81,7 @@ class UserRecognitionAudioUseCase:
         return None
 
     def _max_similarity(self, embedding, embeddings):
-        sims = [
-            np.dot(embedding, e) / (np.linalg.norm(embedding) * np.linalg.norm(e))
-            for e in embeddings
-        ]
+        sims = [_cosine(embedding, e) for e in embeddings]
         return max(sims)
 
     def _update_user_profile(self, user_id, embedding):
