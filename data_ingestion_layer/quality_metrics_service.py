@@ -19,6 +19,7 @@ from datetime import datetime
 from pymongo import MongoClient
 import paho.mqtt.client as mqtt
 from paho.mqtt.client import CallbackAPIVersion
+from framework.mqtt_auth import apply_mqtt_auth
 
 # Configuration
 MONGO_URL = os.environ.get("MONGO_URL", "mongodb://mongodb:27017")
@@ -44,6 +45,7 @@ class QualityMetricsService:
         
         # MQTT connection
         self.mqtt_client = mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION2)
+        apply_mqtt_auth(self.mqtt_client)
         self.mqtt_client.on_connect = self.on_connect
         self.mqtt_client.on_message = self.on_message
         self.mqtt_client.connect(mqtt_host, mqtt_port, 60)

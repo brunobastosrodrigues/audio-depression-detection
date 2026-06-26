@@ -1,7 +1,8 @@
+import os
 from pymongo import MongoClient
 
 def setup_indexes():
-    client = MongoClient("mongodb://mongodb:27017")
+    client = MongoClient(os.getenv("MONGO_URI", os.getenv("MONGO_URL", "mongodb://mongodb:27017")))
     db = client["iotsensing"]
     
     collections = [

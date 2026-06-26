@@ -589,6 +589,9 @@ with tab_config:
                                     q.put(msg)
                                     
                                 client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
+                                _mqtt_user = os.getenv("MQTT_USER")
+                                if _mqtt_user:
+                                    client.username_pw_set(_mqtt_user, os.getenv("MQTT_PASS"))
                                 client.on_message = on_message
                                 client.connect(hostname, port, 60)
                                 client.subscribe(topic)

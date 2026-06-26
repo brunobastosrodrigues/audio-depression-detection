@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional
 from datetime import datetime
 from collections import defaultdict
@@ -36,9 +37,10 @@ ALL_DBS = ["iotsensing_live", "iotsensing_dataset", "iotsensing_demo"]
 class MongoPersistenceAdapter(PersistencePort):
     def __init__(
         self,
-        mongo_url="mongodb://mongodb:27017",
+        mongo_url=None,
         db_name="iotsensing_live",  # Default to live database
     ):
+        mongo_url = mongo_url or os.getenv("MONGO_URL", "mongodb://mongodb:27017")
         self.client = MongoClient(mongo_url)
         self.db = self.client[db_name]
         self.collection_raw_metrics = self.db["raw_metrics"]

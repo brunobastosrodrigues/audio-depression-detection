@@ -21,6 +21,9 @@ except ImportError:
 class BoardRecorder:
     def __init__(self, broker_address="mqtt", broker_port=1883):
         self.client = mqtt.Client()
+        _mqtt_user = os.getenv("MQTT_USER")
+        if _mqtt_user:
+            self.client.username_pw_set(_mqtt_user, os.getenv("MQTT_PASS"))
         self.broker_address = broker_address
         self.broker_port = broker_port
         self.audio_queue = queue.Queue()
