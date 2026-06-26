@@ -8,8 +8,12 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 set -a; [ -f .env ] && . ./.env; set +a
 : "${MONGO_USER:?set MONGO_USER in .env}"; : "${MONGO_PASS:?set MONGO_PASS in .env}"
-docker exec -i mongodb mongosh --quiet admin --eval "
-  try { if (db.getUser('${MONGO_USER}')) { print('user already exists'); quit(0); } } catch (e) {}
-  db.createUser({user: '${MONGO_USER}', pwd: '${MONGO_PASS}', roles: [{role: 'root', db: 'admin'}]});
-  print('root user ${MONGO_USER} created');
-"
+# Pass creds as ENV into the container (never interpolated into the JS string), so passwords
+# containing quotes/backslashes/$/backticks can't break the eval or inject JS -> avoids the
+# "auth enabled but no user created => full lockout" failure mode.
+docker exec -e MU="$MONGO_USER" -e MP="$MONGO_PASS" -i mongodb mongosh --quiet admin --eval '
+  const u = process.env.MU, p = process.env.MP;
+  try { if (db.getUser(u)) { print("user already exists"); quit(0); } } catch (e) {}
+  db.createUser({user: u, pwd: p, roles: [{role: "root", db: "admin"}]});
+  print("root user " + u + " created");
+'

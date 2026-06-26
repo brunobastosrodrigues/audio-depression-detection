@@ -10,8 +10,18 @@ class ComputeMetricsHandler(Handler):
     def __call__(self, topic, payload):
         try:
             data = json.loads(payload.decode())
-            audio_b64 = data["data"]
+            audio_b64 = data.get("data") or ""
             audio_bytes = base64.b64decode(audio_b64)
+
+            # The audio extractors require real audio. The features-only transport (data="",
+            # provided_features set) is not yet wired as a no-audio ingestion path, so handle
+            # it explicitly rather than crash-dropping it in the generic except below.
+            if not audio_bytes:
+                if data.get("provided_features"):
+                    print(f"[{topic}] features-only payload (no audio) not yet supported; dropping")
+                else:
+                    print(f"[{topic}] empty audio payload; dropping")
+                return
 
             # Extract metadata from payload (optional fields)
             metadata = {

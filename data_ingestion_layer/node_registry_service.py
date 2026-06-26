@@ -50,10 +50,17 @@ class NodeRegistryService:
     def on_message(self, client, userdata, msg):
         try:
             data = json.loads(msg.payload.decode())
-            # The topic addresses the node; fill node_id from it if the payload omits it.
+            # SECURITY: the TOPIC segment is the authoritative node identity (a node may only
+            # publish to its own nodes/{id}/... under broker ACLs). Always use it and ignore any
+            # node_id in the payload, so a node can't spoof another node's id to overwrite its
+            # registry entry or publish a (retained) config to its topic.
             topic_id = node_id_from_topic(msg.topic)
-            if topic_id and not data.get("node_id"):
-                data["node_id"] = topic_id
+            if not topic_id:
+                print(f"Ignoring advert on non-node topic {msg.topic}")
+                return
+            if data.get("node_id") and data["node_id"] != topic_id:
+                print(f"node_id mismatch: payload '{data['node_id']}' != topic '{topic_id}'; using topic")
+            data["node_id"] = topic_id
 
             caps, assignment, problems = process_capabilities(data)
             if problems:
