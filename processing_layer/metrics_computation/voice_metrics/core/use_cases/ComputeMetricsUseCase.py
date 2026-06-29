@@ -4,10 +4,13 @@ import csv
 
 
 class ComputeMetricsUseCase:
-    def __init__(self, user_profiling, persistence, metrics_computation_service):
+    def __init__(self, user_profiling, persistence, metrics_computation_service,
+                 enrollment=None):
         self.user_profiling = user_profiling
         self.persistence = persistence
         self.metrics_computation_service = metrics_computation_service
+        # Optional: resolves an enrolled node's pinned system_mode (NodeEnrollmentAdapter).
+        self.enrollment = enrollment
 
         # logging performance measurements
         self.log_path = "performance_log.csv"
@@ -21,6 +24,15 @@ class ComputeMetricsUseCase:
 
     def execute(self, audio_bytes: bytes, metadata: dict = None):
         metadata = metadata or {}
+
+        # SECURITY: if board_id (taken from the ACL-enforced topic) is an ENROLLED edge node,
+        # its system_mode is pinned at enrollment -> ignore the payload's system_mode so a live
+        # node can't route its records into the dataset/demo DB. Unenrolled publishers (the
+        # trusted service-account dataset injector) keep the payload mode.
+        if self.enrollment is not None:
+            enrolled_mode = self.enrollment.get_mode(metadata.get("board_id"))
+            if enrolled_mode:
+                metadata["system_mode"] = enrolled_mode
 
         # Use user_id from metadata if provided, otherwise recognize from audio
         if metadata.get("user_id"):
