@@ -3,6 +3,18 @@ import base64
 from adapters.inbound.handlers.Handler import Handler
 
 
+def _ids_from_voice_topic(topic):
+    """Parse (user_id, board_id) from voice/{user_id}/{board_id}/{env}. user_id -> int when
+    all-digits (dataset), else str (live uuid). Returns (None, None) for non-voice topics."""
+    parts = (topic or "").split("/")
+    if len(parts) >= 3 and parts[0] == "voice":
+        uid = parts[1]
+        if isinstance(uid, str) and uid.isdigit():
+            uid = int(uid)
+        return uid, parts[2]
+    return None, None
+
+
 class ComputeMetricsHandler(Handler):
     def __init__(self, use_case):
         self.use_case = use_case
@@ -23,10 +35,15 @@ class ComputeMetricsHandler(Handler):
                     print(f"[{topic}] empty audio payload; dropping")
                 return
 
-            # Extract metadata from payload (optional fields)
+            # SECURITY: take user_id + board_id from the TOPIC, which the broker ACL pins to
+            # the authenticated node (a per-node cred may only publish voice/{its_user}/{its_id}/#).
+            # This prevents a node from attributing fabricated data to another user/board via the
+            # payload. Fall back to the payload only when the topic isn't a voice topic (e.g. the
+            # service-account dataset injector, which is trusted).
+            topic_user_id, topic_board_id = _ids_from_voice_topic(topic)
             metadata = {
-                "board_id": data.get("board_id"),
-                "user_id": data.get("user_id"),
+                "board_id": topic_board_id if topic_board_id is not None else data.get("board_id"),
+                "user_id": topic_user_id if topic_user_id is not None else data.get("user_id"),
                 "environment_id": data.get("environment_id"),
                 "environment_name": data.get("environment_name"),
                 "source_topic": topic,
