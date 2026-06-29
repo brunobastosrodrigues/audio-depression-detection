@@ -52,7 +52,7 @@ from core.extractors.myprosody_extractors import myprosody_extractors_handler
 from core.extractors.temporal_modulation import get_temporal_modulation
 from core.extractors.spectral_modulation import get_spectral_modulation
 from core.extractors.spectro_utils import log_melspectrogram
-from core.gap_filler import select_tasks
+from core.gap_filler import select_tasks, sanitize_provided_features
 from core.extractors.voice_onset_time import get_vot
 from core.extractors.glottal_pulse_rate import get_glottal_pulse_rate
 from core.extractors.psd_subbands import get_psd_subbands
@@ -227,9 +227,12 @@ class MetricsComputationService:
 
         # --- Edge-offload gap-filler ---------------------------------------------------
         # If the node computed some features on-device (metadata["provided_features"]), skip
-        # the matching server extractors and use the node values. Backward compatible: with
-        # no provided_features every task runs exactly as before.
-        provided_features = (metadata or {}).get("provided_features") or {}
+        # the matching server extractors and use the node values. SECURITY: these come over
+        # MQTT and feed clinical scoring, so sanitize first -- only the trusted allow-list,
+        # finite + range-clamped (sanitize_provided_features). A node can therefore neither
+        # inject nor override the server-side clinical markers (jitter/shimmer/HNR/...).
+        # Backward compatible: with no provided_features every task runs exactly as before.
+        provided_features = sanitize_provided_features((metadata or {}).get("provided_features"))
         all_tasks, results = select_tasks(all_tasks, provided_features)
         # -------------------------------------------------------------------------------
 
@@ -355,14 +358,20 @@ class MetricsComputationService:
             timestamp = datetime.now(timezone.utc)
 
         # Prepare acoustic feature records (for raw_metrics collection)
+        node_cap_version = metadata.get("node_capabilities_version")
         acoustic_feature_records = []
         for metric_name, metric_value in flat_metrics.items():
+            # Provenance: distinguish node-computed (edge_node) from server-computed metrics so
+            # analysis/audit can down-weight or trace them. provided_features is already
+            # sanitized to the trusted allow-list.
+            from_node = metric_name in provided_features
             acoustic_feature_records.append({
                 "user_id": user_id,
                 "timestamp": timestamp,
                 "metric_name": metric_name,
                 "metric_value": metric_value,
-                "origin": "metrics_computation",
+                "origin": "edge_node" if from_node else "metrics_computation",
+                "node_capabilities_version": node_cap_version if from_node else None,
                 "board_id": metadata.get("board_id"),
                 "environment_id": metadata.get("environment_id"),
                 "environment_name": metadata.get("environment_name"),

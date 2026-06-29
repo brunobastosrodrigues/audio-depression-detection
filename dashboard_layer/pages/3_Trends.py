@@ -43,6 +43,7 @@ st.sidebar.title("Actions")
 
 if st.sidebar.button("🔄 Refresh Analysis"):
     refresh_procedure()
+    load_indicator_scores.clear()  # drop cached scores so the recompute is shown immediately
 
 # Render user selector
 selected_user = render_user_selector()

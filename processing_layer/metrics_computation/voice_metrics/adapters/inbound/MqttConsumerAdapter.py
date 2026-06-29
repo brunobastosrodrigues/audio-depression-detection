@@ -11,6 +11,9 @@ class MqttConsumerAdapter(ConsumerPort):
     # Queue monitoring thresholds
     QUEUE_WARNING_THRESHOLD = 5
     QUEUE_CRITICAL_THRESHOLD = 10
+    # Hard cap so a faster-than-realtime publisher can't grow the queue without bound and
+    # OOM the (mem-limited) container. When full we drop the OLDEST queued message.
+    QUEUE_MAX_DEPTH = 100
 
     def __init__(self, mqtt_client):
         self.client = mqtt_client
@@ -19,7 +22,7 @@ class MqttConsumerAdapter(ConsumerPort):
         # Threaded processing with monitoring. Initialize ALL state the worker reads
         # BEFORE starting the thread -- otherwise the worker races __init__ and hits
         # AttributeError on _max_queue_depth/etc. on the first iterations.
-        self.message_queue = queue.Queue()
+        self.message_queue = queue.Queue(maxsize=self.QUEUE_MAX_DEPTH)
         self.is_running = True
 
         # Queue monitoring stats
@@ -69,9 +72,21 @@ class MqttConsumerAdapter(ConsumerPort):
         return False
 
     def on_message(self, client, userdata, msg):
-        # Offload processing to the worker thread immediately
-        # This keeps the MQTT loop unblocked
-        self.message_queue.put((msg.topic, msg.payload))
+        # Offload processing to the worker thread immediately to keep the MQTT loop unblocked.
+        # Bounded queue with drop-oldest: never block the network loop, never grow without
+        # bound (a slow extractor + fast publisher would otherwise OOM the container).
+        try:
+            self.message_queue.put_nowait((msg.topic, msg.payload))
+        except queue.Full:
+            try:
+                self.message_queue.get_nowait()  # drop oldest
+                self.message_queue.task_done()
+            except queue.Empty:
+                pass
+            try:
+                self.message_queue.put_nowait((msg.topic, msg.payload))
+            except queue.Full:
+                logger.warning("message_queue full; dropping incoming message")
 
     def _worker(self):
         """Background thread to process messages from the queue with monitoring."""

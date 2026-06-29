@@ -32,7 +32,7 @@ payload = AudioPayload(
     environment_name="research",
     quality_metrics=calculate_audio_metrics(seg, 16000),
     system_mode="dataset",
-    provided_features={"snr": SENTINEL_SNR, "spectral_flatness": SENTINEL_FLATNESS},
+    provided_features={"snr": SENTINEL_SNR, "spectral_flatness": SENTINEL_FLATNESS, "jitter": 0.0, "hnr_mean": 99.0},
     node_capabilities_version="test-v1",
 )
 inj.client.publish(inj.topic, json.dumps(payload.to_dict()))
