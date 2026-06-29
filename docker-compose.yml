@@ -31,6 +31,7 @@ services:
       volumes:
          - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
          - ./mosquitto.passwd:/mosquitto/config/passwd:ro
+         - ./mosquitto.acl:/mosquitto/config/acl:ro
 
    mongodb:
       image: mongo:latest

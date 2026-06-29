@@ -39,3 +39,4 @@ GEMINI.md
 # Secrets (Mongo/MQTT auth)
 .env
 mosquitto.passwd
+mosquitto.acl
