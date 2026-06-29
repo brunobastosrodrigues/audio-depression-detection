@@ -5,6 +5,7 @@ from adapters.inbound.MqttConsumerAdapter import (
 )
 from adapters.outbound.RestUserProfilingAdapter import RestUserProfilingAdapter
 from adapters.outbound.MongoPersistenceAdapter import MongoPersistenceAdapter
+from adapters.outbound.NodeEnrollmentAdapter import NodeEnrollmentAdapter
 from core.use_cases.ComputeMetricsUseCase import ComputeMetricsUseCase
 from core.MetricsComputationService import MetricsComputationService
 from adapters.inbound.handlers.ComputeMetricsHandler import ComputeMetricsHandler
@@ -19,9 +20,10 @@ if _mqtt_user:
 user_profiling = RestUserProfilingAdapter()
 persistence = MongoPersistenceAdapter()
 metrics_computation_service = MetricsComputationService()
+enrollment = NodeEnrollmentAdapter()
 
 comput_metrics_use_case = ComputeMetricsUseCase(
-    user_profiling, persistence, metrics_computation_service
+    user_profiling, persistence, metrics_computation_service, enrollment=enrollment
 )
 mqtt_adapter = MqttConsumerAdapter(client)
 
