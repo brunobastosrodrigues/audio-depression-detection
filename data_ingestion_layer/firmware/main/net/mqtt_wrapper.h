@@ -25,7 +25,7 @@ typedef struct {
     // Last-will: published (retained) by the broker if the node dies uncleanly, so the
     // dashboard's online/stale view never shows a dead node as alive. Empty topic => no LWT.
     char lwt_topic[64];
-    char lwt_payload[64];
+    char lwt_payload[96];   // fits {"node_id":"<up to 39>","online":false} without truncation
     mqtt_msg_cb_t on_message;
     void *user;
 } mqtt_client_cfg_t;
