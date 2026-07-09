@@ -13,6 +13,7 @@
 #include "esp_err.h"
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {

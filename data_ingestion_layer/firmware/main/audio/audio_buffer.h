@@ -10,6 +10,7 @@
 
 #include "esp_err.h"
 #include "config/audio_config.h"
+#include "freertos/FreeRTOS.h"
 #include <stddef.h>
 #include <stdint.h>
 

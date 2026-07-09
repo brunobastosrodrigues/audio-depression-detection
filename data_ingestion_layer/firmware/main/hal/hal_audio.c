@@ -11,6 +11,8 @@
 #include "config/board_config.h"
 #include "config/audio_config.h"
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "driver/i2s_std.h"
 #include "esp_log.h"
 #include <math.h>
