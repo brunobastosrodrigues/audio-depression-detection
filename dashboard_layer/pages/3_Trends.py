@@ -24,8 +24,6 @@ from utils.DSM5Descriptions import DSM5Descriptions
 from utils.database import get_database, render_mode_selector, get_current_mode, load_indicator_scores
 from utils.user_selector import render_user_selector
 
-st.set_page_config(page_title="Trends", page_icon="📈", layout="wide")
-
 apply_custom_css()
 
 st.title("Longitudinal Trends")

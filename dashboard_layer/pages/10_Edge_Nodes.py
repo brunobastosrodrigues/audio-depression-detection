@@ -6,8 +6,6 @@ from datetime import datetime, timezone
 
 from utils.database import get_client, render_mode_selector
 
-st.set_page_config(page_title="Edge Nodes", page_icon="🔌", layout="wide")
-
 render_mode_selector()
 
 st.title("🔌 Edge Nodes")
@@ -20,11 +18,9 @@ st.markdown(
 ONLINE_WINDOW_S = 90  # 3x the 30s heartbeat interval + slack (was 300s/5min: with 30s
                        # heartbeats that stale threshold made healthy nodes read "offline")
 
-
 @st.cache_data(ttl=10, show_spinner=False)
 def load_nodes():
     return list(get_client()["iotsensing"]["nodes"].find({}, {"_id": 0}))
-
 
 if st.button("🔄 Refresh"):
     load_nodes.clear()
@@ -37,14 +33,12 @@ if not nodes:
     )
     st.stop()
 
-
 def _to_naive_utc(dt):
     if dt is None:
         return None
     if getattr(dt, "tzinfo", None) is not None:
         return dt.astimezone(timezone.utc).replace(tzinfo=None)
     return dt
-
 
 now = datetime.utcnow()
 rows = []

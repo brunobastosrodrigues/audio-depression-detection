@@ -16,8 +16,6 @@ from utils.theme import COLORS, INDICATOR_CLINICAL_NAMES, apply_custom_css
 from utils.database import get_database, render_mode_selector
 from utils.user_selector import render_user_selector
 
-st.set_page_config(page_title="Self-Report", page_icon="📋", layout="wide")
-
 apply_custom_css()
 
 st.title("Self-Report Assessment")
@@ -279,7 +277,6 @@ with tab_new:
             - **International Association for Suicide Prevention:** https://www.iasp.info/resources/Crisis_Centres/
             """
         )
-
 
 # ============================================================================
 # HISTORY TAB

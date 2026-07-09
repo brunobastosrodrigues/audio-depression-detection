@@ -20,8 +20,6 @@ import numpy as np
 from utils.database import get_database, render_mode_selector, get_current_mode
 from utils.user_selector import render_user_selector
 
-st.set_page_config(page_title="Boards", page_icon="📡", layout="wide")
-
 # Mode Check
 if get_current_mode() != "live":
     st.info("This page is only available in Live mode.")
@@ -38,7 +36,6 @@ raw_metrics_collection = db["raw_metrics"]
 audio_quality_metrics_collection = db["audio_quality_metrics"]
 
 ANALYSIS_LAYER_URL = "http://analysis_layer:8083"
-
 
 # --- SIDEBAR ---
 render_mode_selector()

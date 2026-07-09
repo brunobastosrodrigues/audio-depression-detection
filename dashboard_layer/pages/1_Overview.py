@@ -20,8 +20,6 @@ from utils.DSM5Descriptions import DSM5Descriptions
 from utils.database import get_database, render_mode_selector
 from utils.user_selector import render_user_selector
 
-st.set_page_config(page_title="Overview", page_icon="🏠", layout="wide")
-
 apply_custom_css()
 
 st.title("Your Wellness Overview")
@@ -46,7 +44,6 @@ selected_user = render_user_selector()
 if not selected_user:
     st.warning("No data available. Please load some audio data first.")
     st.stop()
-
 
 def compute_wellness_score(indicator_scores: dict, threshold: float = 0.5) -> tuple:
     """
@@ -80,7 +77,6 @@ def compute_wellness_score(indicator_scores: dict, threshold: float = 0.5) -> tu
 
     return wellness_score, status_label, status_color, active_count, has_core
 
-
 def get_trend_indicator(current_scores: dict, previous_scores: dict) -> tuple:
     """
     Compare current and previous scores to determine trend.
@@ -109,7 +105,6 @@ def get_trend_indicator(current_scores: dict, previous_scores: dict) -> tuple:
         return "📉", "Needs attention", COLORS["warning"]
     else:
         return "➡️", "Stable", COLORS["info"]
-
 
 # --- MAIN CONTENT ---
 if selected_user:

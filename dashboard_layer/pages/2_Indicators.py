@@ -29,8 +29,6 @@ from utils.DSM5Descriptions import DSM5Descriptions
 from utils.database import get_database, render_mode_selector, get_current_mode, load_indicator_scores
 from utils.user_selector import render_user_selector
 
-st.set_page_config(page_title="Indicators", page_icon="📊", layout="wide")
-
 apply_custom_css()
 
 st.title("DSM-5 Indicators")
@@ -103,7 +101,6 @@ latest_scores = latest_doc.get("indicator_scores", {})
 metric_records = list(
     collection_metrics.find({"user_id": selected_user, "timestamp": latest_ts})
 )
-
 
 # ============================================================================
 # SUMMARY VIEW
@@ -257,7 +254,6 @@ if view_mode == "Summary":
             annotation_text="Threshold",
         )
         st.plotly_chart(fig_trend, use_container_width=True)
-
 
 # ============================================================================
 # CLINICAL ANALYSIS VIEW (Indicator-First Drill-Down)
@@ -604,7 +600,6 @@ elif view_mode == "Clinical Analysis":
             # DSM-5 Context
             with st.expander("📖 DSM-5 Criterion Details"):
                 st.markdown(DSM5Descriptions.format_indicator_card(selected_indicator))
-
 
 # ============================================================================
 # RESEARCH DATA VIEW

@@ -20,8 +20,6 @@ from utils.database import get_database, render_mode_selector, get_current_mode
 from utils.user_selector import render_user_selector, get_user_display_name, is_selected_user_calibrated
 from utils.alerts import render_actionable_banner
 
-st.set_page_config(page_title="Scene Analysis", page_icon="🔬", layout="wide")
-
 # Mode Check - Scene Analysis only meaningful in Live mode
 if get_current_mode() != "live":
     st.info("Scene Analysis is only available in Live mode. The gatekeeper is disabled in demo/dataset modes.")

@@ -23,8 +23,6 @@ import plotly.graph_objects as go
 from utils.database import get_database, render_mode_selector, get_current_mode
 from utils.user_selector import USER_ID_KEY
 
-st.set_page_config(page_title="Data Tools", page_icon="🔧", layout="wide")
-
 # Mode Check
 if get_current_mode() != "dataset":
     st.info("This page is only available in Dataset mode.")
@@ -57,7 +55,6 @@ try:
 except ImportError:
     VoiceFromFile = None
     VOICE_FROM_FILE_AVAILABLE = False
-
 
 class StoppableVoiceFromFile:
     """Wrapper for VoiceFromFile with start/stop controls."""
@@ -113,7 +110,6 @@ class StoppableVoiceFromFile:
             self.thread.join(timeout=1.0)
             self.thread = None
 
-
 @st.cache_data
 def load_users_data_tools():
     """
@@ -132,7 +128,6 @@ def load_users_data_tools():
     if not users_list:
         return ["test-user1"]
     return users_list
-
 
 # --- SIDEBAR ---
 render_mode_selector()
@@ -169,7 +164,6 @@ tab_audio, tab_baseline, tab_export = st.tabs([
     "📊 Baseline Viewer",
     "📥 Data Export",
 ])
-
 
 # ============================================================================
 # AUDIO LOADER TAB
@@ -267,7 +261,6 @@ with tab_audio:
                         st.session_state.streamer.stop()
                         st.session_state.streamer = None
                         st.rerun()
-
 
             # Status Display
             if st.session_state.streamer:

@@ -47,8 +47,6 @@ try:
 except ImportError:
     RESEMBLYZER_AVAILABLE = False
 
-st.set_page_config(page_title="User Management", page_icon="👥", layout="wide")
-
 # Mode Check - Only available in Live mode
 if get_current_mode() != "live":
     st.warning("⚠️ User Management is only available in Live Mode.")
@@ -72,16 +70,13 @@ environments_collection = db["environments"]
 # API endpoints
 VOICE_PROFILING_API = os.getenv("VOICE_PROFILING_API", "http://voice_profiling:8000")
 
-
 @st.cache_resource
 def get_encoder():
     if RESEMBLYZER_AVAILABLE:
         return VoiceEncoder()
     return None
 
-
 encoder = get_encoder()
-
 
 # =============================================================================
 # HELPER FUNCTIONS
@@ -95,7 +90,6 @@ def get_all_users():
     except Exception as e:
         st.error(f"Error loading users: {e}")
         return []
-
 
 def delete_user(user_id: str):
     """Delete a user from the database."""
@@ -118,7 +112,6 @@ def delete_user(user_id: str):
     except Exception as e:
         st.error(f"Error deleting user: {e}")
         return False
-
 
 def enroll_user_local(user_id: str, name: str, role: str, audio_path: str):
     """Enroll a user using the enrollment API."""
@@ -163,7 +156,6 @@ def enroll_user_local(user_id: str, name: str, role: str, audio_path: str):
     except Exception as e:
         st.error(f"Enrollment error: {e}")
         return False, {"error": str(e)}
-
 
 # =============================================================================
 # MAIN CONTENT
@@ -723,7 +715,6 @@ with tab3:
 
                     except Exception as e:
                         st.error(f"Recognition error: {e}")
-
 
 # =============================================================================
 # FOOTER

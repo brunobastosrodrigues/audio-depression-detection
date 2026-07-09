@@ -19,8 +19,6 @@ from datetime import datetime, timezone, timedelta
 from utils.database import get_client, get_database
 from utils.theme import COLORS
 
-st.set_page_config(page_title="Fleet Health", page_icon="🩺", layout="wide")
-
 st.title("🩺 Fleet Health & Reliability")
 st.markdown(
     "Live status and historical reliability of the edge-node fleet: online/offline, signal "
@@ -38,14 +36,12 @@ WINDOW_OPTIONS = {
     "30 d": timedelta(days=30),
 }
 
-
 def _to_naive_utc(dt):
     if dt is None:
         return None
     if getattr(dt, "tzinfo", None) is not None:
         return dt.astimezone(timezone.utc).replace(tzinfo=None)
     return dt
-
 
 def _humanize_seconds(seconds):
     if seconds is None:
@@ -62,7 +58,6 @@ def _humanize_seconds(seconds):
     parts.append(f"{m}m")
     return " ".join(parts)
 
-
 # ------------------------------------------------------------------------------- controls
 top_l, top_r = st.columns([3, 1])
 with top_l:
@@ -76,12 +71,10 @@ window_delta = WINDOW_OPTIONS[window_label]
 now = datetime.utcnow()
 window_start = now - window_delta
 
-
 # ------------------------------------------------------------------------------- loaders
 @st.cache_data(ttl=15, show_spinner=False)
 def load_nodes():
     return list(get_client()["iotsensing"]["nodes"].find({}, {"_id": 0}))
-
 
 @st.cache_data(ttl=15, show_spinner=False)
 def load_history(window_start_iso: str):
@@ -93,7 +86,6 @@ def load_history(window_start_iso: str):
     )
     return docs
 
-
 @st.cache_data(ttl=15, show_spinner=False)
 def load_markers(window_start_iso: str):
     window_start_dt = datetime.fromisoformat(window_start_iso)
@@ -103,7 +95,6 @@ def load_markers(window_start_iso: str):
         .sort("ts", -1)
     )
     return docs
-
 
 @st.cache_data(ttl=15, show_spinner=False)
 def load_segment_counts(window_start_iso: str):
@@ -119,7 +110,6 @@ def load_segment_counts(window_start_iso: str):
     ]
     segs = list(db["raw_metrics"].aggregate(pipeline))
     return segs
-
 
 nodes = load_nodes()
 history_docs = load_history(window_start.isoformat())
@@ -145,14 +135,12 @@ if not marker_df.empty:
 
 node_ids = [n.get("node_id", "?") for n in nodes]
 
-
 # ------------------------------------------------------------------------------- latest-per-node
 def _latest_for(node_id):
     if hist_df.empty:
         return None
     rows = hist_df[hist_df["node_id"] == node_id]
     return rows.iloc[-1] if not rows.empty else None
-
 
 online_count = 0
 weakest_rssi = None
@@ -193,7 +181,6 @@ if not hist_df.empty:
     tmp["prev_uptime"] = tmp.groupby("node_id")["uptime_s"].shift()
     reboot_count = int((tmp["uptime_s"] < tmp["prev_uptime"]).sum())
 
-
 # ------------------------------------------------------------------------------- section 1: tiles
 st.subheader("Fleet summary")
 t1, t2, t3, t4, t5 = st.columns(5)
@@ -209,7 +196,6 @@ t4.metric("Muted now", muted_count)
 t5.metric(f"Markers ({window_label})", len(marker_docs))
 
 st.divider()
-
 
 # ------------------------------------------------------------------------------- section 2: per-node cards
 st.subheader("Per-node status")
@@ -246,7 +232,6 @@ if hist_df.empty:
     )
 
 st.divider()
-
 
 # ------------------------------------------------------------------------------- section 3: reliability timeline
 st.subheader("Reliability timeline")
@@ -316,7 +301,6 @@ else:
 
 st.divider()
 
-
 # ------------------------------------------------------------------------------- section 4: reboot & disconnect tables
 st.subheader("Reboots & connectivity gaps")
 rc1, rc2 = st.columns(2)
@@ -357,7 +341,6 @@ with rc2:
 
 st.divider()
 
-
 # ------------------------------------------------------------------------------- section 5: data delivery
 st.subheader("Data delivery (segments/hour, live mode)")
 st.caption(
@@ -376,7 +359,6 @@ else:
     st.plotly_chart(fig2, use_container_width=True)
 
 st.divider()
-
 
 # ------------------------------------------------------------------------------- section 6: markers list
 st.subheader("Event markers")

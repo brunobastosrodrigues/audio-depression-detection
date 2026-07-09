@@ -12,8 +12,6 @@ from utils.theme import COLORS, apply_custom_css
 from utils.database import get_database, render_mode_selector
 from utils.MetricExplainerAdapter import MetricExplainerAdapter, METRIC_CATEGORIES
 
-st.set_page_config(page_title="Settings", page_icon="⚙️", layout="wide")
-
 apply_custom_css()
 
 st.title("⚙️ Settings")
@@ -28,14 +26,12 @@ _mongo_client = MongoClient(os.getenv("MONGO_URI", "mongodb://mongodb:27017"))
 _base_db = _mongo_client["iotsensing"]
 settings_collection = _base_db["system_settings"]
 
-
 def get_config_mode():
     """Get config mode from database or default to environment variable."""
     doc = settings_collection.find_one({"setting": "config_mode"})
     if doc:
         return doc.get("value", "legacy")
     return os.getenv("CONFIG_MODE", "legacy").lower()
-
 
 def set_config_mode(mode: str):
     """Save config mode to database."""
@@ -44,7 +40,6 @@ def set_config_mode(mode: str):
         {"$set": {"value": mode}},
         upsert=True
     )
-
 
 # --- SIDEBAR ---
 render_mode_selector()
@@ -218,7 +213,6 @@ with tab_analysis:
 
             st.markdown("  •  ".join(metric_list))
 
-
 # ============================================================================
 # METRICS REFERENCE TAB
 # ============================================================================
@@ -299,7 +293,6 @@ with tab_metrics:
                         st.caption(f"{direction_icon} {meaning}")
 
             st.markdown("---")
-
 
 # ============================================================================
 # SYSTEM INFO TAB

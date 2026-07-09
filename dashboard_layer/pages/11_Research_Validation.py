@@ -31,8 +31,6 @@ from utils.validation import (
     PHQ8_TO_INDICATOR_MAPPING,
 )
 
-st.set_page_config(page_title="Research Validation", page_icon="🔬", layout="wide")
-
 # Mode Check
 if get_current_mode() != "dataset":
     st.info("This page is only available in Dataset mode.")
@@ -54,14 +52,12 @@ if not EVALUATION_DATA_DIR.exists():
 DEPRESSED_JSON = EVALUATION_DATA_DIR / "depressed.json"
 NONDEPRESSED_JSON = EVALUATION_DATA_DIR / "nondepressed.json"
 
-
 @st.cache_data
 def load_validation_data():
     """Load and cache the cohort data for validation."""
     if not DEPRESSED_JSON.exists() or not NONDEPRESSED_JSON.exists():
         return None, None
     return load_cohort_data(str(DEPRESSED_JSON), str(NONDEPRESSED_JSON))
-
 
 @st.cache_data
 def compute_system_accuracy():
@@ -141,7 +137,6 @@ def compute_system_accuracy():
         "best_auc": best_auc or 0,
         "agreement_score": direction_correct_count / total_tests * 100 if total_tests > 0 else 0,
     }
-
 
 # ============================================================================
 # RESEARCH QUESTION
@@ -288,7 +283,6 @@ else:
     st.info("Gender data not available in the current dataset.")
 
 st.divider()
-
 
 # ============================================================================
 # BEST DISCRIMINATING FEATURE
@@ -473,7 +467,6 @@ with tab_hypothesis:
             fig.add_vrect(x0=0.2, x1=0.5, fillcolor="#F9EBEA", opacity=0.3, layer="below", line_width=0)
             fig.add_vrect(x0=0.5, x1=0.8, fillcolor="#E8DAEF", opacity=0.3, layer="below", line_width=0)
             fig.add_vrect(x0=0.8, x1=2.0, fillcolor="#D6EAF8", opacity=0.3, layer="below", line_width=0)
-
 
             fig.update_layout(
                 title="Cohen's d Effect Size with 95% Confidence Intervals",
