@@ -334,7 +334,7 @@ void app_main(void)
     xTaskCreatePinnedToCore(
         telemetry_task,
         "telemetry",
-        2048,
+        TASK_STACK_TELEMETRY,
         NULL,
         3,
         NULL,

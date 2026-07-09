@@ -235,6 +235,10 @@ extern "C" {
 #define TASK_STACK_TCP_SENDER       8192
 #define TASK_STACK_DSP_CONTROL      4096
 #define TASK_STACK_WIFI             4096
+// ESP_LOGI (vprintf) + esp_wifi_sta_get_ap_info need well over 2048 bytes; the
+// telemetry task previously hardcoded 2048 and overflowed at first tick (boot crash-loop
+// found at first hardware bring-up, 2026-07-09).
+#define TASK_STACK_TELEMETRY        4096
 
 // Task core affinity
 #define TASK_CORE_AUDIO             1       // Core 1 for audio (real-time)
