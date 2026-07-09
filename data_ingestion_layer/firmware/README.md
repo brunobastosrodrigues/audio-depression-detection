@@ -2,6 +2,33 @@
 
 Unified ESP-IDF firmware for ReSpeaker audio capture boards supporting depression detection research.
 
+> ## ⚠️ READ THIS FIRST — two transports, one is default
+>
+> **The authoritative bring-up document is [`BUILD_AND_FLASH.md`](BUILD_AND_FLASH.md).**
+> This README predates the plug-and-play work and much of what follows describes the
+> **legacy TCP transport only**.
+>
+> The firmware has a Kconfig **Transport** choice (`menuconfig → IHearYou Firmware
+> Configuration → Transport`):
+>
+> | Transport | Default? | Wi-Fi config | Server address | Server counterpart |
+> |---|---|---|---|---|
+> | **`TRANSPORT_MQTT_OFFLOAD`** (plug-and-play) | **YES** | **None at build time** — runtime provisioning: NVS creds → `DEFAULT_SITE_SSID` → SoftAP captive portal | **None** — mDNS discovery of `_iotsensing-mqtt._tcp` (NVS / `SERVER_HOST` only as fallbacks) | MQTT broker + `node_registry_service` |
+> | `TRANSPORT_LEGACY_TCP` | no | `WIFI_SSID`/`WIFI_PASSWORD` baked via menuconfig | `SERVER_HOST:SERVER_PORT` baked (respeaker_service.py :8010) | `respeaker_service.py` |
+>
+> **The only build-time settings that matter for a first MQTT-offload flash:**
+> 1. `Plug-and-play Provisioning → Bootstrap MQTT username/password` — the defaults
+>    (`node-bootstrap` / empty) will be **rejected** by the authenticated broker; set the
+>    service-account creds from the VM's `.env` (see BUILD_AND_FLASH.md §5).
+> 2. *(Recommended)* `Network Configuration → Server IP Address` = `192.168.1.16` — the
+>    default is `192.168.1.100` (wrong host); it is only the last-resort fallback when
+>    mDNS yields nothing.
+> 3. *(Optional)* `BUTTON_GPIO` — see BUILD_AND_FLASH.md §1a.
+>
+> Everything else (Wi-Fi, broker discovery, capability negotiation, mode assignment) is
+> provisioned **at runtime**. The `WIFI_SSID`/`WIFI_PASSWORD` options below are dead
+> config in offload mode.
+
 ## Supported Boards
 
 | Board | DSP | Microphones | Features |
