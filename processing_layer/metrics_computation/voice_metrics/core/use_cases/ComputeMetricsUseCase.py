@@ -39,6 +39,13 @@ class ComputeMetricsUseCase:
             user_id = metadata["user_id"]
         else:
             user_id = self.user_profiling.recognize_user(audio_bytes)
+            if user_id is None:
+                # No enrolled speaker matched: DROP the segment by design (privacy: we
+                # only ever measure enrolled, consenting speakers). Routine in live mode
+                # -- TV, guests, distant speech -- so an info line, not an error.
+                print(f"Unrecognized speaker; dropping segment from board "
+                      f"{metadata.get('board_id')} ({len(audio_bytes)} bytes)")
+                return
 
         start = time.perf_counter()
         raw_metrics_list, quality_metrics_record = self.metrics_computation_service.compute(
