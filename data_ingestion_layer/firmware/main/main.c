@@ -38,6 +38,7 @@
 
 #if CONFIG_TRANSPORT_MQTT_OFFLOAD
 #include "app/offload_app.h"
+#include "transport/mqtt_sender.h"   // telemetry reports the sender's counters
 // Plug-and-play runtime state (provisioning, capabilities, live assignment).
 static app_ctx_t s_app_ctx;
 #endif
@@ -661,12 +662,28 @@ static void telemetry_task(void *param)
             s_telemetry.wifi_rssi = ap_info.rssi;
         }
 
+#if CONFIG_TRANSPORT_MQTT_OFFLOAD
+        // In offload mode the MQTT sender owns the send counters — report those.
+        // (audio_chunks_sent is the legacy TCP path's counter and stays 0 here,
+        // which made silently-failing nodes look healthy at first fleet bring-up.)
+        mqtt_sender_stats_t ss;
+        mqtt_sender_get_stats(&ss);
+        ESP_LOGI(TAG, "Telemetry: uptime=%lus, seg_pub=%u, seg_drop=%u, pub_fail=%u, overflows=%lu, heap=%lu, rssi=%d",
+                 s_telemetry.uptime_seconds,
+                 (unsigned)ss.segments_published,
+                 (unsigned)ss.segments_dropped,
+                 (unsigned)ss.publish_failures,
+                 s_telemetry.buffer_overflows,
+                 s_telemetry.free_heap,
+                 s_telemetry.wifi_rssi);
+#else
         ESP_LOGI(TAG, "Telemetry: uptime=%lus, chunks_sent=%lu, overflows=%lu, heap=%lu, rssi=%d",
                  s_telemetry.uptime_seconds,
                  s_telemetry.audio_chunks_sent,
                  s_telemetry.buffer_overflows,
                  s_telemetry.free_heap,
                  s_telemetry.wifi_rssi);
+#endif
     }
 
     vTaskDelete(NULL);

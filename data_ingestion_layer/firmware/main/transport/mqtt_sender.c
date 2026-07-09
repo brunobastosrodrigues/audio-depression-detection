@@ -107,8 +107,15 @@ static void publish_segment(app_ctx_t *ctx, uint8_t *buf, size_t pcm_len,
     // are idempotent per (timestamp, board_id).
     if (mqtt_client_publish(topic, json, strlen(json), 1, false)) {
         s_stats.segments_published++;
+        // One utterance per line: cheap, sparse (VAD-gated), and the room-placement
+        // debugging story lives or dies on this line being visible.
+        ESP_LOGI(TAG, "segment %u published (%u B pcm) -> %s",
+                 (unsigned)s_stats.segments_published, (unsigned)pcm_len, topic);
     } else {
         s_stats.publish_failures++;
+        ESP_LOGE(TAG, "segment publish FAILED (%u B pcm) -> %s (failures=%u dropped=%u)",
+                 (unsigned)pcm_len, topic,
+                 (unsigned)s_stats.publish_failures, (unsigned)s_stats.segments_dropped);
     }
     free(json);
 }
