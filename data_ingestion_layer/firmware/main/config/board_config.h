@@ -125,8 +125,11 @@ extern "C" {
 #define I2S_SLOT_MODE               I2S_SLOT_MODE_MONO
 #define I2S_SLOT_STRIDE             1   // hardware mono RX (left slot) — no deinterleave
 
-// No digital gain needed - XVF3800 has 60dB AGC
-#define DIGITAL_GAIN_SHIFT          0
+// 32->16 bit conversion shift. The XVF3800's raw 32-bit samples carry audio in
+// the top 16 bits like the Lite's (silence rms_hi16 ~600, speech 2k-6k measured
+// at bring-up); shift 0 saturated everything at the int16 cast and the VAD
+// calibrated its noise floor to ~16k (= rails), gating out all speech.
+#define DIGITAL_GAIN_SHIFT          16
 
 // I2C Configuration for XVF3800 Control
 #define XVF3800_I2C_PORT            I2C_NUM_0
