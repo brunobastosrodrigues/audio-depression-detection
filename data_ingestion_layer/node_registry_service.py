@@ -23,9 +23,12 @@ MQTT_PORT = int(os.environ.get("MQTT_PORT", 1883))
 
 CAPABILITIES_TOPIC = "nodes/+/capabilities"
 STATUS_TOPIC = "nodes/+/status"
+MARKER_TOPIC = "nodes/+/marker"
 
 # Mode-isolated DBs (mirrors the pipeline's routing map).
 DB_MAP = {"live": "iotsensing_live", "dataset": "iotsensing_dataset", "demo": "iotsensing_demo"}
+
+STATUS_HISTORY_TTL_SECONDS = 90 * 24 * 3600  # 90 days
 
 
 def node_id_from_topic(topic: str):
@@ -39,6 +42,18 @@ class NodeRegistryService:
         # Global (non mode-isolated) registry, like board/system settings.
         self.registry = NodeRegistry(self.mongo_client["iotsensing"]["nodes"])
 
+        # Fleet-health history: append-only, global, TTL-capped. Indexes are idempotent
+        # (create_index is a no-op if the index already matches) so it is safe to call on
+        # every boot rather than gating it behind a migration step.
+        self.status_history = self.mongo_client["iotsensing"]["node_status_history"]
+        self.status_history.create_index([("node_id", 1), ("ts", -1)])
+        self.status_history.create_index("ts", expireAfterSeconds=STATUS_HISTORY_TTL_SECONDS)
+
+        # Event markers (participant button double-press): precious ground-truth
+        # annotations for the study -- kept forever, no TTL.
+        self.markers = self.mongo_client["iotsensing"]["node_markers"]
+        self.markers.create_index([("node_id", 1), ("ts", -1)])
+
         self.mqtt_client = mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION2)
         apply_mqtt_auth(self.mqtt_client)
         self.mqtt_client.on_connect = self.on_connect
@@ -50,7 +65,8 @@ class NodeRegistryService:
         print(f"Connected to MQTT broker with result code {rc}")
         client.subscribe(CAPABILITIES_TOPIC)
         client.subscribe(STATUS_TOPIC)
-        print(f"Subscribed to {CAPABILITIES_TOPIC} and {STATUS_TOPIC}")
+        client.subscribe(MARKER_TOPIC)
+        print(f"Subscribed to {CAPABILITIES_TOPIC}, {STATUS_TOPIC}, {MARKER_TOPIC}")
 
     def handle_status(self, topic_id: str, data: dict):
         """Heartbeat: refresh last_seen/telemetry and mirror into the legacy `boards`
@@ -70,6 +86,23 @@ class NodeRegistryService:
             "mode": data.get("mode"),
         }
         self.registry.touch(topic_id, telemetry=telemetry, last_seen=now)
+
+        # History write is best-effort: a failure here must never break the existing
+        # touch/boards-bridge behavior above (which is depended on by the Boards page
+        # and the Edge Nodes online indicator).
+        try:
+            self.status_history.insert_one({
+                "node_id": topic_id,
+                "ts": now,
+                "online": online,
+                "rssi": data.get("rssi"),
+                "free_heap": data.get("free_heap"),
+                "uptime_s": data.get("uptime_s"),
+                "muted": data.get("muted"),
+                "mode": data.get("mode"),
+            })
+        except Exception as e:
+            print(f"Failed to write status history for '{topic_id}':", e)
 
         enrollment = self.mongo_client["iotsensing"]["node_enrollments"].find_one(
             {"node_id": topic_id}
@@ -103,6 +136,24 @@ class NodeRegistryService:
             upsert=True,
         )
 
+    def handle_marker(self, topic_id: str, data: dict):
+        """Event marker (participant button double-press): the participant flagging 'this
+        moment' for ground-truth annotation. Stored verbatim under `payload` (defensive --
+        the firmware's marker shape is out of scope for this service to validate) plus the
+        two fields we know are always present for querying without unpacking payload."""
+        now = datetime.now(timezone.utc)
+        try:
+            self.markers.insert_one({
+                "node_id": topic_id,
+                "ts": now,
+                "uptime_s": data.get("uptime_s"),
+                "muted": data.get("muted"),
+                "payload": data,
+            })
+            print(f"Marker recorded for '{topic_id}'")
+        except Exception as e:
+            print(f"Failed to write marker for '{topic_id}':", e)
+
     def on_message(self, client, userdata, msg):
         try:
             data = json.loads(msg.payload.decode())
@@ -116,6 +167,9 @@ class NodeRegistryService:
                 return
             if msg.topic.endswith("/status"):
                 self.handle_status(topic_id, data)
+                return
+            if msg.topic.endswith("/marker"):
+                self.handle_marker(topic_id, data)
                 return
             if data.get("node_id") and data["node_id"] != topic_id:
                 print(f"node_id mismatch: payload '{data['node_id']}' != topic '{topic_id}'; using topic")
