@@ -17,7 +17,8 @@ st.markdown(
     "`nodes/{id}/capabilities`; the node_registry_service replies on `nodes/{id}/config`."
 )
 
-ONLINE_WINDOW_S = 300  # a node is "online" if seen within the last 5 minutes
+ONLINE_WINDOW_S = 90  # 3x the 30s heartbeat interval + slack (was 300s/5min: with 30s
+                       # heartbeats that stale threshold made healthy nodes read "offline")
 
 
 @st.cache_data(ttl=10, show_spinner=False)
