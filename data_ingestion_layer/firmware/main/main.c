@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -391,10 +392,39 @@ static void i2s_capture_task(void *param)
             continue;
         }
 
-        // Process samples: convert 32-bit to 16-bit with soft limiting
-        for (size_t i = 0; i < samples_read; i++) {
+#if CONFIG_ENABLE_AUDIO_DEBUG
+        // Bring-up instrumentation: raw 32-bit sample stats every ~2 s.
+        // Splits wrong-DIN-pin (all zero) / wrong-shift (energy only in low
+        // 16 bits) / VAD-threshold (healthy hi-16 energy) in one look.
+        {
+            static uint32_t s_dbg_iter = 0;
+            if ((s_dbg_iter++ % 64) == 0) {   // 512 samples/read @16k => ~2 s
+                int32_t mn = raw_buffer[0], mx = raw_buffer[0];
+                uint64_t acc_hi = 0, acc_lo = 0;
+                for (size_t i = 0; i < samples_read; i += I2S_SLOT_STRIDE) {
+                    int32_t v = raw_buffer[i];
+                    if (v < mn) mn = v;
+                    if (v > mx) mx = v;
+                    int32_t hi = v >> 16;
+                    int32_t lo = (int16_t)(v & 0xFFFF);
+                    acc_hi += (uint64_t)(hi * hi);
+                    acc_lo += (uint64_t)(lo * lo);
+                }
+                size_t dbg_frames = samples_read / I2S_SLOT_STRIDE;
+                ESP_LOGI(TAG, "RAWDBG min=%ld max=%ld rms_hi16=%lu rms_lo16=%lu",
+                         (long)mn, (long)mx,
+                         (unsigned long)sqrtf((float)(acc_hi / dbg_frames)),
+                         (unsigned long)sqrtf((float)(acc_lo / dbg_frames)));
+            }
+        }
+#endif
+
+        // Process samples: convert 32-bit to 16-bit with soft limiting.
+        // Stereo boards (Lite): deinterleave — keep slot 0 (processed mic) only.
+        size_t frames = samples_read / I2S_SLOT_STRIDE;
+        for (size_t i = 0; i < frames; i++) {
             // Apply digital gain (board-specific)
-            int32_t sample = raw_buffer[i] >> DIGITAL_GAIN_SHIFT;
+            int32_t sample = raw_buffer[i * I2S_SLOT_STRIDE] >> DIGITAL_GAIN_SHIFT;
 
             // Apply soft-knee limiter (instead of hard clipping)
             float fsample = (float)sample;
@@ -408,7 +438,7 @@ static void i2s_capture_task(void *param)
         }
 
         // Write to ring buffer
-        ret = audio_buffer_write(processed_buffer, samples_read * sizeof(int16_t));
+        ret = audio_buffer_write(processed_buffer, frames * sizeof(int16_t));
         if (ret != ESP_OK) {
             s_telemetry.buffer_overflows++;
             ESP_LOGW(TAG, "Ring buffer overflow - dropping audio");

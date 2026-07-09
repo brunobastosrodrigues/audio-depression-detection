@@ -72,7 +72,7 @@ esp_err_t hal_audio_init(void)
     // Configure I2S standard mode
     i2s_std_config_t std_cfg = {
         .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(AUDIO_SAMPLE_RATE),
-        .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_BITS_PER_SAMPLE, I2S_SLOT_MODE),
+        .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_BITS_PER_SAMPLE, I2S_SLOT_MODE),
         .gpio_cfg = {
             .mclk = I2S_MCLK_PIN,
             .bclk = I2S_BCK_PIN,

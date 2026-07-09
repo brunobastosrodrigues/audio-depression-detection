@@ -73,9 +73,14 @@ extern "C" {
 #define I2S_MCLK_PIN                GPIO_NUM_NC     // Not used (slave mode)
 
 // I2S Configuration
+// XU316 I2S firmware transmits 16 kHz / 32-bit / STEREO Philips frames
+// (ref: respeaker/ReSpeaker_Lite xiao examples: AudioInfo(16000, 2, 32),
+// is_master=false). Reading the frame as mono/MSB slices samples across
+// slot boundaries and yields speech-invariant full-scale garbage.
 #define I2S_ROLE                    I2S_ROLE_SLAVE
 #define I2S_BITS_PER_SAMPLE         I2S_DATA_BIT_WIDTH_32BIT
-#define I2S_SLOT_MODE               I2S_SLOT_MODE_MONO
+#define I2S_SLOT_MODE               I2S_SLOT_MODE_STEREO
+#define I2S_SLOT_STRIDE             2   // take slot 0 (processed mic) of each stereo frame
 
 // Digital gain (bit shift for amplification from 32-bit to 16-bit)
 #define DIGITAL_GAIN_SHIFT          16
@@ -113,6 +118,7 @@ extern "C" {
 #define I2S_ROLE                    I2S_ROLE_SLAVE
 #define I2S_BITS_PER_SAMPLE         I2S_DATA_BIT_WIDTH_32BIT
 #define I2S_SLOT_MODE               I2S_SLOT_MODE_MONO
+#define I2S_SLOT_STRIDE             1   // unverified on real silicon (fabricated register map)
 
 // No digital gain needed - XVF3800 has 60dB AGC
 #define DIGITAL_GAIN_SHIFT          0
