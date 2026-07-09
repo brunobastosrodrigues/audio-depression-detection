@@ -61,10 +61,13 @@ class MongoPersistenceAdapter(PersistencePort):
                     latest = doc["timestamp"]
         return latest
 
-    def get_first_indicator_score_date(self, user_id: int) -> Optional[datetime]:
-        """Query all databases and return the earliest date."""
+    def get_first_indicator_score_date(self, user_id: int, system_mode: str = None) -> Optional[datetime]:
+        """Earliest indicator-score date. When system_mode is given, only that mode's DB is
+        read -- a cross-mode global extremum would let demo/dataset history distort the
+        live learning-period anchor (and vice versa)."""
         earliest = None
-        for db_name in ALL_DBS:
+        dbs = [DB_MAP[system_mode]] if system_mode in DB_MAP and system_mode else ALL_DBS
+        for db_name in dbs:
             db = self.client[db_name]
             cursor = (
                 db["indicator_scores"].find({"user_id": user_id_match(user_id)})
@@ -77,10 +80,11 @@ class MongoPersistenceAdapter(PersistencePort):
                     earliest = doc["timestamp"]
         return earliest
 
-    def get_latest_indicator_score_date(self, user_id: int) -> Optional[datetime]:
-        """Query all databases and return the latest date."""
+    def get_latest_indicator_score_date(self, user_id: int, system_mode: str = None) -> Optional[datetime]:
+        """Latest indicator-score date (mode-scoped when system_mode is given)."""
         latest = None
-        for db_name in ALL_DBS:
+        dbs = [DB_MAP[system_mode]] if system_mode in DB_MAP and system_mode else ALL_DBS
+        for db_name in dbs:
             db = self.client[db_name]
             cursor = (
                 db["indicator_scores"].find({"user_id": user_id_match(user_id)})
@@ -94,12 +98,15 @@ class MongoPersistenceAdapter(PersistencePort):
         return latest
 
     def get_latest_indicator_score(
-        self, user_id: int
+        self, user_id: int, system_mode: str = None
     ) -> Optional[dict]:
-        """Query all databases and return the latest indicator score."""
+        """Latest indicator score. When system_mode is given, only that mode's DB is read:
+        seeding the live EMA from a demo/dataset score (or vice versa) contaminates the
+        temporal state across isolation boundaries."""
         latest_doc = None
         latest_ts = None
-        for db_name in ALL_DBS:
+        dbs = [DB_MAP[system_mode]] if system_mode in DB_MAP and system_mode else ALL_DBS
+        for db_name in dbs:
             db = self.client[db_name]
             doc = db["indicator_scores"].find_one(
                 {"user_id": user_id_match(user_id)},

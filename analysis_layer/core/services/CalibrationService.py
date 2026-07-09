@@ -27,7 +27,7 @@ class CalibrationService:
         # Since we just updated the baseline, the *next* run will be better, but we are looking at *past* performance to adjust thresholds.
 
         # We need the most recent computed score.
-        latest_score_record = self.baseline_manager.get_indicator_scores(user_id)
+        latest_score_record = self.baseline_manager.get_indicator_scores(user_id, system_mode=system_mode)
 
         if not latest_score_record:
             print(f"No acoustic history for user {user_id}, skipping threshold calibration.")

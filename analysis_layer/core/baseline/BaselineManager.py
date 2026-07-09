@@ -167,6 +167,27 @@ class BaselineManager:
             )
         )
 
+    def _fetch_contextual_metric_records(self, user_id, system_mode=None):
+        """Fetch contextual (EMA-smoothed daily) values shaped like raw records.
+
+        The baseline MUST be computed on the same quantity that analyze_metrics
+        z-scores -- contextual_metrics.contextual_value. The old baseline was built
+        from per-utterance raw_metrics.metric_value: z = (contextual - mean_raw)/std_raw
+        mixed two different quantities (smoothed daily vs raw utterance), understating/
+        inflating z depending on the metric's within-day variance."""
+        docs = self._db(system_mode)["contextual_metrics"].find(
+            {"user_id": user_id_match(user_id)},
+            {"_id": 0, "metric_name": 1, "contextual_value": 1, "timestamp": 1},
+        )
+        return [
+            {
+                "metric_name": d["metric_name"],
+                "metric_value": d.get("contextual_value"),
+                "timestamp": d.get("timestamp"),
+            }
+            for d in docs
+        ]
+
     def compute_and_store_baseline(self, user_id, system_mode=None, min_samples=10, records=None):
         """Derive a per-user baseline from the user's ingested raw metrics and store it.
 
@@ -177,7 +198,7 @@ class BaselineManager:
         data for any metric yet.
         """
         if records is None:
-            records = self._fetch_raw_metric_records(user_id, system_mode)
+            records = self._fetch_contextual_metric_records(user_id, system_mode)
         if not records:
             return None
 
@@ -236,7 +257,7 @@ class BaselineManager:
         if existing:
             return None
 
-        records = self._fetch_raw_metric_records(user_id, system_mode)
+        records = self._fetch_contextual_metric_records(user_id, system_mode)
         if not records or not self._past_learning_period(records, learning_period_days):
             return None
 
@@ -284,7 +305,10 @@ class BaselineManager:
             if predicted_score is None:
                 continue
 
-            error = actual_score - predicted_score
+            # PHQ items are 0-3; predicted S_bar lives on the ~[0,1] score scale.
+            # Normalize the PHQ item to the same scale before differencing -- the raw
+            # difference was dominated by the PHQ magnitude (dimensionally invalid).
+            error = (actual_score / 3.0) - predicted_score
 
             # Check if indicator exists in config
             if indicator not in user_config:
@@ -301,12 +325,19 @@ class BaselineManager:
                 mean = baseline["mean"]
                 std = baseline["std"]
 
+                # Sign: to RAISE the predicted score for the same raw values,
+                #   positive-direction metric (w=+z): z must rise  -> mean must DROP
+                #   negative-direction metric (w=-z): z must fall  -> mean must RISE
+                # The previous factors were inverted, so every PHQ-9 submission pushed
+                # future predictions AWAY from the reported symptoms (divergent feedback).
                 if direction == "positive":
-                    direction_factor = 1
-                elif direction == "negative":
                     direction_factor = -1
-                else:
+                elif direction == "negative":
                     direction_factor = 1
+                else:
+                    # "both"/"anomaly" contributes |z|-c: shifting the mean cannot
+                    # monotonically move it -- skip rather than adjust blindly.
+                    continue
 
                 learning_rate = 0.2
 
@@ -334,8 +365,11 @@ class BaselineManager:
                 "std": data["std"],
             }
 
-        complete_baseline = old_baseline.copy()
-        complete_baseline.update(updated_baselines)
+        # Only the metrics actually adjusted belong to the user's partition.
+        # old_baseline is population-MERGED (get_user_baseline backfills every missing
+        # metric from the population); writing it verbatim stamped ~45 population entries
+        # into the personal partition after a single PHQ-9 submission, masking the sparse
+        # computed_from_data baseline while claiming to be personalized.
 
         # Determine context key for this timestamp
         context_key = self._get_context_key(timestamp)
@@ -366,10 +400,12 @@ class BaselineManager:
                 }
             }
 
-        # Update the target context partition
+        # Update the target context partition: existing personal metrics + adjustments only
         if context_key not in partitions:
             partitions[context_key] = {"metrics": {}}
-        partitions[context_key]["metrics"] = complete_baseline
+        context_metrics = dict(partitions[context_key].get("metrics", {}))
+        context_metrics.update(updated_baselines)
+        partitions[context_key]["metrics"] = context_metrics
 
         # Also update general partition with the merged data
         general_metrics = partitions.get("general", {}).get("metrics", {}).copy()
