@@ -1,0 +1,187 @@
+# Build & Flash Guide — IHearYou Node Firmware (ESP32-S3)
+
+Target readers: a developer (or Claude instance) with physical access to the boards.
+Covers: toolchain setup → configure → build → flash → first boot → server-side
+prerequisites → verification → troubleshooting.
+
+**State of this code:** source-complete but **never compiled** (written without ESP-IDF
+available). Expect a handful of first-build errors (missing includes, API-version
+mismatches). Fix them directly — the architecture is settled; do not restructure.
+
+---
+
+## 1. Hardware
+
+| Variant | Board | Notes |
+|---|---|---|
+| `BOARD_RESPEAKER_LITE` | ReSpeaker Lite (XMOS XU316 + ESP32-S3), 2-mic | **Start here.** No XVF3800 dependency. |
+| `BOARD_RESPEAKER_XVF3800` | ReSpeaker XVF3800 (ESP32-S3), 4-mic | XVF3800 I2C driver uses a **fabricated register map** — needs real-silicon protocol work before this variant is meaningful. |
+
+All units have an attached speaker (I2S TX is initialized in `hal/hal_audio.c` but
+playback is not implemented yet).
+
+### 1a. Buttons — identify the user-button GPIO at bring-up
+
+Physical buttons on the actual units:
+- **ReSpeaker Lite:** `Usr` (user button) and `Mute`. The `Mute` button is a
+  **hardware mic mute at the XU316 codec** (own red LED) — it works with zero firmware
+  involvement and is invisible to the ESP32 unless queried over I2C. Treat it as the
+  participant's hard-privacy control; the firmware's software mute (below) is the
+  *observable* one (dashboard sees it).
+- **ReSpeaker XVF3800:** `BUT_A` (user button) and `RST` (reset).
+
+The firmware's gesture handler (short = privacy mute toggle / attest, double = event
+marker, long ≥5 s = factory reset) listens on **`CONFIG_BUTTON_GPIO`**
+(menuconfig → Plug-and-play Provisioning). Default is 0 (the ESP32-S3 module BOOT
+button — always present but may be unreachable inside the case).
+
+**Do NOT guess the Usr/BUT_A GPIO — measure it** (1 minute, board flashed with any
+firmware that boots):
+```c
+// drop into app_main temporarily, or use the monitor + a scratch build:
+for (int g of interest in {1,2,3,4,5,6,7,21,38,39,40,41,42,47,48}) ... // or simpler:
+```
+Simplest: `idf.py monitor`, then in a scratch loop log all input levels once per
+second (`gpio_get_level`) across candidate pins while pressing the button — the pin
+that toggles is your GPIO. Check the Seeed schematic first (search
+"reSpeaker Lite SCH" / "reSpeaker XVF3800 SCH"); if the schematic shows `Usr`/`BUT_A`
+wired to the XU316/XVF3800 instead of the ESP32-S3, the button is only reachable over
+I2C — fall back to `BUTTON_GPIO=0` (BOOT) or wire the gesture to the DSP-side GPIO
+via the driver (XVF3800 GPIO reads are part of its I2C protocol).
+Then set `CONFIG_BUTTON_GPIO` accordingly and rebuild.
+
+Connect the board via USB-C. It enumerates as `/dev/ttyACM0` (or `/dev/ttyUSB0`).
+If flashing fails to start: hold BOOT, tap RST, release BOOT (manual download mode).
+
+## 2. Toolchain (ESP-IDF v5.1+)
+
+```bash
+sudo apt install -y git wget flex bison gperf python3 python3-pip python3-venv \
+    cmake ninja-build ccache libffi-dev libssl-dev dfu-util libusb-1.0-0
+mkdir -p ~/esp && cd ~/esp
+git clone -b v5.2.2 --recursive --depth 1 --shallow-submodules \
+    https://github.com/espressif/esp-idf.git
+cd esp-idf && ./install.sh esp32s3
+. ./export.sh          # run in every new shell (or add an alias)
+```
+
+The `mdns` dependency is a **managed component** declared in
+`main/idf_component.yml`; the IDF component manager fetches it automatically during
+the first build (needs internet).
+
+## 3. Configure
+
+```bash
+cd <repo>/data_ingestion_layer/firmware
+idf.py set-target esp32s3
+# Board-variant defaults (pick one):
+cp sdkconfig.defaults sdkconfig.defaults.bak   # only if you need to inspect
+idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.lite" reconfigure
+idf.py menuconfig
+```
+
+In `menuconfig → IHearYou Firmware Configuration`:
+
+| Setting | Value for the home (bbr) deployment |
+|---|---|
+| Target Board | ReSpeaker Lite |
+| **Transport** | **Plug-and-play MQTT offload** (default) |
+| Plug-and-play Provisioning → Default site SSID | leave `IHearYou-Net` (not present at home → portal is used) — or set it to the home SSID to skip the portal entirely |
+| Default site password | (matching) |
+| **Bootstrap MQTT username/password** | see §5 — for first bring-up use the service account from the VM's `.env` (`MQTT_USER` / `MQTT_PASS`) |
+| Network Configuration → Server IP Address | `192.168.1.16` (VM; used only as last-resort fallback when mDNS fails) |
+
+PSRAM: the ESP32-S3 module needs `CONFIG_SPIRAM=y` + `CONFIG_SPIRAM_USE_MALLOC=y`
+(should come from `sdkconfig.defaults`; verify — `transport/mqtt_sender.c` and the
+MQTT out-buffer allocate from PSRAM).
+
+## 4. Build, flash, monitor
+
+```bash
+idf.py build                       # first build: fix errors as they surface, they are expected
+idf.py -p /dev/ttyACM0 flash monitor   # Ctrl+] to exit monitor
+```
+
+Likely first-build friction points (fix, don't redesign):
+- `mqtt_client.h` name collision: `net/mqtt_client.h` (ours) vs esp-mqtt's header —
+  `net/mqtt_client.c` includes esp-mqtt via `#include "mqtt_client.h"`; if the include
+  resolves to our own header, use `#include <mqtt_client.h>` or reorder include dirs.
+- esp-mqtt config struct field names differ slightly across IDF minor versions
+  (`broker.address.uri`, `credentials.authentication.password` are v5.x names).
+- mDNS API: `esp_ipaddr_ntoa` / result-struct field names per the managed component version.
+- `esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP)` needs `esp_mac.h` (included).
+- Provisioning portal: `esp_netif_create_default_wifi_ap()` must be called once —
+  if `wifi_manager` already created the STA netif, AP creation is additive (APSTA);
+  set `WIFI_MODE_APSTA` if plain `WIFI_MODE_AP` conflicts.
+- `-Werror` is on: unused-variable warnings in `#if`-gated paths are build errors.
+
+## 5. Server-side prerequisites (on the VM, 192.168.1.16)
+
+The stack lives in `~/audio-depression-detection` (docker compose). The node needs:
+
+1. **Broker reachable from the LAN.** `docker-compose.yml` currently binds MQTT to
+   `127.0.0.1:1883` (hardening PR #81). For node bring-up change the mosquitto port
+   mapping to `1883:1883` (LAN-exposed, auth still required) and `docker compose up -d mqtt`.
+2. **Credentials for the node.** Two options:
+   - *Quick bring-up:* use the service account (`MQTT_USER`/`MQTT_PASS` from `.env`)
+     as the firmware's Bootstrap MQTT user — it has `readwrite #` ACL, so
+     capabilities/status/voice all work immediately.
+   - *Proper (per-node ACL, do after first success):* `scripts/enroll_node.sh
+     respeaker-<mac12> <user_id> live` mints a per-node account restricted to its own
+     topics; put those creds in the firmware Bootstrap fields (or wait for the
+     `nodes/{id}/provision` push flow, which is designed but not yet implemented
+     server-side).
+3. **node_registry_service running** (compose service) — it answers the capability
+   advert with the retained `nodes/{id}/config` assignment. Without it the node stays
+   in "waiting for dashboard approval" (it still connects and publishes status).
+4. **mDNS advertisement** (`deploy/mdns/`, PR #86) so the node discovers the broker:
+   needs avahi on the VM host advertising `_iotsensing-mqtt._tcp` port 1883.
+   Fallback if you skip this: the firmware uses its stored/Kconfig `SERVER_HOST`.
+5. **Speaker/voice enrollment for live mode:** the scene gatekeeper fail-closes without
+   a voice profile — enroll the target speaker via the dashboard (Live mode) before
+   expecting `raw_metrics` to appear.
+
+## 6. First boot — what you should see
+
+```
+IHEARYOU: Starting IHearYou firmware...
+offload_app: unprovisioned; trying default site SSID 'IHearYou-Net'
+prov: portal AP up: IHearYou-Setup-XXXX          # if no default network
+```
+1. Join `IHearYou-Setup-XXXX` from a phone → captive portal opens → enter Wi-Fi +
+   room name → node reboots and joins.
+2. `discovery: mDNS sink 192.168.1.16:1883` (or the fallback warning).
+3. `mqtt: connected` → capabilities published (retained) → assignment received:
+   `offload_app: assignment: mode=1 vad_gated=1`.
+4. Speak near the node → `mqtt_sender` publishes AudioPayload JSON to
+   `voice/{user}/{node_id}/{room}` → server `ComputeMetricsHandler` ingests it.
+
+Verify end-to-end on the VM:
+```bash
+mosquitto_sub -h localhost -u "$MQTT_USER" -P "$MQTT_PASS" -t 'nodes/#' -v   # status/capabilities
+mosquitto_sub -h localhost -u "$MQTT_USER" -P "$MQTT_PASS" -t 'voice/#' -v | head -c 400
+# then check Mongo raw_metrics for new records (metrics_computation logs too)
+```
+
+Button checks: short press → status shows `"muted":true` (and voice/# goes quiet);
+double press → one message on `nodes/{id}/marker`; hold 5 s → reboots into the portal.
+
+## 7. Troubleshooting
+
+| Symptom | Check |
+|---|---|
+| No `IHearYou-Setup` AP | Board booted? Monitor output? GPIO0 held low accidentally (case button pressing BOOT)? |
+| Portal loads but save does nothing | Phone kept mobile data on (captive portal detection) — disable data, retry |
+| `no broker found` | mDNS advert not running → set Server IP in menuconfig as fallback; broker port bound to 127.0.0.1 (see §5.1) |
+| `broker refused connection` | Wrong bootstrap creds / ACL — test the same creds with `mosquitto_sub` from another host |
+| Connects, no assignment | `node_registry_service` not running, or its account lacks `nodes/#` read ACL |
+| Voice published, no metrics | Scene gatekeeper fail-closed (no speaker enrollment, §5.5) or `voice_metrics` service down |
+| Random reboots under load | PSRAM not enabled → the 384 KB MQTT out-buffer landed in internal RAM |
+
+## 8. Deliberately out of scope (for now)
+
+- Speaker playback (`hal_audio_play`, `nodes/{id}/play`) — HIL replay rig, next phase.
+- XVF3800 board variant — real register protocol needed.
+- `nodes/{id}/provision` per-node credential push — server side not implemented.
+- Dashboard "Pending → Approve" flow — registry currently auto-assigns any
+  advertising node; the button attest messages are published but not yet consumed.

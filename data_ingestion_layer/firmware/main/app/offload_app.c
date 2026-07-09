@@ -43,6 +43,10 @@ static const char *TAG = "offload_app";
 #define CONFIG_BOOTSTRAP_MQTT_PASS ""
 #endif
 
+#ifndef CONFIG_BUTTON_GPIO
+#define CONFIG_BUTTON_GPIO 0
+#endif
+
 #define WIFI_TRY_DEFAULT_TIMEOUT_MS 15000
 #define STATUS_DEFAULT_INTERVAL_MS  30000
 
@@ -294,6 +298,6 @@ void offload_app_start(app_ctx_t *ctx) {
     ctx->latest_doa = INT16_MIN;
     ctx->muted = false;
     offload_app_build_capabilities(ctx);
-    button_start(-1, on_button, ctx);   // GPIO0/BOOT: mute / marker / factory-reset
+    button_start(CONFIG_BUTTON_GPIO, on_button, ctx);   // Usr/BUT_A (Kconfig): mute / marker / factory-reset
     xTaskCreatePinnedToCore(app_task, "offload_app", 6144, ctx, 9, NULL, 0);
 }

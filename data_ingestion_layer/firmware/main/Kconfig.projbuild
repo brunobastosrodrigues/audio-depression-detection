@@ -76,6 +76,18 @@ menu "IHearYou Firmware Configuration"
             bool "Advertise on-node spectral flatness"
             default y
 
+        config BUTTON_GPIO
+            int "User-button GPIO (Usr / BUT_A)"
+            default 0
+            range 0 48
+            help
+                ESP32-S3 GPIO of the board user button: "Usr" on the ReSpeaker Lite,
+                "BUT_A" on the ReSpeaker XVF3800. Default 0 = the module BOOT button
+                (always works, but may be inaccessible inside a case). VERIFY the real
+                GPIO at bring-up (see BUILD_AND_FLASH.md §1a) -- do not trust guesses.
+                Note: the Lite's "Mute" button is a hardware mic mute at the XU316
+                codec (own LED), independent of this firmware.
+
     endmenu
 
     menu "Network Configuration"
