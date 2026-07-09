@@ -38,16 +38,14 @@ def test_all_negative_voice_is_not_treated_as_silence():
     assert d["hnr_mean"] == -2.0
 
 
-def test_all_unvoiced_returns_zero_dict():
+def test_all_unvoiced_returns_nan_dict():
+    # Unmeasurable (no voiced frames) must be NaN ("not measured"), NOT 0.0: a fake zero
+    # would be persisted as a real measurement and encode silence density into HNR stats.
+    import math
     lld = _lld([0.0, 0.0, 0.0])
     d = get_hnr_dynamic(lld)
-    assert d == {
-        "hnr_mean": 0.0,
-        "hnr_std": 0.0,
-        "hnr_cv": 0.0,
-        "hnr_iqr": 0.0,
-        "hnr_entropy": 0.0,
-    }
+    assert set(d) == {"hnr_mean", "hnr_std", "hnr_cv", "hnr_iqr", "hnr_entropy"}
+    assert all(math.isnan(v) for v in d.values())
 
 
 def test_positive_only_unchanged():
