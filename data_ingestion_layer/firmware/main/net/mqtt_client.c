@@ -1,11 +1,11 @@
 // mqtt_client.c — thin esp-mqtt wrapper (auth, LWT, auto-reconnect, pub/sub).
 // SDK: components/mqtt ("mqtt" in REQUIRES). The broker requires credentials (PR #81);
 // per-node accounts are ACL-restricted to their own topics (PR #88).
-#include "net/mqtt_client.h"
+#include "net/mqtt_wrapper.h"
 #include <string.h>
 #include <stdio.h>
 #include "esp_log.h"
-#include "mqtt_client.h"  // esp-mqtt (same basename; resolved via component include path)
+#include "mqtt_client.h"  // esp-mqtt: local header renamed to mqtt_wrapper.h so this basename is unambiguous
 
 static const char *TAG = "mqtt";
 static esp_mqtt_client_handle_t s_client;

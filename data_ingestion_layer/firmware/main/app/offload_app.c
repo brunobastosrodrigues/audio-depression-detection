@@ -11,7 +11,7 @@
 #include "app/offload_app.h"
 #include "net/discovery.h"
 #include "system/button.h"
-#include "net/mqtt_client.h"
+#include "net/mqtt_wrapper.h"
 #include "transport/mqtt_sender.h"
 #include "wifi_manager.h"        // existing STA manager
 #include "board_config.h"

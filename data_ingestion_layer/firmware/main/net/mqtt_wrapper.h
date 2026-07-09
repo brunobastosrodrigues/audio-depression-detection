@@ -1,4 +1,6 @@
-// mqtt_client.h — thin esp-mqtt wrapper for the offload protocol (auth, reconnect, pub/sub).
+// mqtt_wrapper.h — thin esp-mqtt wrapper for the offload protocol (auth, reconnect, pub/sub).
+// (Renamed from mqtt_client.h: the basename collided with esp-mqtt's own header, which a
+// quoted include from net/ can never reach — the sibling always resolves first.)
 //
 // Add `mqtt` to main/CMakeLists.txt REQUIRES. Broker comes from discovery; creds from
 // provisioning (PR #81 made the broker require auth).

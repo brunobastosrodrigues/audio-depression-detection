@@ -1,6 +1,6 @@
 // mqtt_sender.c — speech-segment publisher for the plug-and-play offload path.
 #include "transport/mqtt_sender.h"
-#include "net/mqtt_client.h"
+#include "net/mqtt_wrapper.h"
 #include "audio/audio_buffer.h"
 #include "audio/audio_quality.h"
 #include "features/edge_features.h"
