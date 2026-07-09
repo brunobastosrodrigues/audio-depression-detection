@@ -4,9 +4,12 @@ Target readers: a developer (or Claude instance) with physical access to the boa
 Covers: toolchain setup → configure → build → flash → first boot → server-side
 prerequisites → verification → troubleshooting.
 
-**State of this code:** source-complete but **never compiled** (written without ESP-IDF
-available). Expect a handful of first-build errors (missing includes, API-version
-mismatches). Fix them directly — the architecture is settled; do not restructure.
+**State of this code:** compiled, flashed and **verified end-to-end on a ReSpeaker
+Lite** at first hardware bring-up (2026-07-09, ESP-IDF v5.5.2, Windows bench): zero-touch
+Wi-Fi join → mDNS broker discovery → authenticated MQTT → capability negotiation →
+VAD-gated speech segments (complete WAV files) arriving on `voice/#`. The first-build
+errors this banner used to predict were found and fixed — see the §4 friction list for
+what they actually were. The XVF3800 variant remains unverified on real silicon.
 
 ---
 
@@ -134,14 +137,35 @@ idf.py build                       # first build: fix errors as they surface, th
 idf.py -p /dev/ttyACM0 flash monitor   # Ctrl+] to exit monitor
 ```
 
-Likely first-build friction points (fix, don't redesign):
-- `mqtt_client.h` name collision: `net/mqtt_client.h` (ours) vs esp-mqtt's header —
-  `net/mqtt_client.c` includes esp-mqtt via `#include "mqtt_client.h"`; if the include
-  resolves to our own header, use `#include <mqtt_client.h>` or reorder include dirs.
+First-build friction — found and **fixed** at first hardware bring-up (2026-07-09,
+IDF v5.5.2). Already in the tree; listed so future IDF bumps know what to re-check:
+- `mqtt_client.h` name collision — resolved by **renaming ours to `net/mqtt_wrapper.h`**.
+  The old advice (angle-include or reorder dirs) does not work: a quoted
+  `#include "mqtt_client.h"` inside `net/` always resolves to the sibling header
+  (quoted includes search the includer's directory first), and `main/net` is on the
+  `-I` path ahead of esp-mqtt anyway. Diverging the basenames is the only robust fix.
+- Missing includes (hard errors on 5.5): `<stdbool.h>` in `hal/hal_audio.h`;
+  `freertos/FreeRTOS.h` + `freertos/task.h` in `hal/hal_audio.c`;
+  `freertos/FreeRTOS.h` in `audio/audio_buffer.h`.
+- `-Werror=format-truncation`: the LWT JSON is 69 bytes worst-case vs
+  `lwt_payload[64]` — widened to 96 in `net/mqtt_wrapper.h`.
+- Telemetry task stack: hardcoded 2048 overflowed at the first telemetry tick
+  (boot crash-loop) → `TASK_STACK_TELEMETRY` 4096 (commit 764ff23).
+- Partition table refit to the real 8 MB flash; OTA-ready layout (commit 2f5bbe9).
+- **I2S framing — the audio-plane bug:** the XU316 I2S firmware transmits
+  16 kHz / 32-bit / **stereo Philips** frames (confirmed against
+  respeaker/ReSpeaker_Lite's official examples). Reading them as mono/MSB slices
+  samples across slot boundaries → speech-invariant full-scale noise while clocks
+  and pins (BCK 8 / WS 7 / DIN 44) are all fine. Slave config must be Philips +
+  stereo, keeping slot 0 (the processed mic) — see `I2S_SLOT_STRIDE` in
+  `config/board_config.h` and the deinterleave in `main.c`. Diagnosed with the
+  `CONFIG_ENABLE_AUDIO_DEBUG`-gated raw-sample stats in the capture loop — flip
+  that on for any future board/DSP bring-up before theorizing.
+
+Still-relevant version-drift watch items (unchanged):
 - esp-mqtt config struct field names differ slightly across IDF minor versions
   (`broker.address.uri`, `credentials.authentication.password` are v5.x names).
 - mDNS API: `esp_ipaddr_ntoa` / result-struct field names per the managed component version.
-- `esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP)` needs `esp_mac.h` (included).
 - Provisioning portal: `esp_netif_create_default_wifi_ap()` must be called once —
   if `wifi_manager` already created the STA netif, AP creation is additive (APSTA);
   set `WIFI_MODE_APSTA` if plain `WIFI_MODE_AP` conflicts.
