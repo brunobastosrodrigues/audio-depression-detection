@@ -177,6 +177,10 @@ class MongoPersistenceAdapter(PersistencePort):
                     "metric_name": doc["metric_name"],
                     "aggregated_value": doc["aggregated_value"],
                     "system_mode": doc.get("system_mode", system_mode),
+                    # Evidence-quality fields; None on legacy records written before
+                    # sample bookkeeping existed.
+                    "sample_count": doc.get("sample_count"),
+                    "sample_std": doc.get("sample_std"),
                 })
         return all_records
 
