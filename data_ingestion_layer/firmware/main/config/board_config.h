@@ -107,18 +107,23 @@ extern "C" {
 
 #if BOARD_TYPE_XVF3800
 
-// I2S Pins (ESP32 is I2S slave, XVF3800 is master)
+// I2S Pins (ESP32 is I2S MASTER with stock XVF3800 firmware; pins per Seeed docs)
 #define I2S_BCK_PIN                 GPIO_NUM_8
 #define I2S_WS_PIN                  GPIO_NUM_7
 #define I2S_DIN_PIN                 GPIO_NUM_43     // RX from XVF3800
 #define I2S_DOUT_PIN                GPIO_NUM_44     // TX for reference audio (AEC)
-#define I2S_MCLK_PIN                GPIO_NUM_NC     // XVF3800 generates MCLK
+#define I2S_MCLK_PIN                GPIO_NUM_NC     // not required (XVF3800 syncs from BCLK)
 
 // I2S Configuration
-#define I2S_ROLE                    I2S_ROLE_SLAVE
+// Stock XVF3800 I2S firmware expects the HOST as I2S master — the ESP32 drives
+// BCLK/WS, no MCLK needed (ref: Seeed-Projects/Xiaozhi_Esp32S3_reSpeaker
+// no_audio_codec.cc: I2S_ROLE_MASTER, mclk=I2S_GPIO_UNUSED, 16 kHz, 32-bit,
+// mono LEFT slot, bit_shift=true). With both sides configured slave, no one
+// clocks the bus and every read times out — found at XVF3800 bring-up.
+#define I2S_ROLE                    I2S_ROLE_MASTER
 #define I2S_BITS_PER_SAMPLE         I2S_DATA_BIT_WIDTH_32BIT
 #define I2S_SLOT_MODE               I2S_SLOT_MODE_MONO
-#define I2S_SLOT_STRIDE             1   // unverified on real silicon (fabricated register map)
+#define I2S_SLOT_STRIDE             1   // hardware mono RX (left slot) — no deinterleave
 
 // No digital gain needed - XVF3800 has 60dB AGC
 #define DIGITAL_GAIN_SHIFT          0
