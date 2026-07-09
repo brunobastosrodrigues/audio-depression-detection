@@ -10,11 +10,20 @@ Data sources:
 This page is the deployment babysitter for the in-home study AND the reliability dataset for
 the paper's evaluation section.
 """
+import math
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timezone, timedelta
+
+
+def _nan_to_none(v):
+    """pandas yields NaN for missing numeric cells; NaN crashes int()/formatting and
+    displays as 'nan'. Normalize to None so downstream shows '—'."""
+    if v is None or (isinstance(v, float) and math.isnan(v)):
+        return None
+    return v
 
 from utils.database import get_client, get_database
 from utils.theme import COLORS
@@ -44,7 +53,7 @@ def _to_naive_utc(dt):
     return dt
 
 def _humanize_seconds(seconds):
-    if seconds is None:
+    if seconds is None or (isinstance(seconds, float) and math.isnan(seconds)):
         return "—"
     seconds = int(seconds)
     d, rem = divmod(seconds, 86400)
@@ -155,7 +164,7 @@ for n in nodes:
     is_online = age is not None and age <= ONLINE_WINDOW_S
     online_count += int(is_online)
 
-    rssi = latest["rssi"] if latest is not None else None
+    rssi = _nan_to_none(latest["rssi"]) if latest is not None else None
     if rssi is not None and (weakest_rssi is None or rssi < weakest_rssi):
         weakest_rssi = rssi
         weakest_node = nid
@@ -169,8 +178,8 @@ for n in nodes:
         "is_online": is_online,
         "muted": muted,
         "rssi": rssi,
-        "free_heap": latest["free_heap"] if latest is not None else None,
-        "uptime_s": latest["uptime_s"] if latest is not None else None,
+        "free_heap": _nan_to_none(latest["free_heap"]) if latest is not None else None,
+        "uptime_s": _nan_to_none(latest["uptime_s"]) if latest is not None else None,
         "age_s": age,
     })
 
