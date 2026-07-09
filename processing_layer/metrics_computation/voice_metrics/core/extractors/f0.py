@@ -96,26 +96,29 @@ def get_f0_dynamic(features_LLD, audio_signal, sr, librosa_f0=None) -> dict:
     """
     f0_opensmile_hz, f0_librosa = _extract_f0_contour(features_LLD, audio_signal, sr, librosa_f0)
 
-    # Combine both sources for more robust estimates
-    all_f0 = []
-    if len(f0_opensmile_hz) > 0:
-        all_f0.extend(f0_opensmile_hz.tolist())
+    # Use a SINGLE tracker per utterance -- never pool. Pooling OpenSMILE- and pyin-derived
+    # Hz into one array injected the systematic between-tracker offset into every dispersion
+    # statistic (f0_std/range/cv/entropy: the core monotonicity markers) and made f0_avg a
+    # frame-count-weighted blend. Prefer the shared pyin contour (it also drives voicing);
+    # fall back to the OpenSMILE contour only when pyin found no voiced frames.
     if len(f0_librosa) > 0:
-        all_f0.extend(f0_librosa.tolist())
-
-    all_f0 = np.array(all_f0)
+        all_f0 = np.asarray(f0_librosa, dtype=float)
+    else:
+        all_f0 = np.asarray(f0_opensmile_hz, dtype=float)
 
     if len(all_f0) == 0:
+        # NaN = "not measurable" (no voiced frames); omitted by the service, not zeroed.
+        nan = float("nan")
         return {
-            "f0_avg": 0.0,
-            "f0_std": 0.0,
-            "f0_range": 0.0,
-            "f0_cv": 0.0,
-            "f0_iqr": 0.0,
-            "f0_entropy": 0.0,
+            "f0_avg": nan,
+            "f0_std": nan,
+            "f0_range": nan,
+            "f0_cv": nan,
+            "f0_iqr": nan,
+            "f0_entropy": nan,
         }
 
-    # Compute legacy metrics (averaged between sources for consistency)
+    # Legacy metrics, computed on the single selected contour
     f0_mean = float(np.mean(all_f0))
     f0_std = float(np.std(all_f0))
     f0_range = float(np.max(all_f0) - np.min(all_f0))

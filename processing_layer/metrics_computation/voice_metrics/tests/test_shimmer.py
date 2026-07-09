@@ -19,5 +19,7 @@ def test_shimmer_reads_real_column_and_averages_voiced():
     assert get_shimmer(lld) == 2.0
 
 
-def test_shimmer_all_unvoiced_is_zero():
-    assert get_shimmer(_lld([0.0, 0.0])) == 0.0
+def test_shimmer_all_unvoiced_is_nan():
+    # Unmeasurable -> NaN ("not measured"), not a fake 0.0 measurement.
+    import math
+    assert math.isnan(get_shimmer(_lld([0.0, 0.0])))
