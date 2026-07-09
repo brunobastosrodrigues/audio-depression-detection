@@ -9,7 +9,10 @@ Lite** at first hardware bring-up (2026-07-09, ESP-IDF v5.5.2, Windows bench): z
 Wi-Fi join → mDNS broker discovery → authenticated MQTT → capability negotiation →
 VAD-gated speech segments (complete WAV files) arriving on `voice/#`. The first-build
 errors this banner used to predict were found and fixed — see the §4 friction list for
-what they actually were. The XVF3800 variant remains unverified on real silicon.
+what they actually were. The XVF3800 variant's **audio plane is also verified on real
+silicon** (same date: control plane + I2S capture + segments on `voice/#`); only its
+I2C DSP control (DoA/beam/AGC) still uses the fabricated register protocol — the probe
+times out and the firmware degrades gracefully, so audio is unaffected.
 
 ---
 
@@ -18,7 +21,7 @@ what they actually were. The XVF3800 variant remains unverified on real silicon.
 | Variant | Board | Notes |
 |---|---|---|
 | `BOARD_RESPEAKER_LITE` | ReSpeaker Lite (XMOS XU316 + ESP32-S3), 2-mic | **Start here.** No XVF3800 dependency. |
-| `BOARD_RESPEAKER_XVF3800` | ReSpeaker XVF3800 (ESP32-S3), 4-mic | XVF3800 I2C driver uses a **fabricated register map** — needs real-silicon protocol work before this variant is meaningful. |
+| `BOARD_RESPEAKER_XVF3800` | ReSpeaker XVF3800 (ESP32-S3), 4-mic | **Audio verified on silicon 2026-07-09** (ESP32 is I2S *master* here — opposite of the Lite; build with `-B build_xvf -D SDKCONFIG=sdkconfig.xvf`). I2C DSP control (DoA/beam/AGC) still uses a **fabricated register map** — probe times out, gracefully degraded; real XMOS resource-command protocol is future work. |
 
 All units have an attached speaker (I2S TX is initialized in `hal/hal_audio.c` but
 playback is not implemented yet).
