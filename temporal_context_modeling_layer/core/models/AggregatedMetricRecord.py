@@ -11,6 +11,10 @@ class AggregatedMetricRecord:
     metric_name: str
     aggregated_value: float
     system_mode: Optional[str] = None
+    # Per-day evidence quality: how many raw utterances the daily mean is built from and
+    # their spread. None on legacy records written before these fields existed.
+    sample_std: Optional[float] = None
+    sample_count: Optional[int] = None
 
     def to_dict(self):
         ts = self.timestamp
@@ -30,4 +34,7 @@ class AggregatedMetricRecord:
         }
         if self.system_mode is not None:
             result["system_mode"] = self.system_mode
+        if self.sample_count is not None:
+            result["sample_count"] = self.sample_count
+            result["sample_std"] = self.sample_std
         return result
