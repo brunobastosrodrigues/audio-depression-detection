@@ -53,7 +53,7 @@ def _fleet_strip():
     c3.metric("Segments (24h)", segs)
     with c4:
         st.markdown("&nbsp;")
-        st.page_link("pages/12_Fleet_Health.py", label="Open Fleet Health →")
+        st.page_link("views/12_Fleet_Health.py", label="Open Fleet Health →")
 
 
 st.subheader("Fleet at a glance")

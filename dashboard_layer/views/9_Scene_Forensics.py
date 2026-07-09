@@ -45,7 +45,7 @@ if not is_selected_user_calibrated():
         message=f"Voice profile missing for {user_display_name}. Speaker verification is disabled.",
         alert_type="error",
         action_label="Calibrate Now",
-        action_page="pages/8_User_Management.py",
+        action_page="views/8_User_Management.py",
         key="forensics_cal_warning",
     )
 else:

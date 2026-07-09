@@ -54,7 +54,7 @@ def render_actionable_banner(
         message: The alert message to display
         alert_type: One of 'error', 'warning', 'success', 'info'
         action_label: Label for the action button (e.g., "Enroll Now")
-        action_page: Page path to navigate to (e.g., "pages/8_User_Management.py")
+        action_page: Page path to navigate to (e.g., "views/8_User_Management.py")
         dismissible: Whether the banner can be dismissed
         key: Unique key for session state management
     """

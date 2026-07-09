@@ -33,25 +33,25 @@ _ensure_indexes_once()
 # Operator-primary: to put Fleet above My Wellbeing, move the "Fleet" block up.
 pages = {
     " ": [  # ungrouped, top of the sidebar (no visible header)
-        st.Page("pages/00_Home.py", title="Home", icon="🏠", default=True),
+        st.Page("views/00_Home.py", title="Home", icon="🏠", default=True),
     ],
     "My Wellbeing": [
-        st.Page("pages/1_Overview.py",    title="Overview",    icon="💚"),
-        st.Page("pages/2_Indicators.py",  title="Indicators",  icon="📊"),
-        st.Page("pages/3_Trends.py",      title="Trends",      icon="📈"),
-        st.Page("pages/4_Self_Report.py", title="Self-Report", icon="📝"),
+        st.Page("views/1_Overview.py",    title="Overview",    icon="💚"),
+        st.Page("views/2_Indicators.py",  title="Indicators",  icon="📊"),
+        st.Page("views/3_Trends.py",      title="Trends",      icon="📈"),
+        st.Page("views/4_Self_Report.py", title="Self-Report", icon="📝"),
     ],
     "Fleet": [
-        st.Page("pages/12_Fleet_Health.py", title="Fleet Health",   icon="🩺"),
-        st.Page("pages/5_Boards.py",        title="Boards & Rooms", icon="📡"),
-        st.Page("pages/10_Edge_Nodes.py",   title="Edge Nodes",     icon="🔌"),
+        st.Page("views/12_Fleet_Health.py", title="Fleet Health",   icon="🩺"),
+        st.Page("views/5_Boards.py",        title="Boards & Rooms", icon="📡"),
+        st.Page("views/10_Edge_Nodes.py",   title="Edge Nodes",     icon="🔌"),
     ],
     "Admin": [
-        st.Page("pages/8_User_Management.py",      title="Users & Enrollment",  icon="👥"),
-        st.Page("pages/7_Data_Tools.py",           title="Data Tools",          icon="🔧"),
-        st.Page("pages/9_Scene_Forensics.py",      title="Scene Analysis",      icon="🔬"),
-        st.Page("pages/6_Settings.py",             title="Settings",            icon="⚙️"),
-        st.Page("pages/11_Research_Validation.py", title="Research Validation", icon="🧪"),
+        st.Page("views/8_User_Management.py",      title="Users & Enrollment",  icon="👥"),
+        st.Page("views/7_Data_Tools.py",           title="Data Tools",          icon="🔧"),
+        st.Page("views/9_Scene_Forensics.py",      title="Scene Analysis",      icon="🔬"),
+        st.Page("views/6_Settings.py",             title="Settings",            icon="⚙️"),
+        st.Page("views/11_Research_Validation.py", title="Research Validation", icon="🧪"),
     ],
 }
 
