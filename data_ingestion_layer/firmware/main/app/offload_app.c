@@ -57,7 +57,7 @@ void offload_app_build_capabilities(app_ctx_t *ctx) {
     np_make_node_id(c->node_id, sizeof(c->node_id));
     strncpy(ctx->node_id, c->node_id, sizeof(ctx->node_id));
     c->firmware = NP_FW_VERSION;
-#if HAS_XVF3800
+#if BOARD_TYPE_XVF3800   // was '#if HAS_XVF3800' — an undefined macro, silently 0: the XVF advertised as a Lite
     c->hardware = NP_HARDWARE_XVF;
     c->provides.aec = true; c->provides.doa = true; c->provides.beamforming = true;
 #else
