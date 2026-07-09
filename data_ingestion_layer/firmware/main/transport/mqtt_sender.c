@@ -20,6 +20,23 @@ static const char *TAG = "mqtt_sender";
 // staged in PSRAM, well under the broker's 4 MB message_size_limit (PR #87).
 #define SEG_MAX_BYTES (16000 * 2 * 8)
 
+// Segments are shipped as complete WAV files: 44-byte RIFF header + PCM, so
+// voice_profiling/librosa can parse them without out-of-band format knowledge.
+#define WAV_HEADER_BYTES 44
+
+// Minimal RIFF/WAVE header for 16 kHz mono s16 PCM (little-endian, as is the ESP32).
+static void wav_header(uint8_t *h, uint32_t data_len) {
+    uint32_t riff_len = 36 + data_len, fmt_len = 16, rate = 16000, byte_rate = 32000;
+    uint16_t fmt_pcm = 1, channels = 1, block_align = 2, bits = 16;
+    memcpy(h,      "RIFF", 4);  memcpy(h + 4,  &riff_len, 4);
+    memcpy(h + 8,  "WAVEfmt ", 8);
+    memcpy(h + 16, &fmt_len, 4);
+    memcpy(h + 20, &fmt_pcm, 2);   memcpy(h + 22, &channels, 2);
+    memcpy(h + 24, &rate, 4);      memcpy(h + 28, &byte_rate, 4);
+    memcpy(h + 32, &block_align, 2); memcpy(h + 34, &bits, 2);
+    memcpy(h + 36, "data", 4);     memcpy(h + 40, &data_len, 4);
+}
+
 static mqtt_sender_stats_t s_stats;
 
 void mqtt_sender_get_stats(mqtt_sender_stats_t *out) { *out = s_stats; }
@@ -41,8 +58,11 @@ static void fill_meta(app_ctx_t *ctx, np_payload_meta_t *m) {
     m->doa_azimuth = ctx->latest_doa;               // INT16_MIN when no XVF3800
 }
 
-static void publish_segment(app_ctx_t *ctx, const uint8_t *pcm, size_t pcm_len,
+// `buf` layout: [WAV_HEADER_BYTES reserved][pcm_len bytes of PCM]. The header is
+// stamped here (it needs the final length); feature mode reads the PCM only.
+static void publish_segment(app_ctx_t *ctx, uint8_t *buf, size_t pcm_len,
                             unsigned char *b64, size_t b64_cap) {
+    const uint8_t *pcm = buf + WAV_HEADER_BYTES;
     np_payload_meta_t meta;
     fill_meta(ctx, &meta);
 
@@ -68,9 +88,10 @@ static void publish_segment(app_ctx_t *ctx, const uint8_t *pcm, size_t pcm_len,
         meta.feature_count = k;
         json = np_build_audio_payload_json(NULL, &meta);
     } else {
-        // Segments mode (default): base64 the VAD-gated utterance.
+        // Segments mode (default): base64 the VAD-gated utterance as a WAV file.
+        wav_header(buf, (uint32_t)pcm_len);
         size_t b64_len = 0;
-        if (mbedtls_base64_encode(b64, b64_cap, &b64_len, pcm, pcm_len) != 0) {
+        if (mbedtls_base64_encode(b64, b64_cap, &b64_len, buf, WAV_HEADER_BYTES + pcm_len) != 0) {
             ESP_LOGE(TAG, "base64 overflow (%u bytes pcm)", (unsigned)pcm_len);
             s_stats.segments_dropped++;
             return;
@@ -95,10 +116,11 @@ static void publish_segment(app_ctx_t *ctx, const uint8_t *pcm, size_t pcm_len,
 static void sender_task(void *arg) {
     app_ctx_t *ctx = (app_ctx_t *)arg;
 
-    uint8_t *pcm = heap_caps_malloc(SEG_MAX_BYTES, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    size_t b64_cap = (SEG_MAX_BYTES / 3 + 2) * 4 + 4;
+    uint8_t *buf = heap_caps_malloc(WAV_HEADER_BYTES + SEG_MAX_BYTES,
+                                    MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    size_t b64_cap = ((WAV_HEADER_BYTES + SEG_MAX_BYTES) / 3 + 2) * 4 + 4;
     unsigned char *b64 = heap_caps_malloc(b64_cap, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!pcm || !b64) {
+    if (!buf || !b64) {
         ESP_LOGE(TAG, "PSRAM alloc failed; sender disabled");
         vTaskDelete(NULL);
         return;
@@ -107,7 +129,7 @@ static void sender_task(void *arg) {
     audio_quality_metrics_t metrics;
     size_t got = 0;
     for (;;) {
-        if (audio_buffer_read_speech(pcm, SEG_MAX_BYTES, &got, &metrics,
+        if (audio_buffer_read_speech(buf + WAV_HEADER_BYTES, SEG_MAX_BYTES, &got, &metrics,
                                      pdMS_TO_TICKS(1000)) != ESP_OK || got == 0) {
             continue;  // no speech in the last second
         }
@@ -118,7 +140,7 @@ static void sender_task(void *arg) {
             s_stats.segments_dropped++;
             continue;
         }
-        publish_segment(ctx, pcm, got, b64, b64_cap);
+        publish_segment(ctx, buf, got, b64, b64_cap);
     }
 }
 
