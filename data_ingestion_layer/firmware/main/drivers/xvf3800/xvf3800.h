@@ -125,7 +125,7 @@ typedef struct {
     uint8_t ns_level;           ///< 0 = off, 1 = low, 2 = medium, 3 = high
 
     bool dereverb_enabled;
-    uint8_t dereverb_decay;     ///< Decay time in ms
+    uint16_t dereverb_decay;    ///< Decay time in ms (default 300 — does not fit uint8_t)
 
     xvf3800_beam_mode_t beam_mode;
     int16_t beam_direction;     ///< Fixed beam direction (degrees)
