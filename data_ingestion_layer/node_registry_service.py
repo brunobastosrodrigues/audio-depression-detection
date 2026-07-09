@@ -22,6 +22,10 @@ MQTT_HOST = os.environ.get("MQTT_HOST", "mqtt")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", 1883))
 
 CAPABILITIES_TOPIC = "nodes/+/capabilities"
+STATUS_TOPIC = "nodes/+/status"
+
+# Mode-isolated DBs (mirrors the pipeline's routing map).
+DB_MAP = {"live": "iotsensing_live", "dataset": "iotsensing_dataset", "demo": "iotsensing_demo"}
 
 
 def node_id_from_topic(topic: str):
@@ -45,7 +49,59 @@ class NodeRegistryService:
     def on_connect(self, client, userdata, flags, rc, properties=None):
         print(f"Connected to MQTT broker with result code {rc}")
         client.subscribe(CAPABILITIES_TOPIC)
-        print(f"Subscribed to {CAPABILITIES_TOPIC}")
+        client.subscribe(STATUS_TOPIC)
+        print(f"Subscribed to {CAPABILITIES_TOPIC} and {STATUS_TOPIC}")
+
+    def handle_status(self, topic_id: str, data: dict):
+        """Heartbeat: refresh last_seen/telemetry and mirror into the legacy `boards`
+        collection so the user-facing Boards page sees MQTT nodes.
+
+        The boards bridge only fires for ENROLLED nodes (iotsensing.node_enrollments,
+        written by scripts/enroll_node.sh) because boards are keyed by user_id -- an
+        unenrolled node has no user and remains visible on the Edge Nodes page only."""
+        now = datetime.now(timezone.utc)
+        online = bool(data.get("online", True))  # LWT publishes {"online": false}
+        telemetry = {
+            "online": online,
+            "rssi": data.get("rssi"),
+            "free_heap": data.get("free_heap"),
+            "uptime_s": data.get("uptime_s"),
+            "muted": data.get("muted"),
+            "mode": data.get("mode"),
+        }
+        self.registry.touch(topic_id, telemetry=telemetry, last_seen=now)
+
+        enrollment = self.mongo_client["iotsensing"]["node_enrollments"].find_one(
+            {"node_id": topic_id}
+        )
+        if not enrollment or not enrollment.get("user_id"):
+            return
+        user_id = enrollment["user_id"]
+        # dataset user ids are ints; keep the stored type consistent with the pipeline
+        if isinstance(user_id, str) and user_id.lstrip("-").isdigit():
+            user_id = int(user_id)
+        db_name = DB_MAP.get(enrollment.get("system_mode", "live"), "iotsensing_live")
+        self.mongo_client[db_name]["boards"].update_one(
+            {"board_id": topic_id},
+            {
+                "$set": {
+                    "user_id": user_id,
+                    "is_active": online,
+                    "last_seen": now,
+                    "muted": bool(data.get("muted", False)),
+                },
+                "$setOnInsert": {
+                    "board_id": topic_id,
+                    # respeaker-<mac12> -> aa:bb:cc:dd:ee:ff
+                    "mac_address": ":".join(
+                        topic_id.split("-")[-1][i:i+2] for i in range(0, 12, 2)
+                    ) if len(topic_id.split("-")[-1]) == 12 else None,
+                    "name": topic_id,          # renameable in the dashboard later
+                    "environment_id": None,    # assigned via the Boards page
+                },
+            },
+            upsert=True,
+        )
 
     def on_message(self, client, userdata, msg):
         try:
@@ -57,6 +113,9 @@ class NodeRegistryService:
             topic_id = node_id_from_topic(msg.topic)
             if not topic_id:
                 print(f"Ignoring advert on non-node topic {msg.topic}")
+                return
+            if msg.topic.endswith("/status"):
+                self.handle_status(topic_id, data)
                 return
             if data.get("node_id") and data["node_id"] != topic_id:
                 print(f"node_id mismatch: payload '{data['node_id']}' != topic '{topic_id}'; using topic")

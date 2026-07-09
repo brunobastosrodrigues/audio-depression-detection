@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
-from typing import Optional
+from typing import Union, Optional
 from datetime import datetime
 import logging
 import traceback
@@ -11,7 +11,9 @@ from core.models.Environment import Environment
 
 
 class CreateEnvironmentRequest(BaseModel):
-    user_id: int
+    # live/demo users are strings ("bruno", UUIDs); dataset users are ints. The old
+    # `int` annotation made pydantic reject every live user at the door.
+    user_id: Union[int, str]
     name: str
     description: Optional[str] = None
 
@@ -25,7 +27,7 @@ def create_service_environments(persistence: PersistencePort):
     router = APIRouter(prefix="/environments", tags=["environments"])
 
     @router.get("/")
-    async def list_environments(user_id: int = Query(...)):
+    async def list_environments(user_id: Union[int, str] = Query(...)):
         try:
             environments = persistence.get_environments_by_user(user_id)
             return [e.to_dict() for e in environments]

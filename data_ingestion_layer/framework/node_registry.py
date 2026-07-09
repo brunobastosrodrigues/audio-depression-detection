@@ -55,6 +55,17 @@ class NodeRegistry:
         self.collection.update_one({"node_id": caps.node_id}, {"$set": doc}, upsert=True)
         return doc
 
+    def touch(self, node_id: str, telemetry: Optional[dict] = None, last_seen=None) -> None:
+        """Heartbeat update: refresh last_seen (+ latest telemetry) WITHOUT re-negotiating.
+
+        The registry previously only wrote last_seen when a capabilities advert arrived
+        (boot/reconnect), so a healthy node beating every 30s drifted past the dashboard's
+        5-minute online threshold and showed as offline. Status messages now keep it fresh."""
+        update = {"last_seen": last_seen}
+        if telemetry:
+            update["telemetry"] = telemetry
+        self.collection.update_one({"node_id": node_id}, {"$set": update}, upsert=False)
+
     def get(self, node_id: str) -> Optional[dict]:
         return self.collection.find_one({"node_id": node_id}, {"_id": 0})
 
