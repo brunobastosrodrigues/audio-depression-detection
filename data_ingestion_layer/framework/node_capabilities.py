@@ -87,7 +87,10 @@ class NodeAssignment:
     vad_gated: bool = False
     features: List[str] = field(default_factory=list)
     raw_on_uncertain: bool = True  # fall back to raw audio when node-VAD is unsure
-    report_interval_ms: int = 1000
+    # Status-heartbeat cadence pushed to nodes. 1000ms was feature-report thinking; for
+    # retained status heartbeats it meant 86k msgs/day/node (observed at first 4-node
+    # fleet bring-up, 2026-07-09). 30s is plenty for the dashboard's online/stale view.
+    report_interval_ms: int = 30000
 
     def to_dict(self) -> dict:
         return asdict(self)
