@@ -62,10 +62,14 @@ def _bm():
 
 def test_compute_and_store_writes_v2_doc():
     bm = _bm()
-    raw = MagicMock()
-    raw.find.return_value = [rec("f0_avg", v, hour=14) for v in range(10)]
+    ctx = MagicMock()
+    ctx.find.return_value = [
+        {"metric_name": "f0_avg", "contextual_value": float(v),
+         "timestamp": datetime(2026, 1, 1, 14, 0)}
+        for v in range(10)
+    ]
     base_coll = MagicMock()
-    bm._db = lambda system_mode=None: {"raw_metrics": raw}
+    bm._db = lambda system_mode=None: {"contextual_metrics": ctx}
     bm._baseline_collection = lambda system_mode=None: base_coll
 
     res = bm.compute_and_store_baseline(1, system_mode="live", min_samples=5)
@@ -80,10 +84,13 @@ def test_compute_and_store_writes_v2_doc():
 
 def test_compute_and_store_insufficient_returns_none_and_no_write():
     bm = _bm()
-    raw = MagicMock()
-    raw.find.return_value = [rec("f0_avg", 1, hour=14)]  # 1 sample < min
+    ctx = MagicMock()
+    ctx.find.return_value = [
+        {"metric_name": "f0_avg", "contextual_value": 1.0,
+         "timestamp": datetime(2026, 1, 1, 14, 0)}
+    ]  # 1 sample < min
     base_coll = MagicMock()
-    bm._db = lambda system_mode=None: {"raw_metrics": raw}
+    bm._db = lambda system_mode=None: {"contextual_metrics": ctx}
     bm._baseline_collection = lambda system_mode=None: base_coll
 
     assert bm.compute_and_store_baseline(1, min_samples=5) is None
@@ -112,7 +119,7 @@ def test_maybe_compute_skips_when_a_computed_baseline_exists():
     base_coll.find_one.return_value = {"_id": 1, "source": "computed_from_data"}
     bm._baseline_collection = lambda system_mode=None: base_coll
     fetched = {"called": False}
-    bm._fetch_raw_metric_records = lambda *a, **k: (fetched.__setitem__("called", True) or [])
+    bm._fetch_contextual_metric_records = lambda *a, **k: (fetched.__setitem__("called", True) or [])
     assert bm.maybe_compute_baseline(1) is None
     assert fetched["called"] is False          # short-circuits before reading metrics
     assert not base_coll.replace_one.called
@@ -123,7 +130,7 @@ def test_maybe_compute_runs_once_past_learning_period():
     base_coll = MagicMock()
     base_coll.find_one.return_value = None      # no computed baseline yet
     bm._baseline_collection = lambda system_mode=None: base_coll
-    bm._fetch_raw_metric_records = lambda *a, **k: _daily_records("f0_avg", 15)  # 14-day span
+    bm._fetch_contextual_metric_records = lambda *a, **k: _daily_records("f0_avg", 15)  # 14-day span
     res = bm.maybe_compute_baseline(1, learning_period_days=14, min_samples=10)
     assert res is not None and "f0_avg" in res["general"]["metrics"]
     assert base_coll.replace_one.called
@@ -134,6 +141,6 @@ def test_maybe_compute_skips_during_learning_period():
     base_coll = MagicMock()
     base_coll.find_one.return_value = None
     bm._baseline_collection = lambda system_mode=None: base_coll
-    bm._fetch_raw_metric_records = lambda *a, **k: _daily_records("f0_avg", 5)  # 4-day span
+    bm._fetch_contextual_metric_records = lambda *a, **k: _daily_records("f0_avg", 5)  # 4-day span
     assert bm.maybe_compute_baseline(1, learning_period_days=14, min_samples=2) is None
     assert not base_coll.replace_one.called
