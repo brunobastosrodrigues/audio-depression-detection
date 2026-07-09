@@ -36,50 +36,70 @@ def derive_indicator_scores(
              with open(mapping_path, "r") as f:
                 mapping_config = json.load(f)
 
-    # Group records by (date, system_mode) to keep data isolated
+    from datetime import datetime, date, time as dt_time
+
+    def _to_naive_dt(d):
+        """Normalize str/datetime (tz-aware or naive) to a naive datetime; None on failure.
+        Mixed str/aware/naive timestamps previously crashed the group sort and the
+        learning-period subtraction mid-deployment."""
+        if isinstance(d, str):
+            try:
+                d = datetime.fromisoformat(d)
+            except ValueError:
+                return None
+        if isinstance(d, datetime):
+            return d.replace(tzinfo=None) if d.tzinfo else d
+        if isinstance(d, date):
+            return datetime.combine(d, dt_time())
+        return None
+
+    # Group records by (CALENDAR DAY, system_mode). Grouping on the full timestamp made
+    # the "daily" EMA fire once per RECORD: with circadian (morning/evening) partitions
+    # guaranteeing >1 record/day, the 14-day persistence window silently collapsed to
+    # ~14 samples and temporal dynamics tracked utterance volume instead of time.
     records_by_date_mode = defaultdict(list)
     for record in records:
-        record_date = record.timestamp
+        ts = _to_naive_dt(record.timestamp)
+        if ts is None:
+            continue
         system_mode = getattr(record, 'system_mode', None) or 'live'
-        records_by_date_mode[(record_date, system_mode)].append(record)
+        records_by_date_mode[(ts.date(), system_mode)].append(record)
     records_by_date_mode = OrderedDict(
-        sorted(records_by_date_mode.items(), key=lambda item: item[0])
+        sorted(records_by_date_mode.items(), key=lambda item: (item[0][0], item[0][1]))
     )
 
     all_scores = []
 
-    # Get the latest previous smoothed scores from repository for EMA initialization
-    # Eq 4: S_bar(t) = (1-alpha)*S(t) + alpha*S_bar(t-1)
-    latest_score_doc = repository.get_latest_indicator_score(user_id)
+    # Per-MODE temporal state. A single shared EMA state bled live -> dataset -> demo
+    # within one call (and could seed the live EMA from a demo score); each mode's
+    # smoothing chain and learning anchor must live entirely inside its own mode.
+    modes = {mode for (_d, mode) in records_by_date_mode.keys()}
+    prev_scores_by_mode = {}
+    first_date_by_mode = {}
+    for mode in modes:
+        # Eq 4 seed: latest smoothed scores FROM THIS MODE only.
+        latest_doc = None
+        try:
+            latest_doc = repository.get_latest_indicator_score(user_id, system_mode=mode)
+        except TypeError:  # older adapter without mode scoping
+            latest_doc = repository.get_latest_indicator_score(user_id)
+        prev = (latest_doc or {}).get("indicator_scores", {}) or {}
+        prev_scores_by_mode[mode] = {
+            ind: (prev.get(ind) if prev.get(ind) is not None else 0.0)
+            for ind in mapping_config.keys()
+        }
 
-    # Initialize previous_smoothed_scores
-    if latest_score_doc:
-        # Assuming the repository stores the latest *smoothed* scores in "indicator_scores"
-        previous_smoothed_scores = latest_score_doc.get("indicator_scores", {})
-    else:
-        # Default 0.0 for initial state if no history
-        previous_smoothed_scores = {indicator: 0.0 for indicator in mapping_config.keys()}
-
-    # Ensure all indicators exist in previous_smoothed_scores
-    for indicator in mapping_config.keys():
-        if indicator not in previous_smoothed_scores or previous_smoothed_scores[indicator] is None:
-            previous_smoothed_scores[indicator] = 0.0
-
-    # Determine if user is in "Learning Mode" (7-14 days)
-    # We need to know when the user started.
-    # We can try to get the first record date from repository.
-    # If not available, we assume this is the first day or we can't determine.
-    # If the user has history, we check the duration.
-
-    first_record_date = None
-    if hasattr(repository, 'get_first_indicator_score_date'):
-        first_record_date = repository.get_first_indicator_score_date(user_id)
-
-    # If no history, this batch might contain the first day.
-    if not first_record_date and records:
-        # Assuming sorted by date, use the first one.
-        # Note: records_by_date_mode is ordered.
-        first_record_date = list(records_by_date_mode.keys())[0][0]
+        # Learning-period anchor: first score date FROM THIS MODE only.
+        first_dt = None
+        if hasattr(repository, 'get_first_indicator_score_date'):
+            try:
+                first_dt = repository.get_first_indicator_score_date(user_id, system_mode=mode)
+            except TypeError:
+                first_dt = repository.get_first_indicator_score_date(user_id)
+        if not first_dt:
+            mode_dates = [d for (d, m) in records_by_date_mode.keys() if m == mode]
+            first_dt = min(mode_dates) if mode_dates else None
+        first_date_by_mode[mode] = _to_naive_dt(first_dt)
 
     # Calculate default alpha for 14-day EMA
     # Alpha (smoothing) = 2 / (N + 1)
@@ -89,36 +109,18 @@ def derive_indicator_scores(
 
     # We iterate through the new records day by day, grouped by system_mode
     for (record_date, system_mode), daily_records in records_by_date_mode.items():
-        # Check if in learning period
+        previous_smoothed_scores = prev_scores_by_mode[system_mode]
+
+        # Check if in learning period (per-mode anchor; both sides naive datetimes)
         learning_period_days = 14
         in_learning_mode = False
-        if first_record_date:
-            # handle both datetime and string dates if necessary, usually strings in ISO
-            # assuming record_date is compatible type with first_record_date or converted
-            from datetime import datetime
-
-            # Simple helper to parse if string
-            def to_dt(d):
-                if isinstance(d, str):
-                    try:
-                        return datetime.fromisoformat(d)
-                    except ValueError:
-                         return None
-                return d
-
-            d_current = to_dt(record_date)
-            d_start = to_dt(first_record_date)
-
-            if d_current and d_start:
-                delta = d_current - d_start
-                if delta.days < learning_period_days:
-                    in_learning_mode = True
+        d_start = first_date_by_mode.get(system_mode)
+        d_current = _to_naive_dt(record_date)
+        if d_start and d_current:
+            if (d_current - d_start).days < learning_period_days:
+                in_learning_mode = True
         else:
-            # If we can't determine start date, and we are processing data,
-            # safe to assume we might be in learning mode if this is the very first batch?
-            # Or assume NOT in learning mode to avoid blocking indefinitely?
-            # Given the requirement "Do not attempt detection on Day 1", let's err on side of caution?
-            # But if first_record_date is None, it means no history. So this IS Day 1.
+            # No determinable start date means no history: this IS day 1.
             in_learning_mode = True
 
 
@@ -159,11 +161,18 @@ def derive_indicator_scores(
 
                 direction = props.get("direction", "positive")
 
-                # Eq 3: directional transformation
+                # Eq 3: directional transformation.
+                # For "both"/"anomaly" the raw |z| has null expectation E[|Z|] = sqrt(2/pi)
+                # ~= 0.798 for a perfectly-at-baseline user -- NOT 0. Indicators built only
+                # from anomaly metrics (fatigue, insomnia in the legacy config) therefore
+                # sat above the 0.5 binarization threshold from pure noise, latching those
+                # flags ON for healthy users. Centering by E[|Z|] makes the anomaly weight
+                # zero-mean under H0, directly comparable to the signed directions.
+                HALF_NORMAL_MEAN = 0.7978845608028654  # sqrt(2/pi)
                 if direction == "negative":
                     w_im = -z_hat
                 elif direction == "both" or direction == "anomaly":
-                    w_im = abs(z_hat)
+                    w_im = abs(z_hat) - HALF_NORMAL_MEAN
                 else:  # "positive" (default)
                     w_im = z_hat
 
@@ -185,8 +194,8 @@ def derive_indicator_scores(
             theta = details.get("severity_threshold", 0.5)
             binary_scores[indicator] = 1 if s_bar_t >= theta else 0
 
-        # Update previous for next iteration
-        previous_smoothed_scores = current_smoothed_scores.copy()
+        # Update THIS MODE's chain state for its next day (state is per-mode; see above)
+        prev_scores_by_mode[system_mode] = current_smoothed_scores.copy()
 
         # Equation 6: Diagnostic Logic
         # MDD_Signal = (Sum(B_j) >= 5) AND (B_1 = 1 OR B_2 = 1)
@@ -224,7 +233,8 @@ def derive_indicator_scores(
         all_scores.append(
             IndicatorScoreRecord(
                 user_id=resolved_user_id,
-                timestamp=record_date,
+                # record_date is a calendar day; store as midnight datetime (Mongo-safe)
+                timestamp=datetime.combine(record_date, dt_time()),
                 indicator_scores=current_smoothed_scores,
                 mdd_signal=mdd_signal,
                 binary_scores=binary_scores,
