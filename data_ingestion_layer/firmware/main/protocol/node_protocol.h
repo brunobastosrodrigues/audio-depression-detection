@@ -84,7 +84,8 @@ char *np_build_capabilities_json(const np_capabilities_t *caps);
 char *np_build_audio_payload_json(const char *audio_b64, const np_payload_meta_t *meta);
 // Heartbeat for nodes/{id}/status (retained).
 char *np_build_status_json(const char *node_id, np_mode_t mode, int rssi,
-                           uint32_t uptime_s, uint32_t free_heap, int16_t last_doa);
+                           uint32_t uptime_s, uint32_t free_heap, int16_t last_doa,
+                           bool muted);
 
 // --- Parse ------------------------------------------------------------------
 // Parse a nodes/{id}/config message into *out. Returns true on success; *out owns heap copies
@@ -96,6 +97,8 @@ void np_assignment_free(np_assignment_t *a);
 size_t np_topic_capabilities(const char *node_id, char *out, size_t n);  // nodes/{id}/capabilities
 size_t np_topic_config(const char *node_id, char *out, size_t n);        // nodes/{id}/config
 size_t np_topic_status(const char *node_id, char *out, size_t n);        // nodes/{id}/status
+size_t np_topic_marker(const char *node_id, char *out, size_t n);        // nodes/{id}/marker
+size_t np_topic_attest(const char *node_id, char *out, size_t n);        // nodes/{id}/attest
 size_t np_topic_voice(const np_payload_meta_t *m, char *out, size_t n);  // voice/{user}/{board}/{env}
 
 #ifdef __cplusplus

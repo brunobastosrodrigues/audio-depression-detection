@@ -59,7 +59,8 @@ char *np_build_audio_payload_json(const char *audio_b64, const np_payload_meta_t
 }
 
 char *np_build_status_json(const char *node_id, np_mode_t mode, int rssi,
-                           uint32_t uptime_s, uint32_t free_heap, int16_t last_doa) {
+                           uint32_t uptime_s, uint32_t free_heap, int16_t last_doa,
+                           bool muted) {
     static const char *MODE_S[] = {"raw", "segments", "features"};
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "node_id", node_id);
@@ -67,6 +68,8 @@ char *np_build_status_json(const char *node_id, np_mode_t mode, int rssi,
     cJSON_AddNumberToObject(root, "rssi", rssi);
     cJSON_AddNumberToObject(root, "uptime_s", uptime_s);
     cJSON_AddNumberToObject(root, "free_heap", free_heap);
+    cJSON_AddBoolToObject(root, "online", true);
+    cJSON_AddBoolToObject(root, "muted", muted);
     if (last_doa != INT16_MIN) cJSON_AddNumberToObject(root, "last_doa", last_doa);
     char *s = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
@@ -109,6 +112,8 @@ void np_assignment_free(np_assignment_t *a) {
 size_t np_topic_capabilities(const char *id, char *o, size_t n) { return snprintf(o, n, "nodes/%s/capabilities", id); }
 size_t np_topic_config(const char *id, char *o, size_t n)       { return snprintf(o, n, "nodes/%s/config", id); }
 size_t np_topic_status(const char *id, char *o, size_t n)       { return snprintf(o, n, "nodes/%s/status", id); }
+size_t np_topic_marker(const char *id, char *o, size_t n)       { return snprintf(o, n, "nodes/%s/marker", id); }
+size_t np_topic_attest(const char *id, char *o, size_t n)       { return snprintf(o, n, "nodes/%s/attest", id); }
 size_t np_topic_voice(const np_payload_meta_t *m, char *o, size_t n) {
     return snprintf(o, n, "voice/%d/%s/%s", m->user_id > 0 ? m->user_id : 0,
                     m->board_id, m->environment_name ? m->environment_name : "default");

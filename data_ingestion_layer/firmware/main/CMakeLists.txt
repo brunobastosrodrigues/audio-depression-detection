@@ -12,6 +12,7 @@ set(SRCS
     "network/wifi_manager.c"
     "network/tcp_client.c"
     "system/watchdog.c"
+    "system/button.c"
     # --- Plug-and-play edge-offload (see docs/firmware/PLUG_AND_PLAY_OFFLOAD_DESIGN.md) ---
     "app/offload_app.c"
     "provisioning/provisioning.c"

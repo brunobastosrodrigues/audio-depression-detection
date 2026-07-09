@@ -111,9 +111,10 @@ static void sender_task(void *arg) {
                                      pdMS_TO_TICKS(1000)) != ESP_OK || got == 0) {
             continue;  // no speech in the last second
         }
-        if (!ctx->assignment.valid || !mqtt_client_is_connected()) {
-            // Not negotiated / offline: drop (the ring buffer keeps absorbing upstream;
-            // privacy over completeness -- we never spool voice to flash).
+        if (ctx->muted || !ctx->assignment.valid || !mqtt_client_is_connected()) {
+            // Muted (participant pressed the privacy button) / not negotiated / offline:
+            // drop. The ring buffer keeps absorbing upstream; privacy over completeness --
+            // we never spool voice to flash, and NOTHING leaves the node while muted.
             s_stats.segments_dropped++;
             continue;
         }

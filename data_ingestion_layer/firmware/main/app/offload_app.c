@@ -10,6 +10,7 @@
 // network is reachable does it fall back to the SoftAP captive portal.
 #include "app/offload_app.h"
 #include "net/discovery.h"
+#include "system/button.h"
 #include "net/mqtt_client.h"
 #include "transport/mqtt_sender.h"
 #include "wifi_manager.h"        // existing STA manager
@@ -172,10 +173,53 @@ static void publish_status(app_ctx_t *ctx) {
     char *json = np_build_status_json(
         ctx->node_id, ctx->assignment.valid ? ctx->assignment.mode : NP_MODE_SEGMENTS,
         wifi_manager_get_rssi(), (uint32_t)(esp_timer_get_time() / 1000000ULL),
-        esp_get_free_heap_size(), ctx->latest_doa);
+        esp_get_free_heap_size(), ctx->latest_doa, ctx->muted);
     if (json) {
         mqtt_client_publish(topic, json, strlen(json), 1, /*retain=*/true);
         free(json);
+    }
+}
+
+// --------------------------------------------------------------------------- button
+// One button, three gestures (see system/button.h). All MQTT publishes are best-effort:
+// gestures must work identically whether or not the broker is reachable.
+static void on_button(button_event_t event, void *user) {
+    app_ctx_t *ctx = (app_ctx_t *)user;
+    char topic[64];
+    char payload[128];
+    switch (event) {
+    case BUTTON_EVENT_SHORT:
+        if (!ctx->assignment.valid) {
+            // Unapproved node: short press = enrollment attestation (physical proof of
+            // presence). The dashboard can require a fresh attest before Approve.
+            np_topic_attest(ctx->node_id, topic, sizeof(topic));
+            snprintf(payload, sizeof(payload),
+                     "{\"node_id\":\"%s\",\"uptime_s\":%u}",
+                     ctx->node_id, (unsigned)(esp_timer_get_time() / 1000000ULL));
+            mqtt_client_publish(topic, payload, strlen(payload), 1, false);
+            ESP_LOGI(TAG, "enrollment attestation published");
+            break;
+        }
+        // Privacy mute toggle: capture keeps running, but nothing leaves the node.
+        ctx->muted = !ctx->muted;
+        ESP_LOGW(TAG, "privacy mute %s", ctx->muted ? "ON" : "OFF");
+        publish_status(ctx);   // retained -> dashboard reflects it immediately
+        break;
+    case BUTTON_EVENT_DOUBLE:
+        // Event marker: the participant flags "this moment" for ground-truth annotation.
+        np_topic_marker(ctx->node_id, topic, sizeof(topic));
+        snprintf(payload, sizeof(payload),
+                 "{\"node_id\":\"%s\",\"uptime_s\":%u,\"muted\":%s}",
+                 ctx->node_id, (unsigned)(esp_timer_get_time() / 1000000ULL),
+                 ctx->muted ? "true" : "false");
+        mqtt_client_publish(topic, payload, strlen(payload), 1, false);
+        ESP_LOGI(TAG, "event marker published");
+        break;
+    case BUTTON_EVENT_LONG:
+        ESP_LOGW(TAG, "factory reset: erasing provisioning");
+        provisioning_erase();
+        esp_restart();
+        break;
     }
 }
 
@@ -184,7 +228,6 @@ static void app_task(void *arg) {
     app_ctx_t *ctx = (app_ctx_t *)arg;
     int64_t last_status_ms = 0;
     for (;;) {
-        provisioning_check_factory_reset();  // BOOT held >=5 s -> wipe + portal
         switch (ctx->state) {
         case APP_BOOT:
             if (provisioning_load(&ctx->prov)) { ctx->state = APP_WIFI_CONNECT; break; }
@@ -249,6 +292,8 @@ static void app_task(void *arg) {
 void offload_app_start(app_ctx_t *ctx) {
     ctx->state = APP_BOOT;
     ctx->latest_doa = INT16_MIN;
+    ctx->muted = false;
     offload_app_build_capabilities(ctx);
+    button_start(-1, on_button, ctx);   // GPIO0/BOOT: mute / marker / factory-reset
     xTaskCreatePinnedToCore(app_task, "offload_app", 6144, ctx, 9, NULL, 0);
 }

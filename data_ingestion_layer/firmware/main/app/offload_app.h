@@ -28,6 +28,7 @@ typedef struct {
     app_state_t state;
     volatile int16_t latest_doa;       // updated by dsp_ctrl (XVF only); INT16_MIN if unknown
     volatile bool config_dirty;        // set when a new nodes/{id}/config arrives
+    volatile bool muted;               // privacy mute (button short-press); sender drops audio
 } app_ctx_t;
 
 // Build the capability advertisement from board feature flags + which features this build
