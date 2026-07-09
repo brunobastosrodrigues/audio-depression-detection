@@ -75,11 +75,21 @@ def classify_voicing_states(audio_np, sample_rate, frame_length=0.04, hop_length
     rms = rms[:n]
     voiced_flag = voiced_flag[:n]
 
+    # Silence gate: RELATIVE to the segment's own noise floor, not a fixed absolute RMS.
+    # A hard constant (old RMS_THRESHOLD=0.01) made silence_ratio/pause_*/voiced_ratio/
+    # speech_velocity gain-dependent: the same speech lands on opposite sides of the gate
+    # for a quiet dataset recording vs a hot ReSpeaker capture, breaking comparability
+    # between published (DAIC-WOZ) and deployed numbers. Noise floor = 5th percentile of
+    # frame RMS; a frame counts as non-silent above 3x that floor. RMS_THRESHOLD survives
+    # only as an absolute lower bound for digital-silence segments.
+    noise_floor = float(np.percentile(rms, 5)) if len(rms) else 0.0
+    silence_gate = max(RMS_THRESHOLD * 0.01, 3.0 * noise_floor)
+
     # Priority: voiced (1) > unvoiced (2) > silence (3)
     state_sequence = np.where(
         voiced_flag,
         1,  # Voiced (periodic / harmonic)
-        np.where(rms > RMS_THRESHOLD, 2, 3),  # Unvoiced (energy, no pitch) or Silence
+        np.where(rms > silence_gate, 2, 3),  # Unvoiced (energy, no pitch) or Silence
     )
 
     return state_sequence.tolist()

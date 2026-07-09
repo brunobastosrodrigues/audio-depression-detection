@@ -58,12 +58,15 @@ def get_hnr_dynamic(features_LLD) -> dict:
     hnr_series = _extract_hnr_series(features_LLD)
 
     if len(hnr_series) == 0:
+        # NaN = "not measurable" (no voiced frames): the service omits these instead of
+        # persisting fake zeros that would encode silence density into the HNR statistics.
+        nan = float("nan")
         return {
-            "hnr_mean": 0.0,
-            "hnr_std": 0.0,
-            "hnr_cv": 0.0,
-            "hnr_iqr": 0.0,
-            "hnr_entropy": 0.0,
+            "hnr_mean": nan,
+            "hnr_std": nan,
+            "hnr_cv": nan,
+            "hnr_iqr": nan,
+            "hnr_entropy": nan,
         }
 
     return {
@@ -85,4 +88,4 @@ def get_hnr_mean(features_LLD):
     LEGACY: Use get_hnr_dynamic() for new implementations.
     """
     hnr_series = _extract_hnr_series(features_LLD)
-    return float(np.mean(hnr_series)) if len(hnr_series) > 0 else 0.0
+    return float(np.mean(hnr_series)) if len(hnr_series) > 0 else float("nan")

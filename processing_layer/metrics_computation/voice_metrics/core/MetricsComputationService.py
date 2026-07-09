@@ -280,8 +280,9 @@ class MetricsComputationService:
             t13_value = get_t13_from_states(voiced_states)
             results["interaction_dynamics"] = get_interaction_dynamics_from_states(voiced_states)
         else:
-            voiced16_20 = 0.0
-            t13_value = 0.0
+            # Unmeasured, not zero -- safe_float(None) omits these from the record.
+            voiced16_20 = None
+            t13_value = None
             results["interaction_dynamics"] = None
 
         # Define which myprosody metrics should be returned
@@ -296,18 +297,26 @@ class MetricsComputationService:
             audio_np, sample_rate, myprosody_metrics_to_extract
         )
 
-        # Helper to safely get result and handle potential None/Errors
-        def safe_float(val, default=0.0):
+        # Missing-data convention: an unmeasurable metric is None and is OMITTED from the
+        # persisted record -- never stored as 0.0 (a fake measurement) and never as NaN
+        # (which Mongo $avg does NOT skip, so one NaN poisons every downstream average).
+        # Silence/noise-only segments previously wrote jitter=shimmer=hnr=f0=0.0, encoding
+        # silence density (itself correlated with psychomotor retardation) into the feature
+        # statistics -- a fabricated depression signal.
+        def safe_float(val):
             try:
                 if val is None:
-                    return default
+                    return None
                 if hasattr(val, "values"):  # Handle pandas Series from opensmile
-                    return float(val.values[0])
-                if isinstance(val, (list, np.ndarray)) and len(val) > 0:
-                    return float(val[0])
-                return float(val)
-            except:
-                return default
+                    val = val.values[0]
+                elif isinstance(val, (list, np.ndarray)):
+                    if len(val) == 0:
+                        return None
+                    val = val[0]
+                val = float(val)
+                return val if np.isfinite(val) else None
+            except (TypeError, ValueError, IndexError):
+                return None
 
         # ----------------------------
         # Flatten all metrics into a single dictionary
@@ -342,13 +351,22 @@ class MetricsComputationService:
             "f2_transition_speed": safe_float(results.get("f2_transition_speed")),
         })
 
-        # Add myprosody results
-        flat_metrics.update(myprosody_results)
+        # Add myprosody results (through the same missing-data convention)
+        for _name, _value in myprosody_results.items():
+            flat_metrics[_name] = safe_float(_value)
 
         # Edge-offload: node-provided features are authoritative for whatever the node
         # computed (and include any node-only feature not produced server-side).
         for _name, _value in provided_features.items():
             flat_metrics[_name] = safe_float(_value)
+
+        # Drop unmeasured metrics entirely: absent key = "not measured on this segment".
+        # Downstream day-aggregation (pandas dropna) then averages over measured values
+        # only, instead of blending in placeholder zeros/NaNs.
+        n_before = len(flat_metrics)
+        flat_metrics = {k: v for k, v in flat_metrics.items() if v is not None}
+        if len(flat_metrics) < n_before:
+            print(f"ℹ️ {n_before - len(flat_metrics)} unmeasured metrics omitted for this segment")
 
         # SAFETY GUARD: Use real-time unless simulation is forced
         if self.simulation_mode:

@@ -14,9 +14,10 @@ Clinical Relevance:
 - Lower formant frequencies: Potential indicator of fatigue
 - F2 transition speed is measured separately for articulatory dynamics
 
-Note: This module currently extracts F1 frequencies using the eGeMAPS
-F2frequency field (which corresponds to the second formant in OpenSMILE).
-The naming is preserved for backward compatibility with existing mappings.
+Note: the formant_f1_* keys now genuinely contain FIRST-formant statistics
+(eGeMAPSv02 F1frequency_sma3nz). Historically this module filtered
+F2frequency_sma3nz while labeling the outputs F1 — any number published from
+the old code under an "F1" label was actually F2.
 """
 
 import numpy as np
@@ -34,7 +35,9 @@ def _extract_formant_series(features_LLD) -> np.ndarray:
     Returns:
         numpy array of formant frequency values
     """
-    formant_series = features_LLD.filter(like="F2frequency_sma3nz", axis=1)
+    # F1 = F1frequency_sma3nz. (F2 lives in F2frequency_sma3nz and is consumed separately
+    # by f2_transition_speed; it must NOT be relabeled as F1.)
+    formant_series = features_LLD.filter(like="F1frequency_sma3nz", axis=1)
 
     if formant_series.empty:
         return np.array([])
@@ -65,12 +68,14 @@ def get_formant_dynamic(features_LLD) -> dict:
     formant_series = _extract_formant_series(features_LLD)
 
     if len(formant_series) == 0:
+        # NaN = "not measurable" (no voiced frames); omitted by the service, not zeroed.
+        nan = float("nan")
         return {
-            "formant_f1_frequencies_mean": 0.0,
-            "formant_f1_std": 0.0,
-            "formant_f1_cv": 0.0,
-            "formant_f1_iqr": 0.0,
-            "formant_f1_entropy": 0.0,
+            "formant_f1_frequencies_mean": nan,
+            "formant_f1_std": nan,
+            "formant_f1_cv": nan,
+            "formant_f1_iqr": nan,
+            "formant_f1_entropy": nan,
         }
 
     return {
@@ -92,4 +97,4 @@ def get_formant_f1_frequencies(features_LLD):
     LEGACY: Use get_formant_dynamic() for new implementations.
     """
     formant_series = _extract_formant_series(features_LLD)
-    return float(np.mean(formant_series)) if len(formant_series) > 0 else 0.0
+    return float(np.mean(formant_series)) if len(formant_series) > 0 else float("nan")
