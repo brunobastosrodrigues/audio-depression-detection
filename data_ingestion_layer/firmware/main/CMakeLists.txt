@@ -19,6 +19,7 @@ set(SRCS
     "net/mqtt_client.c"
     "protocol/node_protocol.c"
     "features/edge_features.c"
+    "transport/mqtt_sender.c"
 )
 
 # Add XVF3800 driver for that board variant
@@ -43,6 +44,7 @@ set(INCLUDE_DIRS
     "net"
     "protocol"
     "features"
+    "transport"
 )
 
 # Register component with ESP-IDF build system
@@ -61,9 +63,11 @@ idf_component_register(
         esp_system
         # Plug-and-play edge-offload deps:
         mqtt                 # esp-mqtt (broker transport)
-        mdns                 # sink discovery (_iotsensing-mqtt._tcp)
-        wifi_provisioning    # SoftAP/BLE first-boot Wi-Fi setup
+        mdns                 # sink discovery (_iotsensing-mqtt._tcp); managed component
+                             # -> main/idf_component.yml pins espressif/mdns
+        esp_http_server      # provisioning captive portal
         json                 # cJSON (protocol payloads)
+        mbedtls              # base64 for segment payloads
         # esp-dsp is a managed component: add espressif/esp-dsp to idf_component.yml for
         # on-node feature extraction (features/edge_features.c).
 )
