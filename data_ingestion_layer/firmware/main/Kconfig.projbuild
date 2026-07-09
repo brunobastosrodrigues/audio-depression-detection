@@ -21,6 +21,63 @@ menu "IHearYou Firmware Configuration"
                 I2S Mode: Slave (XVF3800 is master)
     endchoice
 
+    choice TRANSPORT_MODE
+        prompt "Transport"
+        default TRANSPORT_MQTT_OFFLOAD
+        help
+            How captured speech leaves the node.
+
+        config TRANSPORT_MQTT_OFFLOAD
+            bool "Plug-and-play MQTT offload (mDNS discovery + capability negotiation)"
+            help
+                The plug-and-play path: provision once (or ride the default site SSID),
+                mDNS-discover the broker, advertise capabilities, receive an assignment,
+                publish VAD-gated segments (or features) over authenticated MQTT.
+
+        config TRANSPORT_LEGACY_TCP
+            bool "Legacy raw TCP to respeaker_service (compiled server IP)"
+            help
+                The original pipeline: stream VAD-gated PCM to SERVER_HOST:SERVER_PORT.
+    endchoice
+
+    menu "Plug-and-play Provisioning"
+        depends on TRANSPORT_MQTT_OFFLOAD
+
+        config DEFAULT_SITE_SSID
+            string "Default site SSID (zero-config)"
+            default "IHearYou-Net"
+            help
+                Factory-fresh nodes try this network BEFORE opening the setup portal.
+                Broadcast it from the site's central node (clinic AP) and boards need no
+                per-device configuration at all: power on -> join -> discover -> pending
+                approval in the dashboard.
+
+        config DEFAULT_SITE_PASS
+            string "Default site password"
+            default "ihearyou-setup"
+
+        config BOOTSTRAP_MQTT_USER
+            string "Bootstrap MQTT username"
+            default "node-bootstrap"
+            help
+                Low-privilege enrollment account: ACL-limited to nodes/{id}/capabilities,
+                nodes/{id}/status (pub) and nodes/{id}/config, nodes/{id}/provision (sub).
+                Per-node credentials are minted at dashboard approval (EDGE_TRUST_MODEL.md).
+
+        config BOOTSTRAP_MQTT_PASS
+            string "Bootstrap MQTT password"
+            default ""
+
+        config EDGE_FEATURE_SNR
+            bool "Advertise on-node SNR"
+            default y
+
+        config EDGE_FEATURE_SPECTRAL_FLATNESS
+            bool "Advertise on-node spectral flatness"
+            default y
+
+    endmenu
+
     menu "Network Configuration"
 
         config WIFI_SSID

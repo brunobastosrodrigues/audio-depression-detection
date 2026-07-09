@@ -35,6 +35,12 @@
 #include "drivers/xvf3800/xvf3800.h"
 #endif
 
+#if CONFIG_TRANSPORT_MQTT_OFFLOAD
+#include "app/offload_app.h"
+// Plug-and-play runtime state (provisioning, capabilities, live assignment).
+static app_ctx_t s_app_ctx;
+#endif
+
 static const char *TAG = "IHEARYOU";
 
 // =============================================================================
@@ -55,7 +61,9 @@ static EventGroupHandle_t s_app_event_group;
 
 static TaskHandle_t s_i2s_capture_task = NULL;
 static TaskHandle_t s_vad_task = NULL;
+#if !CONFIG_TRANSPORT_MQTT_OFFLOAD
 static TaskHandle_t s_tcp_sender_task = NULL;
+#endif
 #if BOARD_TYPE_XVF3800
 static TaskHandle_t s_dsp_control_task = NULL;
 #endif
@@ -219,6 +227,13 @@ void app_main(void)
     }
 #endif
 
+#if CONFIG_TRANSPORT_MQTT_OFFLOAD
+    // Plug-and-play path: offload_app owns Wi-Fi (NVS creds -> default site SSID ->
+    // captive portal), discovers the sink via mDNS, negotiates, and starts the MQTT
+    // segment sender once an assignment arrives. No compiled server IP, no TCP client.
+    ESP_LOGI(TAG, "Starting plug-and-play offload app...");
+    offload_app_start(&s_app_ctx);
+#else
     // Initialize WiFi
     ESP_LOGI(TAG, "Initializing WiFi...");
     wifi_manager_config_t wifi_config = {
@@ -258,6 +273,7 @@ void app_main(void)
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to start WiFi: %s", esp_err_to_name(ret));
     }
+#endif
 
     s_audio_state = AUDIO_STATE_RUNNING;
 
@@ -286,7 +302,9 @@ void app_main(void)
         TASK_CORE_AUDIO
     );
 
-    // TCP Sender Task (Core 0 - Network)
+#if !CONFIG_TRANSPORT_MQTT_OFFLOAD
+    // TCP Sender Task (Core 0 - Network). In offload mode the MQTT sender (started by
+    // offload_app once an assignment arrives) drains the speech queue instead.
     xTaskCreatePinnedToCore(
         tcp_sender_task,
         "tcp_sender",
@@ -296,6 +314,7 @@ void app_main(void)
         &s_tcp_sender_task,
         TASK_CORE_NETWORK
     );
+#endif
 
 #if BOARD_TYPE_XVF3800
     // DSP Control Task (Core 0 - Network)

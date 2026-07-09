@@ -20,6 +20,10 @@ typedef struct {
     char client_id[40];    // node_id
     char username[33];
     char password[65];
+    // Last-will: published (retained) by the broker if the node dies uncleanly, so the
+    // dashboard's online/stale view never shows a dead node as alive. Empty topic => no LWT.
+    char lwt_topic[64];
+    char lwt_payload[64];
     mqtt_msg_cb_t on_message;
     void *user;
 } mqtt_client_cfg_t;
