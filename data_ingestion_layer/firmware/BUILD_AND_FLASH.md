@@ -55,6 +55,38 @@ If flashing fails to start: hold BOOT, tap RST, release BOOT (manual download mo
 
 ## 2. Toolchain (ESP-IDF v5.1+)
 
+### Windows 11 (PowerShell) — the actual bring-up machine
+
+Use the official **ESP-IDF Windows Installer** (simplest; bundles Python, Git, toolchain,
+drivers): download `esp-idf-tools-setup` from
+https://dl.espressif.com/dl/esp-idf/ — pick **ESP-IDF v5.2.x**, select the **esp32s3**
+target when asked. It creates an **"ESP-IDF 5.2 PowerShell"** shortcut — do ALL work in
+that shell (it runs the equivalent of `export.sh` automatically).
+
+```powershell
+# in the "ESP-IDF PowerShell" window:
+cd C:\work
+git clone https://github.com/brunobastosrodrigues/audio-depression-detection.git
+cd audio-depression-detection\data_ingestion_layerirmware
+idf.py set-target esp32s3
+idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.lite" reconfigure
+idf.py menuconfig          # renders fine in Windows Terminal
+idf.py build
+idf.py -p COM5 flash monitor   # find the port in Device Manager -> Ports (COM & LPT)
+```
+
+Windows specifics:
+- **Serial port** is `COMx`, not `/dev/ttyACM0`. Plug the board in, check Device
+  Manager; if no port appears install the **CP210x** or **CH34x** VCP driver (depends on
+  the board's USB bridge; the installer offers both) — the ESP32-S3 native USB usually
+  enumerates as "USB Serial Device" with no extra driver.
+- Long-path errors during clone/build: `git config --system core.longpaths true` and
+  enable Windows long paths (`gpedit`/registry), or clone to a short path like `C:\w`.
+- Antivirus can slow/lock ninja builds — exclude the ESP-IDF and project folders.
+- The captive-portal test (§6) works from any phone; no Windows involvement.
+
+### Linux
+
 ```bash
 sudo apt install -y git wget flex bison gperf python3 python3-pip python3-venv \
     cmake ninja-build ccache libffi-dev libssl-dev dfu-util libusb-1.0-0
@@ -117,7 +149,17 @@ Likely first-build friction points (fix, don't redesign):
 
 ## 5. Server-side prerequisites (on the VM, 192.168.1.16)
 
-The stack lives in `~/audio-depression-detection` (docker compose). The node needs:
+> **STATUS 2026-07-09: ALL DONE — the server side is live and verified.** MQTT is
+> LAN-exposed on `192.168.1.16:1883` (auth enforced, anonymous rejected), the stack
+> (mqtt, mongodb, node_registry_service, voice_metrics, temporal, analysis) is up,
+> and avahi advertises `_iotsensing-mqtt._tcp` -> 192.168.1.16:1883 (IPv4, LAN
+> interface only). The full negotiate loop was verified end-to-end with a simulated
+> node: capabilities advert -> retained assignment `{"mode":"segments","vad_gated":true,...}`.
+> **For menuconfig, set Bootstrap MQTT username/password to `MQTT_USER`/`MQTT_PASS`
+> from `~/audio-depression-detection/.env` on the VM** (ssh rodrigues@192.168.1.16,
+> pw semsenha). Remaining human step: voice enrollment (item 5) once the dashboard runs.
+
+The stack lives in `~/audio-depression-detection` (docker compose). What was done:
 
 1. **Broker reachable from the LAN.** `docker-compose.yml` currently binds MQTT to
    `127.0.0.1:1883` (hardening PR #81). For node bring-up change the mosquitto port
