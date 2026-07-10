@@ -260,6 +260,37 @@ Server-side note: the server now also runs a speech gate before recognition (voi
 still waste radio/power and undermine the behavioral traces, so node calibration remains
 mandatory.
 
+## 6c. XVF ROOT CAUSE (supersedes 6b): over-gain saturation, not VAD threshold
+
+Spectral analysis of live XVF segments (2026-07-10, coordinator) overturned the initial
+"raise VAD threshold" hypothesis. The captured "noise" is NOT broadband room noise — it is
+**loud, near-clipping tonal content**:
+- peak amplitudes 28,957-30,478 of int16 max 32,767 -> the front end is **saturating**;
+- dominant tones ~50 Hz + harmonics (60/71/109 Hz) = **mains hum**, plus a 640 Hz device
+  tone and near-Nyquist artifacts;
+- 11-23% of spectral energy below 120 Hz.
+
+Cause: `board_config.h DIGITAL_GAIN_SHIFT 16` right-shifts the 32-bit I2S sample keeping the
+TOP 16 bits, where strongly-coupled mains hum dominates -> the int16 result clips ~30k and
+the energy VAD triggers continuously. The 2026-07-09 gain 0->16 change over-corrected: 0
+saturated at the LSB end (deaf VAD), 16 saturates at the MSB end (loud hum). Raising the
+VAD threshold (6b) cannot fix a signal clipping at 30,000 — it is necessary but not
+sufficient. **Do the following at the bench instead:**
+
+1. **Sweep DIGITAL_GAIN_SHIFT** (try 12, 13, 14) while watching silent-room peak amplitude
+   via the RAWDBG serial print: target silent-room peak well under clipping (< ~5,000) and
+   speech at 2-3 m reaching a healthy 5,000-15,000. Set the value that achieves both.
+2. **Add a high-pass filter (~80-100 Hz)** in the capture path (main.c, after the gain
+   shift, before VAD). Human speech energy is > 100 Hz; mains hum is 50 Hz + harmonics, so
+   an 80 Hz high-pass removes the dominant offender regardless of gain. This is the robust
+   fix; do it even if the gain sweep helps.
+3. Then apply the VAD-threshold calibration (6b) and the silent-room acceptance test.
+
+Server-side, the gate now rejects saturated/hum/tonal segments explicitly (peak>28k,
+sub-120Hz energy fraction, near-pure-tone), so un-reflashed nodes no longer poison the
+pipeline — but they still waste power/bandwidth and their behavioral traces are garbage,
+so the gain+high-pass fix remains required before the field test.
+
 ## 7. Troubleshooting
 
 | Symptom | Check |
