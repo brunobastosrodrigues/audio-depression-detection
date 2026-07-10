@@ -27,7 +27,7 @@ services:
       image: eclipse-mosquitto
       restart: unless-stopped
       ports:
-         - "127.0.0.1:1883:1883"
+         - "1883:1883"   # LAN-exposed for edge nodes (auth + ACLs enforced; 2026-07-09)
       volumes:
          - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
          - ./mosquitto.passwd:/mosquitto/config/passwd:ro
