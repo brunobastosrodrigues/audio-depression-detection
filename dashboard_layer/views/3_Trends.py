@@ -201,55 +201,63 @@ selected_indicators = st.multiselect(
 )
 
 if selected_indicators:
-    # Prepare data for stacked area chart
-    plot_df = filtered_df[["timestamp"] + selected_indicators].copy()
-    plot_df = plot_df.melt(
-        id_vars=["timestamp"], var_name="Indicator", value_name="Score"
-    )
-    plot_df["Indicator_Display"] = plot_df["Indicator"].map(
-        lambda x: INDICATOR_CLINICAL_NAMES.get(x, x)
-    )
+    n_days = filtered_df["timestamp"].nunique()
+    if n_days < 2:
+        st.info(
+            f"Trends need at least 2 days of data. "
+            f"This user has {n_days} day(s) so far; "
+            f"the chart will populate as more data is collected."
+        )
+    else:
+        # Prepare data for stacked area chart
+        plot_df = filtered_df[["timestamp"] + selected_indicators].copy()
+        plot_df = plot_df.melt(
+            id_vars=["timestamp"], var_name="Indicator", value_name="Score"
+        )
+        plot_df["Indicator_Display"] = plot_df["Indicator"].map(
+            lambda x: INDICATOR_CLINICAL_NAMES.get(x, x)
+        )
 
-    # Create color map
-    color_map = {
-        INDICATOR_CLINICAL_NAMES.get(k, k): INDICATOR_COLORS.get(k, COLORS["info"])
-        for k in selected_indicators
-    }
+        # Create color map
+        color_map = {
+            INDICATOR_CLINICAL_NAMES.get(k, k): INDICATOR_COLORS.get(k, COLORS["info"])
+            for k in selected_indicators
+        }
 
-    fig_area = px.area(
-        plot_df,
-        x="timestamp",
-        y="Score",
-        color="Indicator_Display",
-        color_discrete_map=color_map,
-        template="plotly_white",
-    )
+        fig_area = px.area(
+            plot_df,
+            x="timestamp",
+            y="Score",
+            color="Indicator_Display",
+            color_discrete_map=color_map,
+            template="plotly_white",
+        )
 
-    fig_area.update_layout(
-        height=400,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="left",
-            x=0,
-            title=None,
-        ),
-        hovermode="x unified",
-        xaxis_title="",
-        yaxis_title="Score",
-    )
+        fig_area.update_layout(
+            height=400,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0,
+                title=None,
+            ),
+            hovermode="x unified",
+            xaxis_title="",
+            yaxis_title="Score",
+        )
 
-    # Add threshold line
-    fig_area.add_hline(
-        y=0.5,
-        line_dash="dash",
-        line_color=COLORS["warning"],
-        annotation_text="Threshold",
-        annotation_position="right",
-    )
+        # Add threshold line
+        fig_area.add_hline(
+            y=0.5,
+            line_dash="dash",
+            line_color=COLORS["warning"],
+            annotation_text="Threshold",
+            annotation_position="right",
+        )
 
-    st.plotly_chart(fig_area, use_container_width=True)
+        st.plotly_chart(fig_area, use_container_width=True)
 
 st.divider()
 

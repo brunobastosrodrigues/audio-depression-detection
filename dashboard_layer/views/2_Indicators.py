@@ -224,36 +224,44 @@ if view_mode == "Summary":
         # --- TRENDS ---
         st.subheader("Trends Over Time")
 
-        # Use Plotly for better styling
-        trend_df = display_df.set_index("timestamp")[selected_indicators].reset_index()
-        trend_df = trend_df.melt(
-            id_vars=["timestamp"], var_name="Indicator", value_name="Score"
-        )
-        trend_df["Indicator"] = trend_df["Indicator"].map(
-            lambda x: INDICATOR_CLINICAL_NAMES.get(x, x)
-        )
+        n_days = display_df["timestamp"].nunique()
+        if n_days < 2:
+            st.info(
+                f"Trends need at least 2 days of data. "
+                f"This user has {n_days} day(s) so far; "
+                f"the chart will populate as more data is collected."
+            )
+        else:
+            # Use Plotly for better styling
+            trend_df = display_df.set_index("timestamp")[selected_indicators].reset_index()
+            trend_df = trend_df.melt(
+                id_vars=["timestamp"], var_name="Indicator", value_name="Score"
+            )
+            trend_df["Indicator"] = trend_df["Indicator"].map(
+                lambda x: INDICATOR_CLINICAL_NAMES.get(x, x)
+            )
 
-        fig_trend = px.line(
-            trend_df,
-            x="timestamp",
-            y="Score",
-            color="Indicator",
-            template="plotly_white",
-        )
-        fig_trend.update_layout(
-            height=400,
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-            hovermode="x unified",
-            xaxis_title="",
-            yaxis_title="Score",
-        )
-        fig_trend.add_hline(
-            y=0.5,
-            line_dash="dash",
-            line_color=COLORS["warning"],
-            annotation_text="Threshold",
-        )
-        st.plotly_chart(fig_trend, use_container_width=True)
+            fig_trend = px.line(
+                trend_df,
+                x="timestamp",
+                y="Score",
+                color="Indicator",
+                template="plotly_white",
+            )
+            fig_trend.update_layout(
+                height=400,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+                hovermode="x unified",
+                xaxis_title="",
+                yaxis_title="Score",
+            )
+            fig_trend.add_hline(
+                y=0.5,
+                line_dash="dash",
+                line_color=COLORS["warning"],
+                annotation_text="Threshold",
+            )
+            st.plotly_chart(fig_trend, use_container_width=True)
 
 # ============================================================================
 # CLINICAL ANALYSIS VIEW (Indicator-First Drill-Down)

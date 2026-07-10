@@ -56,7 +56,9 @@ class SunburstAdapter:
             if score is None: score = 0
 
             # Use specific threshold from config or default to 0.5
-            threshold = self.mapping_config.get(key, {}).get('severity_threshold', 0.5)
+            # Skip metadata keys whose values are not dicts (e.g. _comment, _version)
+            cfg_entry = self.mapping_config.get(key, {})
+            threshold = cfg_entry.get('severity_threshold', 0.5) if isinstance(cfg_entry, dict) else 0.5
 
             if score >= threshold:
                 active_count += 1
@@ -84,7 +86,10 @@ class SunburstAdapter:
         total_root_value = 0.0
 
         # Iterate through DSM-5 Indicators (Inner Ring)
+        # Skip metadata keys (string values or underscore-prefixed keys like _comment, _version)
         for ind_key, ind_details in self.mapping_config.items():
+            if not isinstance(ind_details, dict) or ind_key.startswith('_'):
+                continue
 
             # Prepare Label
             parts = ind_key.split('_', 1)
