@@ -23,11 +23,13 @@ from utils.theme import (
 from utils.DSM5Descriptions import DSM5Descriptions
 from utils.database import get_database, render_mode_selector, get_current_mode, load_indicator_scores
 from utils.user_selector import render_user_selector
+from utils.disclaimer import render_disclaimer
 
 apply_custom_css()
 
 st.title("Longitudinal Trends")
 st.markdown("Track how your patterns change over time and identify emerging trends.")
+render_disclaimer()
 
 # --- SIDEBAR ---
 # Mode selector MUST be called first to initialize session state
@@ -171,7 +173,7 @@ try:
                 """
                 - **Nodes (boxes)** represent the dominant symptom for each week
                 - **Links (flows)** show transitions between dominant symptoms
-                - **Colors**: 🔴 Red = MDD concern, 🟠 Orange = Specific symptom, 🟢 Green = No concerns
+                - **Colors**: 🔴 Red = Elevated patterns, 🟠 Orange = Specific signal, 🟢 Green = Within typical range
                 - **Width** of links indicates the strength/severity of the transition
 
                 Look for patterns like recurring symptoms or concerning transitions.

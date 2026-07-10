@@ -28,10 +28,12 @@ from utils.MetricExplainerAdapter import MetricExplainerAdapter
 from utils.DSM5Descriptions import DSM5Descriptions
 from utils.database import get_database, render_mode_selector, get_current_mode, load_indicator_scores
 from utils.user_selector import render_user_selector
+from utils.disclaimer import render_disclaimer
 
 apply_custom_css()
 
 st.title("DSM-5 Indicators")
+render_disclaimer()
 
 # --- SIDEBAR ---
 # Mode selector MUST be called first to initialize session state
@@ -58,8 +60,8 @@ if not selected_user:
 # --- VIEW MODE SELECTION ---
 view_mode = st.selectbox(
     "View Mode",
-    ["Summary", "Clinical Analysis", "Research Data"],
-    help="Summary: Quick overview | Clinical Analysis: Indicator drill-down | Research Data: Raw metrics",
+    ["Summary", "Pattern Analysis", "Research Data"],
+    help="Summary: Quick overview | Pattern Analysis: Indicator drill-down | Research Data: Raw metrics",
 )
 
 st.divider()
@@ -190,7 +192,7 @@ if view_mode == "Summary":
         st.divider()
 
         # --- SUNBURST ---
-        st.subheader("Clinical Status Hierarchy")
+        st.subheader("Speech Pattern Overview")
 
         try:
             config_path = get_config_path()
@@ -266,7 +268,7 @@ if view_mode == "Summary":
 # ============================================================================
 # CLINICAL ANALYSIS VIEW (Indicator-First Drill-Down)
 # ============================================================================
-elif view_mode == "Clinical Analysis":
+elif view_mode == "Pattern Analysis":
     st.subheader("Indicator Drill-Down")
     st.markdown(
         "Select an indicator to explore which acoustic features contribute to its score."
@@ -551,7 +553,7 @@ elif view_mode == "Clinical Analysis":
                                 f"{badge}{metric_info.get('name', metric_name)}"
                             ):
                                 st.markdown(f"**What it measures:** {metric_info.get('simple', 'N/A')}")
-                                st.markdown(f"**Clinical relevance:** {metric_info.get('clinical', 'N/A')}")
+                                st.markdown(f"**Acoustic relevance:** {metric_info.get('clinical', 'N/A')}")
 
                                 # Show direction meaning if available
                                 direction_meaning = metric_info.get("direction_meaning", {})

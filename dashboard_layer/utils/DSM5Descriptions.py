@@ -187,7 +187,7 @@ class DSM5Descriptions:
                 "Research has identified specific acoustic patterns associated with "
                 "suicidal ideation, including changes in spectral characteristics "
                 "and voiced segment patterns. These features require careful "
-                "interpretation and clinical validation."
+                "interpretation and research validation."
             ),
             "is_core": False,
             "is_sensitive": True,
@@ -260,24 +260,24 @@ class DSM5Descriptions:
         """Get explanation of MDD status based on active symptoms."""
         if active_count >= 5 and has_core:
             return (
-                f"**{active_count} symptoms active** including a core symptom. "
-                "This pattern meets the symptom count threshold for Major Depressive "
-                "Disorder according to DSM-5 criteria. Professional evaluation is recommended."
+                f"**{active_count} indicators elevated** including a core speech-pattern indicator. "
+                "This pattern shows elevated acoustic signals across multiple research dimensions. "
+                "This is a research pattern flag, not a diagnosis — only a licensed clinician can interpret these signals."
             )
         elif active_count >= 5:
             return (
-                f"**{active_count} symptoms active** but no core symptom (depressed mood or "
-                "loss of interest). While the symptom count is elevated, the full DSM-5 "
-                "criteria for MDD are not met. Continued monitoring is recommended."
+                f"**{active_count} indicators elevated** but no core speech-pattern indicator (depressed mood or "
+                "loss of interest). Acoustic signals are elevated in several dimensions. "
+                "Continued monitoring is recommended (research signal, not a diagnosis)."
             )
         elif active_count >= 3:
             return (
-                f"**{active_count} symptoms active**. This is below the MDD threshold but "
-                "warrants monitoring. Consider completing a PHQ-9 assessment for more context."
+                f"**{active_count} indicators elevated**. Some acoustic signals are above typical range. "
+                "Consider completing a PHQ-9 self-report for additional context (research signal, not a diagnosis)."
             )
         else:
             return (
-                f"**{active_count} symptoms active**. Current patterns are within normal "
+                f"**{active_count} indicators elevated**. Current acoustic patterns are within typical "
                 "range. Continue regular monitoring to track any changes over time."
             )
 
@@ -305,7 +305,7 @@ class DSM5Descriptions:
         if info.get("is_core"):
             parts.extend([
                 "",
-                "*This is a core symptom required for MDD diagnosis.*"
+                "*This is a core indicator associated with depressive behavioral patterns in research.*"
             ])
 
         return "\n".join(parts)

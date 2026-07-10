@@ -20,7 +20,7 @@ class SankeyAdapter:
             self.mapping_config = json.load(f)
 
     def _get_pretty_name(self, key):
-        if key == "mdd_support": return "MDD Support"
+        if key == "mdd_support": return "Elevated Patterns"
         if key == "no_support": return "Monitoring" # Or "Healthy"
 
         parts = key.split('_', 1)

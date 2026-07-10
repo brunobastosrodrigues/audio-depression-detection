@@ -66,13 +66,13 @@ class SunburstAdapter:
                     core_symptom_active = True
 
         if active_count >= 5 and core_symptom_active:
-            center_label = "<b>MDD<br>SUPPORT</b>"
+            center_label = "<b>ELEVATED<br>PATTERNS</b>"
             center_color = COLORS["danger"]
         elif active_count > 0:
-            center_label = "<b>MONITORING</b>"
+            center_label = "<b>SOME ELEVATED<br>SIGNALS</b>"
             center_color = COLORS["warning"]
         else:
-            center_label = "<b>NO<br>SUPPORT</b>"
+            center_label = "<b>WITHIN TYPICAL<br>RANGE</b>"
             center_color = COLORS["success"]
 
         # --- 3. Build Plotly Lists ---

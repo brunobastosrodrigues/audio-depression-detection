@@ -8,6 +8,7 @@ from datetime import datetime, timezone, timedelta
 from utils.refresh_procedure import refresh_procedure
 from utils.database import get_client, get_database, render_mode_selector, get_current_mode, MODE_CONFIG
 from utils.user_selector import render_user_selector, get_user_display_name, load_users_with_status
+from utils.disclaimer import render_disclaimer
 
 # --- SIDEBAR ---
 # Mode selector MUST be called first to initialize session state with default mode.
@@ -22,6 +23,7 @@ selected_user = render_user_selector()
 # --- HEADER ---
 st.title("IHearYou")
 st.markdown("### Linking Acoustic Speech Features with Major Depressive Disorder Symptoms")
+render_disclaimer()
 
 
 # --- FLEET AT A GLANCE (operator-first) ---
@@ -138,7 +140,7 @@ if current_mode == "live":
             st.markdown(
                 f"""
                 <div style="padding: 1rem; background: {attention_color}15; border-radius: 8px; border-left: 4px solid {attention_color};">
-                    <div style="color: #7F8C8D; font-size: 0.9rem;">Needs Attention</div>
+                    <div style="color: #7F8C8D; font-size: 0.9rem;">Elevated patterns</div>
                     <div style="font-size: 1.5rem; font-weight: 600; color: {attention_color};">{user_statuses["attention"]}</div>
                 </div>
                 """,
@@ -148,7 +150,7 @@ if current_mode == "live":
             st.markdown(
                 f"""
                 <div style="padding: 1rem; background: #F39C1215; border-radius: 8px; border-left: 4px solid #F39C12;">
-                    <div style="color: #7F8C8D; font-size: 0.9rem;">Monitoring</div>
+                    <div style="color: #7F8C8D; font-size: 0.9rem;">Some elevated signals</div>
                     <div style="font-size: 1.5rem; font-weight: 600; color: #F39C12;">{user_statuses["monitoring"]}</div>
                 </div>
                 """,
@@ -158,7 +160,7 @@ if current_mode == "live":
             st.markdown(
                 f"""
                 <div style="padding: 1rem; background: #27AE6015; border-radius: 8px; border-left: 4px solid #27AE60;">
-                    <div style="color: #7F8C8D; font-size: 0.9rem;">Normal</div>
+                    <div style="color: #7F8C8D; font-size: 0.9rem;">Within typical range</div>
                     <div style="font-size: 1.5rem; font-weight: 600; color: #27AE60;">{user_statuses["normal"]}</div>
                 </div>
                 """,
@@ -171,7 +173,7 @@ if current_mode == "live":
 # In Dataset mode, show the loaded dataset participants
 elif current_mode == "dataset":
     st.markdown("### DAIC-WOZ Participants")
-    st.markdown("Each participant in the clinical dataset is analyzed as a 'user'. Select one from the sidebar.")
+    st.markdown("Each participant in the research dataset is analyzed as a 'user'. Select one from the sidebar.")
 
     participant_ids = set()
     for col_name in ["raw_metrics", "indicator_scores", "analyzed_metrics"]:
@@ -189,13 +191,13 @@ elif current_mode == "dataset":
             **Dataset Mode** analyzes a pre-loaded research dataset using the same
             visualization and analysis tools as live monitoring.
 
-            **Current Dataset — DAIC-WOZ:** clinical interviews with PHQ-8 scores. Each
+            **Current Dataset — DAIC-WOZ:** research interviews with PHQ-8 scores. Each
             participant is treated as a separate user; select one from the sidebar to view
             their indicator scores and trends.
 
             **Limitations:**
             - PHQ-9 self-report submission is not applicable in this mode
-            - Results should be interpreted as research validation, not clinical diagnosis
+            - Results should be interpreted as research validation, not a diagnosis
             """
         )
 
@@ -218,13 +220,13 @@ if selected_user:
         )
 
         if active_count >= 5 and has_core:
-            status = "Needs Attention"
+            status = "Elevated patterns"
             status_color = "#E74C3C"
         elif active_count >= 3:
-            status = "Monitoring"
+            status = "Some elevated signals"
             status_color = "#F39C12"
         else:
-            status = "Normal"
+            status = "Within typical range"
             status_color = "#27AE60"
 
         if current_mode == "live":
@@ -288,8 +290,8 @@ with st.expander("About This Project", expanded=False):
 
         Using passive sensing techniques, the system focuses on the detection of potential depressive
         behavior to allow timely intervention. By constructing a direct mapping between behavioral
-        patterns and observable clinical symptoms, users can gain insight into their mental health
-        state, helping to overcome the limitations of traditional methods.
+        patterns and observable behavioral indicators, users can gain insight into their speech patterns,
+        helping to overcome the limitations of traditional methods.
         """
     )
     st.image("assets/conceptual_idea.png", caption="Conceptual project idea.")

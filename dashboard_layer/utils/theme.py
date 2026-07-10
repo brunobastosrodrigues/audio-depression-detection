@@ -133,10 +133,10 @@ def get_mdd_status(active_count: int, has_core_symptom: bool) -> tuple[str, str]
         Tuple of (status_label, color)
     """
     if active_count >= 5 and has_core_symptom:
-        return "MDD Support", COLORS["danger"]
+        return "Elevated patterns", COLORS["danger"]
     elif active_count >= 3:
-        return "Monitoring", COLORS["warning"]
-    return "No Concerns", COLORS["success"]
+        return "Some elevated signals", COLORS["warning"]
+    return "Within typical range", COLORS["success"]
 
 
 def format_indicator_key(key: str) -> str:
