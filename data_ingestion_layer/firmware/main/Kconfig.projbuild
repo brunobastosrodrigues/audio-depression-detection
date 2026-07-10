@@ -138,7 +138,13 @@ menu "IHearYou Firmware Configuration"
         config VAD_THRESHOLD
             int "VAD Energy Threshold"
             default 150 if BOARD_RESPEAKER_LITE
-            default 80 if BOARD_RESPEAKER_XVF3800
+            # 80 was calibrated for the pre-gain-fix XVF3800 (digital gain 0). With the
+            # 2026-07-09 gain fix (shift 16) the amplified noise floor sits ABOVE 80, so
+            # the VAD self-triggers continuously (~1200 false segments/hour measured in a
+            # sleeping house, 27k noise segments in 18h). 400 is a deliberate over-correction
+            # starting point; CALIBRATE per BUILD_AND_FLASH.md §"XVF VAD calibration" —
+            # acceptance: a silent room must produce ~0 segments/hour.
+            default 400 if BOARD_RESPEAKER_XVF3800
             range 10 1000
             help
                 Energy threshold for voice activity detection.

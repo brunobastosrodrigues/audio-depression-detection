@@ -235,6 +235,31 @@ mosquitto_sub -h localhost -u "$MQTT_USER" -P "$MQTT_PASS" -t 'voice/#' -v | hea
 Button checks: short press → status shows `"muted":true` (and voice/# goes quiet);
 double press → one message on `nodes/{id}/marker`; hold 5 s → reboots into the portal.
 
+## 6b. XVF VAD calibration (MANDATORY before any deployment — field-test blocker)
+
+Symptom found in the 2026-07-10 overnight pilot: XVF3800 boards published ~1200 false
+"speech" segments/hour around the clock (bedroom board at 3 AM while the occupant slept;
+27k noise segments in 18h fleet-wide). Cause: the VAD energy threshold (80) was tuned for
+the pre-gain-fix silicon; after the digital-gain fix (0→16) the amplified noise floor sits
+above it, so the energy VAD triggers on silence.
+
+Procedure (per board variant, once):
+1. Build with the new default (`VAD_THRESHOLD=400` for XVF) and flash one XVF board.
+2. Put it in a QUIET room, nobody speaking, 15 minutes. Watch the broker:
+   `mosquitto_sub -t 'voice/#'` filtered to that board — **acceptance: ~0 segments in
+   15 min** (occasional one on a door slam is fine).
+3. Speak at 2–3 m at normal volume — segments MUST appear within a sentence. If not,
+   the threshold overshot: halve it and repeat. If silence still streams, raise by 50%.
+4. The RAWDBG serial prints (if still compiled in) show per-chunk energy — the ideal
+   threshold is ≈3× the observed silent-room energy.
+5. Record the final value in this file. Lite boards (threshold 150, no gain change) were
+   NOT affected — do not touch them.
+
+Server-side note: the server now also runs a speech gate before recognition (voice_metrics
+`VAD_GATE` log lines), so miscalibrated nodes can no longer poison the pipeline — but they
+still waste radio/power and undermine the behavioral traces, so node calibration remains
+mandatory.
+
 ## 7. Troubleshooting
 
 | Symptom | Check |
