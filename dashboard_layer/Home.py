@@ -36,10 +36,11 @@ pages = {
         st.Page("views/00_Home.py", title="Home", icon="🏠", default=True),
     ],
     "My Wellbeing": [
-        st.Page("views/1_Overview.py",    title="Overview",    icon="💚"),
-        st.Page("views/2_Indicators.py",  title="Indicators",  icon="📊"),
-        st.Page("views/3_Trends.py",      title="Trends",      icon="📈"),
-        st.Page("views/4_Self_Report.py", title="Self-Report", icon="📝"),
+        st.Page("views/1_Overview.py",       title="Overview",       icon="💚"),
+        st.Page("views/2_Indicators.py",     title="Indicators",     icon="📊"),
+        st.Page("views/3_Trends.py",         title="Trends",         icon="📈"),
+        st.Page("views/4_Self_Report.py",    title="Self-Report",    icon="📝"),
+        st.Page("views/13_Daily_Checkin.py", title="Daily Check-in", icon="📆"),
     ],
     "Fleet": [
         st.Page("views/12_Fleet_Health.py", title="Fleet Health",   icon="🩺"),
