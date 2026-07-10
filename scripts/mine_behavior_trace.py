@@ -187,7 +187,7 @@ def main():
     # Build Mongo URI from env
     user = os.environ.get("MONGO_USER", "iotsensing")
     password = os.environ.get("MONGO_PASS", "")
-    host = os.environ.get("MONGO_HOST", "mongodb")
+    host = os.environ.get("MONGO_HOST", "127.0.0.1")
     port = int(os.environ.get("MONGO_PORT", "27017"))
     mongo_uri = f"mongodb://{user}:{password}@{host}:{port}/"
 
