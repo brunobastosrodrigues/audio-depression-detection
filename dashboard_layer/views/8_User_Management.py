@@ -328,11 +328,12 @@ These take the shape of a long round arch, with its path high above."""
                     col_rec, col_preview = st.columns([1, 2])
 
                     with col_rec:
-                        if st.button("🎙️ Record (15 sec)", type="primary", key="cal_record_btn"):
+                        st.caption("Read continuously at a natural distance from the board (~1–2 m), not up against it.")
+                        if st.button("🎙️ Record (60 sec)", type="primary", key="cal_record_btn"):
                             if BOARD_RECORDER_AVAILABLE and BoardRecorder:
                                 recorder = BoardRecorder()
-                                with st.spinner("Recording... Please read now!"):
-                                    audio_data = recorder.start_recording(cal_selected_board, duration=15)
+                                with st.spinner("Recording for 60s... read aloud continuously now!"):
+                                    audio_data = recorder.start_recording(cal_selected_board, duration=60)
 
                                 if audio_data is not None and len(audio_data) > 0:
                                     st.session_state["calibration_audio_data"] = audio_data
@@ -504,11 +505,12 @@ a boiling pot of gold at one end. People look, but no one ever finds it."""
             with col_a:
                 duration = st.select_slider(
                     "Duration",
-                    options=[15, 20, 30],
-                    value=20,
+                    options=[30, 60, 90, 120],
+                    value=60,
                     format_func=lambda x: f"{x} sec"
                 )
-                
+                st.caption("Read continuously at a natural distance (~1–2 m). Longer + varied speech = far more reliable recognition.")
+
                 if st.button("🎙️ Start Recording", type="primary", use_container_width=True):
                     recorder = BoardRecorder()
                     with st.spinner(f"Recording for {duration} seconds... Please read now!"):

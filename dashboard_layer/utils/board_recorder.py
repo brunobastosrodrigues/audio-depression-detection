@@ -6,17 +6,31 @@ import queue
 import time
 import json
 import base64
+import io
+import wave
 import numpy as np
 import paho.mqtt.client as mqtt
 
-# Try to find audio_utils or re-implement necessary parts
-try:
-    from framework.audio_utils import decode_base64_audio
-except ImportError:
-    # Minimal fallback
-    def decode_base64_audio(b64_string, dtype=np.int16):
-        audio_bytes = base64.b64decode(b64_string)
-        return np.frombuffer(audio_bytes, dtype=dtype)
+
+def segment_to_pcm(b64_string):
+    """Decode one voice segment (base64) to int16 PCM samples.
+
+    Node segments are WAV (RIFF header) since the firmware WAV change. The header MUST
+    be stripped: reading the 44-byte RIFF header as int16 samples injected ~22 samples
+    of garbage at every segment boundary into the enrollment audio, degrading the
+    speaker embedding. Parse the WAV and take only the data chunk. Falls back to raw
+    int16 for any legacy headerless (non-RIFF) payload.
+    """
+    audio_bytes = base64.b64decode(b64_string)
+    if audio_bytes[:4] == b"RIFF":
+        try:
+            with wave.open(io.BytesIO(audio_bytes), "rb") as w:
+                frames = w.readframes(w.getnframes())
+            return np.frombuffer(frames, dtype=np.int16)
+        except Exception:
+            # Malformed WAV: skip the standard 44-byte header defensively.
+            return np.frombuffer(audio_bytes[44:], dtype=np.int16)
+    return np.frombuffer(audio_bytes, dtype=np.int16)
 
 class BoardRecorder:
     def __init__(self, broker_address="mqtt", broker_port=1883):
@@ -55,9 +69,10 @@ class BoardRecorder:
 
                 payload = json.loads(msg.payload.decode())
                 if 'data' in payload:
-                    # Decode audio
-                    audio_data = decode_base64_audio(payload['data'])
-                    self.audio_queue.put(audio_data)
+                    # Strip the WAV header; keep only PCM samples.
+                    audio_data = segment_to_pcm(payload['data'])
+                    if audio_data.size:
+                        self.audio_queue.put(audio_data)
         except Exception as e:
             print(f"Error processing message: {e}")
 
