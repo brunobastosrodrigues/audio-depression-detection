@@ -2,6 +2,8 @@ import time
 import os
 import csv
 
+from core.vad_gate import check as _vad_gate_check
+
 
 class ComputeMetricsUseCase:
     def __init__(self, user_profiling, persistence, metrics_computation_service,
@@ -33,6 +35,13 @@ class ComputeMetricsUseCase:
             enrolled_mode = self.enrollment.get_mode(metadata.get("board_id"))
             if enrolled_mode:
                 metadata["system_mode"] = enrolled_mode
+
+        # SERVER-SIDE SPEECH GATE: drop noise-only segments before the
+        # expensive recognition HTTP call (VAD_GATE_MIN_SPEECH, default 0.30).
+        # Fail-open: gate errors let the segment through (logged as GATE_ERROR).
+        should_pass, _ = _vad_gate_check(audio_bytes, board_id=metadata.get("board_id"))
+        if not should_pass:
+            return
 
         # Use user_id from metadata if provided, otherwise recognize from audio
         if metadata.get("user_id"):
