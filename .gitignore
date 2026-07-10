@@ -40,3 +40,4 @@ GEMINI.md
 .env
 mosquitto.passwd
 mosquitto.acl
+docs/paper/
