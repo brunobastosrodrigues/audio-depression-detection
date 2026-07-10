@@ -1,7 +1,10 @@
+import logging
 import numpy as np
 from resemblyzer import VoiceEncoder, preprocess_wav
 from audio_utils import wav_bytes_to_np_float32
 from ports.UserRepositoryPort import UserRepositoryPort
+
+logger = logging.getLogger(__name__)
 
 
 def _cosine(a, b) -> float:
@@ -41,22 +44,37 @@ class UserRecognitionAudioUseCase:
         )
 
         # Compare against known profiles
-        matched_user = self._match_user(query_embedding)
+        best_user, best_sim = self._match_user(query_embedding)
 
-        if matched_user:
-            # OPTIONAL: Adaptive learning could go here
-            # For now, we just recognize the user
-            print(f"User {matched_user} recognized.")
-            return {"status": "recognized", "user_id": matched_user}
+        verdict = "accept" if best_user is not None else "reject"
+        log_msg = (
+            f"RECOGNITION_DECISION candidate={best_user} "
+            f"best_sim={best_sim:.4f} threshold={self.similarity_threshold:.4f} "
+            f"verdict={verdict}"
+        )
+        print(log_msg)
+        logger.info(log_msg)
+
+        if best_user is not None:
+            return {
+                "status": "recognized",
+                "user_id": best_user,
+                "best_similarity": round(best_sim, 4),
+                "threshold": self.similarity_threshold,
+            }
         else:
-            # CRITICAL CHANGE: Do NOT create new users.
-            # Return None to signal "Ignore this audio"
-            print("Unknown speaker detected. Ignoring.")
-            return None
+            return {
+                "status": "rejected",
+                "user_id": None,
+                "best_similarity": round(best_sim, 4),
+                "threshold": self.similarity_threshold,
+            }
 
     def _match_user(self, embedding):
         """
-        Finds the user with the maximum similarity score that exceeds the threshold.
+        Finds the user with the maximum similarity score.
+        Returns (best_user_id_or_None, best_similarity_score).
+        best_user_id is None when best_similarity < threshold.
         """
         best_user = None
         max_similarity = -1.0
@@ -74,11 +92,11 @@ class UserRecognitionAudioUseCase:
                 max_similarity = user_max_sim
                 best_user = user_id
 
-        # Strict verification: only return if the best match is above threshold
+        # Strict verification: only return user if the best match is above threshold
         if max_similarity >= self.similarity_threshold:
-            return best_user
+            return best_user, max_similarity
 
-        return None
+        return None, max_similarity
 
     def _max_similarity(self, embedding, embeddings):
         sims = [_cosine(embedding, e) for e in embeddings]
