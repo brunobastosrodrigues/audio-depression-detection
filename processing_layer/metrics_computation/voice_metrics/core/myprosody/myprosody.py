@@ -628,15 +628,14 @@ def mysplev(m, p):
     based on Machine Learning models of the prosodic features of your speech
     """
     import sys
+    import warnings
+    import logging
 
     def my_except_hook(exctype, value, traceback):
-        print("There has been an error in the system")
+        logging.error("Unhandled exception occurred", exc_info=(exctype, value, traceback))
 
     sys.excepthook = my_except_hook
-    import warnings
 
-    if not sys.warnoptions:
-        warnings.simplefilter("ignore")
     sound = os.path.join(p, "dataset", "audioFiles", f"{m}.wav")
     sourcerun = os.path.join(p, "dataset", "essen", "MLTRNL.praat")
     path = os.path.join(p, "dataset", "audioFiles", "")
@@ -649,9 +648,10 @@ def mysplev(m, p):
     files = glob.glob(ph)
     result_array = np.empty((0, 27))
     try:
-        for soundi in files:
-            objects = run_file(
-                sourcerun,
+        with warnings.catch_warnings(record=True) as w:
+            for soundi in files:
+                objects = run_file(
+                    sourcerun,
                 -20,
                 2,
                 0.3,
@@ -823,5 +823,10 @@ def mysplev(m, p):
         if model:
             predictions = model.predict(x)
             print("63% accuracy    ", predictions)
+
+        if w:
+            for warning_message in w:
+                logging.warning(warning_message.message)
+
     except Exception as e:
         print(f"Try again the sound of the audio was not clear. Error: {e}")
